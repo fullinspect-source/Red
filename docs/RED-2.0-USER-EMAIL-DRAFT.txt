@@ -1,5 +1,3 @@
-Subject: RED 2.0 is ready — faster field workflow + easier tablet controls
-
 Hi everyone,
 
 RED 2.0 is the next major RED update. It is a big UI and workflow upgrade built around faster field inspection work, especially on Surface/tablet screens.
