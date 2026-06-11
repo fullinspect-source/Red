@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Red</AssemblyName>
+    <RootNamespace>InspectionEditor</RootNamespace>
+    <Platforms>x64;x86;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationIcon>red2_dev.ico</ApplicationIcon>
+    <Version>2.0.0</Version>
+    <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
+    <Company>Full Inspection Services</Company>
+    <Product>RED 2.0</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="QRCoder" Version="1.4.3" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
+    <PackageReference Include="Docnet.Core" Version="2.6.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+  </ItemGroup>
+
+  <!-- Include settings file with API key pre-configured -->
+  <ItemGroup>
+    <None Update="settings.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+  </ItemGroup>
+
+  <!-- Include quick comments for all team members (flatten to root) -->
+  <ItemGroup>
+    <Content Include="data\quick_comments.json">
+      <Link>quick_comments.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <!-- Include inspector stats for deviation indicators (flatten to root) -->
+  <ItemGroup>
+    <Content Include="data\inspector_stats.json">
+      <Link>inspector_stats.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <!-- Include inspection type rules/config (flatten to root) -->
+  <ItemGroup>
+    <Content Include="data\inspection_types.csv">
+      <Link>inspection_types.csv</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <!-- Embed help PDF inside the exe so all users have it automatically -->
+  <ItemGroup>
+    <EmbeddedResource Include="RedHelp.pdf"/>
+  </ItemGroup>
+
+  <!--
+    Tesseract OCR data — required for FD plan extraction.
+    To set up: create a tessdata/ folder here and place eng.traineddata in it.
+    Download from: https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
+  -->
+  <ItemGroup>
+    <Content Include="tessdata\**\*" Condition="Exists('tessdata')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+</Project>

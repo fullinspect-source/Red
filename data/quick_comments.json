@@ -1,0 +1,3267 @@
+{
+  "generated": "2026-05-02T22:00:41.183331",
+  "version": "1.0",
+  "min_usage": 2,
+  "items": {
+    "AFI|5.1": [
+      {
+        "text": "[hvac] Test static pressure for return and supply separately due to dead battery.",
+        "count": 2
+      }
+    ],
+    "AFI|6.1": [
+      {
+        "text": "[builder] See 6.2.",
+        "count": 2
+      }
+    ],
+    "AFI|6.2": [
+      {
+        "text": "[insulation] Install attic insulation. Final failed due to no attic insulation.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Repair room to room pressure failure from testing.",
+        "count": 2
+      }
+    ],
+    "BC|10.7": [
+      {
+        "text": "[builder] Install emergency sticker at sink cabinet door.",
+        "count": 2
+      }
+    ],
+    "BC|12.8": [
+      {
+        "text": "[electrician] Program and sync clocks in kitchen.",
+        "count": 2
+      }
+    ],
+    "BC|19.1": [
+      {
+        "text": "[framer] Hide base joint at door.",
+        "count": 2
+      }
+    ],
+    "BC|2.1": [
+      {
+        "text": "[painter] Paint exposed lintel ends.",
+        "count": 2
+      }
+    ],
+    "BC|2.15": [
+      {
+        "text": "[painter] Perform paint touchups as needed.",
+        "count": 2
+      }
+    ],
+    "BC|2.2": [
+      {
+        "text": "[concrete] Power wash flatwork.",
+        "count": 2
+      }
+    ],
+    "BC|2.5": [
+      {
+        "text": "[concrete] Clean flatwork.",
+        "count": 3
+      },
+      {
+        "text": "[concrete] Power wash and sweep driveway as needed.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Power wash driveway.",
+        "count": 2
+      }
+    ],
+    "BC|22.1": [
+      {
+        "text": "[cabinet] Install mirror.",
+        "count": 2
+      }
+    ],
+    "BC|22.6": [
+      {
+        "text": "[cabinet] Install vanity mirrors.",
+        "count": 2
+      }
+    ],
+    "BC|24.1": [
+      {
+        "text": "[cabinet] Install missing mirror.",
+        "count": 3
+      }
+    ],
+    "BC|24.6": [
+      {
+        "text": "[cabinet] Install vanity mirror.",
+        "count": 2
+      }
+    ],
+    "BC|5.1": [
+      {
+        "text": "[mason] Power wash patio.",
+        "count": 3
+      }
+    ],
+    "BC|6.1": [
+      {
+        "text": "[builder] Clean out garage and sweep debris.",
+        "count": 3
+      },
+      {
+        "text": "[builder] Clean out garage and sweep debris.",
+        "count": 2
+      },
+      {
+        "text": "[builder] Clean out garage and sweep debris.",
+        "count": 2
+      }
+    ],
+    "BC|6.2": [
+      {
+        "text": "[electrician] Clean service panel.",
+        "count": 2
+      }
+    ],
+    "BC|6.4": [
+      {
+        "text": "[concrete] Patch garage stem wall.",
+        "count": 2
+      }
+    ],
+    "BC|7.1": [
+      {
+        "text": "[flooring] Clean floors throughout.",
+        "count": 2
+      }
+    ],
+    "BC|7.2": [
+      {
+        "text": "[painter] Repair touchups at front door.",
+        "count": 2
+      }
+    ],
+    "BC|9.1": [
+      {
+        "text": "[window] Clean door glass.",
+        "count": 2
+      }
+    ],
+    "BF|1.19": [
+      {
+        "text": "[builder] Install warranty sticker at 2.22.",
+        "count": 3
+      },
+      {
+        "text": "[electrician] Lower ground rod to full depth at 5.1.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Foam seal attic pulldown roof at 2.5.",
+        "count": 2
+      }
+    ],
+    "BF|2.1": [
+      {
+        "text": "[builder] install warranty sticker",
+        "count": 2
+      },
+      {
+        "text": "[builder] Install warranty sticker.",
+        "count": 2
+      }
+    ],
+    "BF|2.12": [
+      {
+        "text": "[framer] Raw wood sole plate and sheathing exposed less than 8 inches from grade at entry.",
+        "count": 3
+      }
+    ],
+    "BF|2.14": [
+      {
+        "text": "[painter] Paint steel lintels.",
+        "count": 3
+      },
+      {
+        "text": "[roofer] Install Z-flashing at rear door per Billie at shed roofs.",
+        "count": 3
+      },
+      {
+        "text": "[painter] Paint flashing.",
+        "count": 2
+      }
+    ],
+    "BF|2.15": [
+      {
+        "text": "[roofer] Repair damaged soffit at front right.",
+        "count": 2
+      }
+    ],
+    "BF|2.16": [
+      {
+        "text": "[painter] Paint PVC plumbing caps.",
+        "count": 4
+      },
+      {
+        "text": "[painter] Paint vent pipes throughout home.",
+        "count": 2
+      },
+      {
+        "text": "[painter] Paint all vent pipes above boots.",
+        "count": 2
+      }
+    ],
+    "BF|2.2": [
+      {
+        "text": "[window] Reglaze broken window.",
+        "count": 2
+      }
+    ],
+    "BF|2.21": [
+      {
+        "text": "[hvac] Caulk water heater exhaust penetration.",
+        "count": 9
+      },
+      {
+        "text": "[siding] Seal penetration.",
+        "count": 3
+      },
+      {
+        "text": "[siding] Caulk all expansion joints, windows, and penetrations.",
+        "count": 2
+      }
+    ],
+    "BF|2.22": [
+      {
+        "text": "[builder] Install warranty sticker.",
+        "count": 13
+      },
+      {
+        "text": "[pest] Verify pest treatment spray completed at BMEP Rough.",
+        "count": 6
+      },
+      {
+        "text": "[builder] Install self-closing hinges at garage door to fully close.",
+        "count": 3
+      }
+    ],
+    "BF|2.23": [
+      {
+        "text": "[builder] Install warranty sticker.",
+        "count": 12
+      },
+      {
+        "text": "[painter] Caulk expansion joints.",
+        "count": 2
+      },
+      {
+        "text": "[painter] Paint steel lintels.",
+        "count": 2
+      }
+    ],
+    "BF|2.3": [
+      {
+        "text": "[painter] Caulk thresholds.",
+        "count": 7
+      },
+      {
+        "text": "[siding] Install weatherstripping at exterior doors.",
+        "count": 6
+      },
+      {
+        "text": "[insulation] Foam seal attic rough opening.",
+        "count": 4
+      }
+    ],
+    "BF|2.4": [
+      {
+        "text": "[builder] Clear attic walkway.",
+        "count": 8
+      },
+      {
+        "text": "[builder] Remove construction materials and wires from catwalk path and workspace.",
+        "count": 2
+      }
+    ],
+    "BF|2.5": [
+      {
+        "text": "[insulation] Groom and fill insulation to confirm R-value per details.",
+        "count": 2
+      }
+    ],
+    "BF|2.6": [
+      {
+        "text": "[framer] Activate self-closing hinges at garage door (must latch closed).",
+        "count": 6
+      },
+      {
+        "text": "[framer] Repair back door deadbolt to fully engage.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install deadbolt at rear door.",
+        "count": 2
+      }
+    ],
+    "BF|2.7": [
+      {
+        "text": "[landscaping] Cannot inspect grade until landscape is complete.",
+        "count": 3
+      },
+      {
+        "text": "[concrete] Provide 6\" minimum slab exposure at siding at rear.",
+        "count": 2
+      },
+      {
+        "text": "[builder] Repair sink hole at left.",
+        "count": 2
+      }
+    ],
+    "BF|2.8": [
+      {
+        "text": "[mason] Caulk expansion joints.",
+        "count": 10
+      }
+    ],
+    "BF|3.1": [
+      {
+        "text": "[hvac] Verify gas supply to furnace at reinspection.",
+        "count": 3
+      },
+      {
+        "text": "[hvac] Plug in fresh air intake.",
+        "count": 2
+      }
+    ],
+    "BF|3.3": [
+      {
+        "text": "[hvac] Investigate loose fiberglass in duct (downstairs, front) for possible damage or leak.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Connect range duct.",
+        "count": 2
+      }
+    ],
+    "BF|3.6": [
+      {
+        "text": "[hvac] Relocate condenser to provide 3\" clearance on all sides from grade per IRC G2408.4.",
+        "count": 2
+      }
+    ],
+    "BF|3.7": [
+      {
+        "text": "[painter] Paint exposed gas pipe.",
+        "count": 6
+      },
+      {
+        "text": "[hvac] Turn gas on at furnace.",
+        "count": 3
+      },
+      {
+        "text": "[plumber] Wrap gas line to protect from corrosion.",
+        "count": 2
+      }
+    ],
+    "BF|3.8": [
+      {
+        "text": "[hvac] Paint and caulk AC copper box.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Paint and caulk copper box.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Paint and caulk AC copper box.",
+        "count": 2
+      }
+    ],
+    "BF|3.9": [
+      {
+        "text": "[builder] Hookup and seal microwave vent.",
+        "count": 15
+      },
+      {
+        "text": "[builder] Repair anti-tip device not holding range.",
+        "count": 4
+      },
+      {
+        "text": "[electrician] Connect range hood.",
+        "count": 4
+      }
+    ],
+    "BF|4.1": [
+      {
+        "text": "[painter] Paint and lower sewer clean-out as needed.",
+        "count": 14
+      },
+      {
+        "text": "[plumber] Do not paint pop-up valve on sewer main clean-out.",
+        "count": 7
+      },
+      {
+        "text": "[plumber] Repair inoperable disposal.",
+        "count": 2
+      }
+    ],
+    "BF|4.11": [
+      {
+        "text": "[insulation] Insulate PEX piping in attic.",
+        "count": 4
+      },
+      {
+        "text": "[plumber] Insulate hot water pipes with minimum R-3 or bury below blown-in insulation per R403.5.2.",
+        "count": 2
+      }
+    ],
+    "BF|4.12": [
+      {
+        "text": "[plumber] Caulk tubs and showers.",
+        "count": 12
+      },
+      {
+        "text": "[tile] Punch tile to tub and shower.",
+        "count": 5
+      },
+      {
+        "text": "[plumber] Install missing master shower drain cover.",
+        "count": 5
+      }
+    ],
+    "BF|4.13": [
+      {
+        "text": "[plumber] Repair inoperative disposal.",
+        "count": 5
+      },
+      {
+        "text": "[painter] Paint gas pipe.",
+        "count": 2
+      }
+    ],
+    "BF|4.2": [
+      {
+        "text": "[painter] Paint and caulk irrigation turn-down.",
+        "count": 12
+      },
+      {
+        "text": "[painter] Paint and caulk water heater drain.",
+        "count": 9
+      },
+      {
+        "text": "[painter] Paint turn-down at left and rear.",
+        "count": 4
+      }
+    ],
+    "BF|4.3": [
+      {
+        "text": "[plumber] No hot water at reinspection (Autofail PO Required).",
+        "count": 6
+      },
+      {
+        "text": "[plumber] No hot water to house (Autofail).",
+        "count": 2
+      },
+      {
+        "text": "[plumber] No water to house.",
+        "count": 2
+      }
+    ],
+    "BF|4.6": [
+      {
+        "text": "[painter] Fully paint gas line to prevent corrosion at meter.",
+        "count": 8
+      },
+      {
+        "text": "[plumber] Unlock gas meter. AUTO FAIL.",
+        "count": 2
+      },
+      {
+        "text": "[plumber] Unpin gas meter.",
+        "count": 2
+      }
+    ],
+    "BF|4.7": [
+      {
+        "text": "[plumber] Caulk toilets.",
+        "count": 11
+      },
+      {
+        "text": "[plumber] Repair toilet not flushing properly at entry bath.",
+        "count": 2
+      }
+    ],
+    "BF|4.8": [
+      {
+        "text": "[plumber] Insulate hose bibs.",
+        "count": 2
+      },
+      {
+        "text": "[plumber] Insulate hose bib.",
+        "count": 2
+      }
+    ],
+    "BF|4.9": [
+      {
+        "text": "[plumber] Paint sewer cleanout flush with brick.",
+        "count": 5
+      },
+      {
+        "text": "[plumber] Paint and lower sewer cleanout.",
+        "count": 2
+      },
+      {
+        "text": "[plumber] Paint sewer cleanouts at siding.",
+        "count": 2
+      }
+    ],
+    "BF|5.1": [
+      {
+        "text": "[electrician] Lower ground rod.",
+        "count": 9
+      },
+      {
+        "text": "[electrician] Label breaker box.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Add screws to panel.",
+        "count": 2
+      }
+    ],
+    "BF|5.2": [
+      {
+        "text": "[electrician] Repair non-working garbage disposal.",
+        "count": 4
+      },
+      {
+        "text": "[electrician] Install attic light.",
+        "count": 3
+      },
+      {
+        "text": "[electrician] Repair non-working doorbell.",
+        "count": 2
+      }
+    ],
+    "BF|5.3": [
+      {
+        "text": "[electrician] Install correct size breaker for condenser.",
+        "count": 7
+      },
+      {
+        "text": "[electrician] Replace AC breaker with maximum 25A size.",
+        "count": 4
+      },
+      {
+        "text": "[electrician] Replace HVAC unit breaker with maximum 15A size.",
+        "count": 4
+      }
+    ],
+    "BF|5.4": [
+      {
+        "text": "[electrician] Note: Washer and dryer installed in mechanical closet; outlet inaccessible to test GFCI.",
+        "count": 4
+      },
+      {
+        "text": "[electrician] Install GFCI protection at utility outlet.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Install GFCI labels at outlets in kitchen and baths.",
+        "count": 2
+      }
+    ],
+    "BF|5.6": [
+      {
+        "text": "[electrician] Relocate master bath receptacle minimum 3 feet from shower per code.",
+        "count": 10
+      },
+      {
+        "text": "[electrician] Relocate upstairs bath dual vanity receptacle minimum 3 feet from tub per code.",
+        "count": 8
+      },
+      {
+        "text": "[electrician] Finish installing kitchen outlet.",
+        "count": 6
+      }
+    ],
+    "BF|5.7": [
+      {
+        "text": "[electrician] Install grommet or smooth out hole for dishwasher cable protection.",
+        "count": 12
+      },
+      {
+        "text": "[electrician] Lower ground rod below grade.",
+        "count": 4
+      },
+      {
+        "text": "[electrician] Wire disposal.",
+        "count": 3
+      }
+    ],
+    "BF|5.8": [
+      {
+        "text": "[electrician] Remove covers from smoke detectors.",
+        "count": 10
+      },
+      {
+        "text": "[builder] Texture ahead of time.",
+        "count": 5
+      },
+      {
+        "text": "[electrician] Lower ground rod.",
+        "count": 4
+      }
+    ],
+    "BF|6.1": [
+      {
+        "text": "[cabinet] Install vanity mirrors.",
+        "count": 3
+      },
+      {
+        "text": "[cabinet] Install mirrors.",
+        "count": 2
+      },
+      {
+        "text": "[glazier] Install shower glass.",
+        "count": 2
+      }
+    ],
+    "BF|6.2": [
+      {
+        "text": "[builder] Clean exterior and garage.",
+        "count": 10
+      },
+      {
+        "text": "[builder] Perform final clean inside and out.",
+        "count": 8
+      },
+      {
+        "text": "[builder] Clean dirty interior.",
+        "count": 2
+      }
+    ],
+    "BF|6.4": [
+      {
+        "text": "[builder] Texted builder at least 30 minutes ahead of arriving in neighborhood; extensive or complex repair items beyond a handful of easy-to-check items that could take significant time to verify or cause additional repairs.",
+        "count": 3
+      },
+      {
+        "text": "[builder] Texted builder ahead of time.",
+        "count": 2
+      }
+    ],
+    "BF|6.5": [
+      {
+        "text": "[insulation] Install borite treatment at BMEP rough.",
+        "count": 2
+      }
+    ],
+    "COH|1.19": [
+      {
+        "text": "[framer] Add rafter tie at 2.6 - Master, Family, Garage, Porch; garage and porch still need work with no progress on garage.",
+        "count": 2
+      }
+    ],
+    "COH|2.9.a": [
+      {
+        "text": "[framer] Install missing (2) 2x10 ceiling joists at garage attic access.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Install missing (2) 2x6 ceiling joists at upstairs rear mid bath.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Install missing 2x6 finger joist per plan at porch.",
+        "count": 8
+      }
+    ],
+    "COH|3.3": [
+      {
+        "text": "[framer] Install joist hangers per placement plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install missing I-joist hangers at left floor edge per placement plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install hanger at triple per placement plans.",
+        "count": 2
+      }
+    ],
+    "COH|4.1.a": [
+      {
+        "text": "[framer] Install clips at top plate splices that are too close.",
+        "count": 45
+      },
+      {
+        "text": "[framer] Install stud to support top plate splice.",
+        "count": 9
+      }
+    ],
+    "COH|4.4": [
+      {
+        "text": "[framer] Add 3 shots at plates spliced where mud sill is not more than 12\" away from splice/front bed, family.",
+        "count": 2
+      }
+    ],
+    "COH|4.5.a": [
+      {
+        "text": "[framer] Install cripple stud.",
+        "count": 33
+      },
+      {
+        "text": "[framer] Add stud to maintain proper spacing.",
+        "count": 15
+      },
+      {
+        "text": "[framer] Replace short stud.",
+        "count": 14
+      }
+    ],
+    "COH|4.9": [
+      {
+        "text": "[framer] Install blocking at gable walls, pony walls, and wall hinges per details.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install D1 blocking at gable walls, pony walls, and wall hinges per details.",
+        "count": 2
+      }
+    ],
+    "COH|5.1.a": [
+      {
+        "text": "[framer] Install missing shots for braced wall/shear wall sheathing.",
+        "count": 15
+      },
+      {
+        "text": "[framer] Install missing OSB at rear wall per details.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Install missing OSB at front right bedroom per details.",
+        "count": 9
+      }
+    ],
+    "COH|5.4": [
+      {
+        "text": "[framer] Install ladder blocking at interior TPLY shearwalls a maximum of 30\" O.C. at garage.",
+        "count": 2
+      }
+    ],
+    "COH|5.6.a": [
+      {
+        "text": "[drywall] Repair delaminated tape on plywood sheathing at front.",
+        "count": 3
+      }
+    ],
+    "COH|6.7": [
+      {
+        "text": "[siding] Flash exterior doors per details.",
+        "count": 2
+      }
+    ],
+    "COH|6.8": [
+      {
+        "text": "[framer] Install garage door trimmers and flash.",
+        "count": 2
+      }
+    ],
+    "COH|7.1": [
+      {
+        "text": "[builder] Marked-up plan attached.",
+        "count": 2
+      }
+    ],
+    "CPP|1.16": [
+      {
+        "text": "[builder] Construction matches revision 4.",
+        "count": 2
+      }
+    ],
+    "CPP|1.19": [
+      {
+        "text": "[concrete] 1 item || 7.4 - Install nail straps at marked locations prior to concrete pour. || [plumber] 1 item || 7.7 - Fill DWV pipes with water and verify prior to concrete pour.",
+        "count": 12
+      },
+      {
+        "text": "[concrete] 1 item || 7.4 - Install nail straps at marked locations prior to concrete pour. || [plumber] 1 item || 7.7 - Water remains in DWV pipes.",
+        "count": 12
+      },
+      {
+        "text": "[concrete] 1 item || 7.4 - Install hold-down at paint-marked location prior to concrete placement.",
+        "count": 6
+      }
+    ],
+    "CPP|2.2": [
+      {
+        "text": "[concrete] Secure loose joints in poly in beams.",
+        "count": 5
+      },
+      {
+        "text": "[concrete] Tape holes in poly around pipes.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Repair poly.",
+        "count": 2
+      }
+    ],
+    "CPP|3.1": [
+      {
+        "text": "[concrete] Maintain proper thickness under tub bucket.",
+        "count": 5
+      },
+      {
+        "text": "[concrete] Install HD1 pit where missing per marked plan.",
+        "count": 2
+      }
+    ],
+    "CPP|4.2": [
+      {
+        "text": "[concrete] Deepen beams as needed to maintain continuous minimum required depth through dropped areas per details.",
+        "count": 7
+      },
+      {
+        "text": "[concrete] Deepen shallow beams at drops to minimum depth as measured to finished floor, not top of forms; check under all floats at drops.",
+        "count": 3
+      },
+      {
+        "text": "[concrete] Deepen all exterior beams to minimum required depth per details.",
+        "count": 2
+      }
+    ],
+    "CPP|4.5": [
+      {
+        "text": "[concrete] Clean loose material from beam.",
+        "count": 17
+      },
+      {
+        "text": "[concrete] Clean out cave-ins.",
+        "count": 10
+      },
+      {
+        "text": "[concrete] Clean out cave-ins at front exterior.",
+        "count": 4
+      }
+    ],
+    "CPP|4.6": [
+      {
+        "text": "[concrete] Pump out minor water from beam.",
+        "count": 10
+      },
+      {
+        "text": "[concrete] Pump out minor water from beam and remove loose soil.",
+        "count": 9
+      },
+      {
+        "text": "[concrete] Pump out water from beam.",
+        "count": 4
+      }
+    ],
+    "CPP|4.7": [
+      {
+        "text": "[concrete] Widen at plumbing buckets 4\" to allow concrete access.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Widen at plumbing buckets 4\" to allow concrete access.",
+        "count": 2
+      }
+    ],
+    "CPP|5.1.a": [
+      {
+        "text": "[concrete] Relocate cables away from HD1 pits per plans.",
+        "count": 148
+      },
+      {
+        "text": "[concrete] Tie cables to intended rebar.",
+        "count": 18
+      },
+      {
+        "text": "[concrete] Rest cable on pad edge per marked plans; do not allow to float.",
+        "count": 18
+      }
+    ],
+    "CPP|5.1.b": [
+      {
+        "text": "[concrete] Install missing short cable (B21) and anchor; counted 15 cables F2B (should be 16), corrected on site to 16 cables.",
+        "count": 7
+      },
+      {
+        "text": "[concrete] Remove 3rd cable from left (S-32); 28 cables F2B originally (should be 27), corrected on site to 27 cables.",
+        "count": 5
+      }
+    ],
+    "CPP|5.1.c": [
+      {
+        "text": "[concrete] Remove one excess S2S cable (23 observed; 22 required) per details; corrected on site.",
+        "count": 9
+      },
+      {
+        "text": "[concrete] Remove one excess S2S cable (31 observed; 30 required) per details; corrected on site with 30 cables now in place.",
+        "count": 9
+      },
+      {
+        "text": "[concrete] Remove two excess S2S cables (23 observed; 21 required) per details; corrected on site.",
+        "count": 9
+      }
+    ],
+    "CPP|5.2": [
+      {
+        "text": "[concrete] Wrap or sleeve cables where sheathing is removed or damaged.",
+        "count": 2
+      }
+    ],
+    "CPP|5.3": [
+      {
+        "text": "[concrete] Relocate anchors at least 4\" from top per details.",
+        "count": 2
+      }
+    ],
+    "CPP|5.4": [
+      {
+        "text": "[concrete] Adjust pocket formers to eliminate gaps and prevent concrete infiltration.",
+        "count": 16
+      },
+      {
+        "text": "[concrete] Secure pocket formers properly to form boards.",
+        "count": 6
+      },
+      {
+        "text": "[concrete] Secure pocket formers properly to form boards.",
+        "count": 2
+      }
+    ],
+    "CPP|5.5": [
+      {
+        "text": "[concrete] Cover live ends of strand with sheathing up to 1 inch.",
+        "count": 12
+      },
+      {
+        "text": "[concrete] Wrap live ends of cables to within 1 inch of anchor.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Cover exposed live ends of cable a minimum of 1 inch.",
+        "count": 2
+      }
+    ],
+    "CPP|5.6": [
+      {
+        "text": "[concrete] Repair toppled chairs.",
+        "count": 25
+      },
+      {
+        "text": "[concrete] Chair cables from pipes and dropforms.",
+        "count": 22
+      },
+      {
+        "text": "[concrete] Stake live ends per Detail 16 with rebar 1' away; install high stake next to rebar 36'' from first, sloping into beam. Rebar is too far for slope.",
+        "count": 10
+      }
+    ],
+    "CPP|5.7": [
+      {
+        "text": "[concrete] Chair cables away from pipes per details.",
+        "count": 2
+      }
+    ],
+    "CPP|6.1": [
+      {
+        "text": "[concrete] Wrap stakes supporting rebar in slab per plans.",
+        "count": 2
+      }
+    ],
+    "CPP|6.4": [
+      {
+        "text": "[concrete] Wrap stakes at ufer rod.",
+        "count": 5
+      }
+    ],
+    "CPP|7.2": [
+      {
+        "text": "[electrician] Remove poly from under Ufer rod.",
+        "count": 9
+      },
+      {
+        "text": "[electrician] Do not tie ground to cable; wrap stakes.",
+        "count": 4
+      }
+    ],
+    "CPP|7.3": [
+      {
+        "text": "[concrete] Pipe hidden under poly. Corrected on site.",
+        "count": 4
+      },
+      {
+        "text": "[concrete] Seal poly at pipe penetration.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Install foam at penetration.",
+        "count": 2
+      }
+    ],
+    "CPP|7.4": [
+      {
+        "text": "[concrete] Install shearwall straps at marked locations prior to concrete pour per plans.",
+        "count": 36
+      },
+      {
+        "text": "[concrete] Mark shearwall strap locations per plans.",
+        "count": 7
+      },
+      {
+        "text": "[concrete] Install shearwall straps at unmarked locations per plans.",
+        "count": 4
+      }
+    ],
+    "CPP|7.5": [
+      {
+        "text": "[electrician] Secure island conduit with firm chairs to maintain designated position.",
+        "count": 6
+      }
+    ],
+    "CPP|7.6": [
+      {
+        "text": "[plumber] Water heard in DWV pipe during rough-in water test.",
+        "count": 2
+      }
+    ],
+    "CPP|7.7": [
+      {
+        "text": "[plumber] Verify water remains in DWV pipes.",
+        "count": 24
+      },
+      {
+        "text": "[plumber] No water observed in DWV pipes.",
+        "count": 11
+      },
+      {
+        "text": "[plumber] Water within 24\" of top of open pipe.",
+        "count": 4
+      }
+    ],
+    "CPP|7.8": [
+      {
+        "text": "[concrete] Relocate cables away from HD1 pits and column bases.",
+        "count": 4
+      },
+      {
+        "text": "[builder] Remove trash.",
+        "count": 4
+      },
+      {
+        "text": "[concrete] Raise buckets to provide minimum 4 inches of flow underneath.",
+        "count": 2
+      }
+    ],
+    "CPP|9.1": [
+      {
+        "text": "[concrete] See marked plans for locations.",
+        "count": 2
+      }
+    ],
+    "CPR|3.6": [
+      {
+        "text": "[concrete] Pour started early; upon arrival, work was being performed correctly.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Concrete delivery failed to arrive; inspection timed out.",
+        "count": 2
+      }
+    ],
+    "CPR|5.1": [
+      {
+        "text": "[plumber] Verify 35 gallons capacity.",
+        "count": 6
+      },
+      {
+        "text": "[concrete] Verify 35 yards quantity.",
+        "count": 6
+      }
+    ],
+    "FSF|1.19": [
+      {
+        "text": "Summary for Mar 24, 2026 |||| [builder] 1 item || 3.5 - Install and flash exterior doors per details. |||| [framer] 4 items || 2.1 - complete interior shearwall at dining to exteriorvwall ,and thru rafters. fadyen 4\" on center || 2.1 - complete interior shearwall at master, thru to rafters || 2.3 - fasten cs16 at interior shearwall || 6.8 - Install detail 7 at gable/hinge wall",
+        "count": 2
+      },
+      {
+        "text": "Summary for Mar 27, 2026 |||| [framer] 2 items || 2.7 - Panels must be nailed minimum 6:12 at all sheathing locations/ Patio || 4.7.a - dbl up bridge joists / Front bed",
+        "count": 2
+      },
+      {
+        "text": "Summary for Mar 24, 2026 |||| [cornice] 1 item || 3.3 - Install and flash missing windows (4) per details. |||| [framer] 1 item || 4.9 - nail triples from both sides |||| [window] 1 item || 3.4 - caulk windows",
+        "count": 2
+      }
+    ],
+    "FSF|2.1": [
+      {
+        "text": "[framer] Install missing shear wall at garage per details.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install missing shear walls per details.",
+        "count": 2
+      }
+    ],
+    "FSF|2.16": [
+      {
+        "text": "[builder] Install address on site.",
+        "count": 2
+      }
+    ],
+    "FSF|2.3": [
+      {
+        "text": "[framer] Install HTT5 hold-downs per manufacturer's specifications.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Fasten all exterior hold-downs per manufacturer's specifications.",
+        "count": 2
+      }
+    ],
+    "FSF|2.5": [
+      {
+        "text": "[framer] Continue OSB through attic with CS16 strap and 14'' lap at OSB shearwalls per detail sheet at garage.",
+        "count": 2
+      }
+    ],
+    "FSF|2.6": [
+      {
+        "text": "[framer] Correct gap at garage portal header and jack studs.",
+        "count": 8
+      },
+      {
+        "text": "[framer] Install garage portal frame per detail.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install garage portal frame sheathing, nailing, and straps per details.",
+        "count": 3
+      }
+    ],
+    "FSF|2.7": [
+      {
+        "text": "[framer] Cover areas without plywood sheathing at entry.",
+        "count": 2
+      }
+    ],
+    "FSF|2.9.a": [
+      {
+        "text": "[framer] Ceiling joists not per plan over stairs.",
+        "count": 9
+      }
+    ],
+    "FSF|3.1": [
+      {
+        "text": "[mason] Brick supports are covered; cannot verify screws (autofail).",
+        "count": 3
+      }
+    ],
+    "FSF|3.3": [
+      {
+        "text": "[window] Flashing at windows installed prior to inspection; unable to confirm screws and screw spacing at sides and tops of all windows.",
+        "count": 6
+      },
+      {
+        "text": "[window] Install and flash all windows per details.",
+        "count": 6
+      },
+      {
+        "text": "[window] Install missing windows.",
+        "count": 4
+      }
+    ],
+    "FSF|3.4": [
+      {
+        "text": "[window] Caulk window sills correctly throughout.",
+        "count": 10
+      },
+      {
+        "text": "[window] Caulk window voids after installation.",
+        "count": 4
+      },
+      {
+        "text": "[window] Install windows.",
+        "count": 2
+      }
+    ],
+    "FSF|3.5": [
+      {
+        "text": "[siding] Install and flash exterior doors per details.",
+        "count": 8
+      },
+      {
+        "text": "[siding] Tape and flash door frames to drainage plane at porch and patio per details.",
+        "count": 2
+      },
+      {
+        "text": "[siding] Install flashing tape at exterior doors per details.",
+        "count": 2
+      }
+    ],
+    "FSF|3.6": [
+      {
+        "text": "[siding] Repair garage door flashing installed incorrectly.",
+        "count": 2
+      }
+    ],
+    "FSF|4.2": [
+      {
+        "text": "[framer] Install joist hangers per placement plans.",
+        "count": 3
+      },
+      {
+        "text": "[framer] Install joist hangers in garage per placement plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install joist hangers at attic access per placement plans.",
+        "count": 2
+      }
+    ],
+    "FSF|4.3.a": [
+      {
+        "text": "[framer] Repair double rafters without full bearing at rafter (master x3, kitchen x3) per span tables or plans.",
+        "count": 5
+      }
+    ],
+    "FSF|4.4": [
+      {
+        "text": "[framer] Add 3-shot nails at splices.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install rafter purlins/bracing, splices, and connections per Detail D3 - GARAGE.",
+        "count": 2
+      }
+    ],
+    "FSF|4.5.a": [
+      {
+        "text": "[framer] Add stud at front bedroom closet.",
+        "count": 9
+      }
+    ],
+    "FSF|4.6.a": [
+      {
+        "text": "[framer] Install blocks between studs per Family detail.",
+        "count": 16
+      },
+      {
+        "text": "[framer] Install furred wall detail 2 with 2x6 blocks at stairs.",
+        "count": 9
+      }
+    ],
+    "FSF|4.6.b": [
+      {
+        "text": "[framer] Verify size, grade, species, and spacing of framing members per details.",
+        "count": 10
+      }
+    ],
+    "FSF|4.7.a": [
+      {
+        "text": "[framer] Nail triples on both sides every 24\" at garage, living room, and primary per plans.",
+        "count": 23
+      },
+      {
+        "text": "[framer] Double up bridge joists in front bedroom.",
+        "count": 18
+      },
+      {
+        "text": "[framer] Install 2x10 joists at garage per plan.",
+        "count": 18
+      }
+    ],
+    "FSF|4.9": [
+      {
+        "text": "[framer] Extend (3)2x12 beam to back of game closet per plan.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install missing (3)2x10 beam in garage.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Nail triples from both sides.",
+        "count": 2
+      }
+    ],
+    "FSF|5.1.a": [
+      {
+        "text": "[framer] Nail interior BWPs 3\" o.c. up.",
+        "count": 74
+      },
+      {
+        "text": "[framer] Add shots at interior BWPs.",
+        "count": 44
+      },
+      {
+        "text": "[framer] Install missing I-blocking at entry rear right, rear left, and front left bed closet.",
+        "count": 9
+      }
+    ],
+    "FSF|5.2": [
+      {
+        "text": "[framer] Nail BWP's 6\" o.c. to subfloor per sole plate anchorage schedule at all 2nd floor BWPs.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Fully nail hold downs at front; covered.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install joist hangers in kitchen.",
+        "count": 2
+      }
+    ],
+    "FSF|5.3": [
+      {
+        "text": "[framer] Install web stiffeners per plan at garage.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Add H2 screw detail at beam in kitchen.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Add GS2 and screws detail in kitchen.",
+        "count": 2
+      }
+    ],
+    "FSF|5.5": [
+      {
+        "text": "[framer] Nail B-B portal wall sections at garage door 6\" o.c. per plan detail.",
+        "count": 3
+      },
+      {
+        "text": "[framer] Install missing MSTC straps at garage portal per plan detail.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install anchor bolts at portal per plan detail.",
+        "count": 2
+      }
+    ],
+    "FSF|5.6.a": [
+      {
+        "text": "[drywall] Seal overshot nails at right side.",
+        "count": 5
+      }
+    ],
+    "FSF|6.1": [
+      {
+        "text": "[framer] Install anchor bolt at garage where beam supports 2 or more purlins.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install 7 anchor bolts at living room where beams support 3 or more purlins; install anchor bolt at garage where beam supports 2 or more purlins.",
+        "count": 2
+      }
+    ],
+    "FSF|6.1.a": [
+      {
+        "text": "[framer] Install structural strap with 8 nails on each side of top plate splice less than 24\" from adjacent splice at garage left and master right.",
+        "count": 63
+      },
+      {
+        "text": "[framer] Install 2x4 under top plate splice at garage.",
+        "count": 46
+      },
+      {
+        "text": "[framer] Relocate top plate splices spaced too close together at garage.",
+        "count": 37
+      }
+    ],
+    "FSF|6.13": [
+      {
+        "text": "[mason] Nail block wall intersections at 24\" o.c. at upper hall.",
+        "count": 2
+      },
+      {
+        "text": "[mason] Nail block wall intersections at 24\" o.c. at entry.",
+        "count": 2
+      }
+    ],
+    "FSF|6.5.a": [
+      {
+        "text": "[framer] Install studs beneath beams for proper load path.",
+        "count": 71
+      },
+      {
+        "text": "[framer] Install missing cripples at opening.",
+        "count": 18
+      },
+      {
+        "text": "[framer] Install double studs under double I-joists.",
+        "count": 10
+      }
+    ],
+    "FSF|6.6": [
+      {
+        "text": "[window] Install and flash missing windows.",
+        "count": 2
+      }
+    ],
+    "FSF|6.7": [
+      {
+        "text": "[builder] Install exit doors.",
+        "count": 2
+      }
+    ],
+    "FSF|6.7.a": [
+      {
+        "text": "[framer] Add stud in game room.",
+        "count": 2
+      }
+    ],
+    "FSF|6.8": [
+      {
+        "text": "[framer] Install detail 7 at gable/hinge wall (garage).",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install detail 7 per details (upstairs).",
+        "count": 2
+      }
+    ],
+    "FSF|6.9": [
+      {
+        "text": "[framer] Install double jack studs at headers greater than 2x10 at right living.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install double jack studs at headers greater than 2x10 at right kitchen.",
+        "count": 2
+      }
+    ],
+    "FSF|7.1": [
+      {
+        "text": "[inspector] Note: Shear wall inspection only.",
+        "count": 5
+      },
+      {
+        "text": "[inspector] Marked up plan attached.",
+        "count": 2
+      },
+      {
+        "text": "[builder] Model home.",
+        "count": 2
+      }
+    ],
+    "FSF|7.4": [
+      {
+        "text": "[framer] Repair gap in exterior fire-resistant sheathing at left side per plan.",
+        "count": 3
+      }
+    ],
+    "FSF|7.6": [
+      {
+        "text": "[drywall] Fill gap at exterior firewall.",
+        "count": 2
+      },
+      {
+        "text": "[drywall] Remove non-permitted penetration at left side of fire-rated wall assembly – exterior face.",
+        "count": 2
+      }
+    ],
+    "FSF|8.1": [
+      {
+        "text": "[builder] Mark home address per details.",
+        "count": 2
+      },
+      {
+        "text": "[builder] Refer to attached marked-up plan.",
+        "count": 2
+      }
+    ],
+    "FS|2.4.a": [
+      {
+        "text": "[framer] Install double rafters per plans at back right.",
+        "count": 18
+      },
+      {
+        "text": "[framer] Install missing double rafter per plan.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Repair double rafter at rear of home that is cut short per plan.",
+        "count": 2
+      }
+    ],
+    "FS|2.8.a": [
+      {
+        "text": "[roofer] Install missing shingles at front right.",
+        "count": 9
+      }
+    ],
+    "FS|3.1.a": [
+      {
+        "text": "[framer] Install RB1 rim board at second floor.",
+        "count": 9
+      }
+    ],
+    "FS|4.1.a": [
+      {
+        "text": "[framer] Fully nail structural top plate splices at front bedroom and hallway per details.",
+        "count": 9
+      }
+    ],
+    "FS|4.4": [
+      {
+        "text": "[framer] Install 3 anchor bolts at sill plate splices when more than 12 inches to next mud shoe.",
+        "count": 6
+      },
+      {
+        "text": "[framer] Install 3 anchor bolts at sill plate splices when more than 12 inches to next mud shoe at back door.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install 3 anchor bolts at sill plate splices when more than 12 inches to next mud shoe at master.",
+        "count": 2
+      }
+    ],
+    "FS|4.5.a": [
+      {
+        "text": "[framer] Install double jack studs under pantry header.",
+        "count": 18
+      },
+      {
+        "text": "[framer] Repair crooked stud at utility/living area.",
+        "count": 14
+      },
+      {
+        "text": "[framer] Install ladder blocking at wall intersection at garage entry.",
+        "count": 9
+      }
+    ],
+    "FS|5.1.a": [
+      {
+        "text": "[framer] Tply and foam seal all hot walls per plans.",
+        "count": 25
+      },
+      {
+        "text": "[framer] Nail tply at BWPs per plans.",
+        "count": 19
+      },
+      {
+        "text": "[framer] Block and nail panel edges in master closet per plans.",
+        "count": 18
+      }
+    ],
+    "FS|5.6.a": [
+      {
+        "text": "[siding] Install missing house wrap at front and rear; corrected on site.",
+        "count": 9
+      },
+      {
+        "text": "[siding] Install missing house wrap where needed.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Block and nail T&G plywood seams at right and left.",
+        "count": 5
+      }
+    ],
+    "FS|6.1": [
+      {
+        "text": "[framer] Framer on site.",
+        "count": 2
+      }
+    ],
+    "FS|6.10.a": [
+      {
+        "text": "[roofer] Install missing roof jacks all.",
+        "count": 9
+      }
+    ],
+    "FS|6.13": [
+      {
+        "text": "[insulation] Block kneewall to prepare for insulation; insulation requires a six-sided air barrier.",
+        "count": 2
+      }
+    ],
+    "FWI|2.13": [
+      {
+        "text": "[drywall] Install fire-rated mud at plumbing penetrations in upper bath per approved firestop system.",
+        "count": 2
+      },
+      {
+        "text": "[drywall] Install fire-rated mud at plumbing penetrations in upstairs bath per approved firestop system.",
+        "count": 2
+      }
+    ],
+    "FWI|2.2": [
+      {
+        "text": "[drywall] Repair gap larger than 1/8\" at upper bath chase per plan.",
+        "count": 2
+      }
+    ],
+    "FWI|2.3": [
+      {
+        "text": "[drywall] Install fire-resistant sheathing in dead space along fire-rated wall in UP bath.",
+        "count": 2
+      }
+    ],
+    "FWI|2.4": [
+      {
+        "text": "[drywall] Install nails at 7\" o.c. in upstairs bath per plan.",
+        "count": 6
+      },
+      {
+        "text": "[drywall] Install nails at 7\" o.c. in water heater closet per plan.",
+        "count": 4
+      },
+      {
+        "text": "[drywall] Install nails at 7\" o.c. in master closet per plan.",
+        "count": 2
+      }
+    ],
+    "HBFI|14.4": [
+      {
+        "text": "[cleaning] Power wash flatwork as needed, clean stains and trash/debris; driveway still has paint stains.",
+        "count": 2
+      }
+    ],
+    "HBFI|14.5": [
+      {
+        "text": "[concrete] Clean concrete spoils.",
+        "count": 2
+      }
+    ],
+    "HBFI|18.1": [
+      {
+        "text": "[landscaping] Clean up trash as needed.",
+        "count": 2
+      },
+      {
+        "text": "[landscaping] Exterminate for ants and bugs as needed.",
+        "count": 2
+      },
+      {
+        "text": "[landscaping] Complete landscaping; no progress as of 4/17.",
+        "count": 2
+      }
+    ],
+    "HBFI|19.2": [
+      {
+        "text": "[painter] Complete exterior touch ups as needed.",
+        "count": 2
+      },
+      {
+        "text": "[painter] Complete exterior touch ups as needed. No progress 4/17.",
+        "count": 2
+      }
+    ],
+    "HBFI|19.4": [
+      {
+        "text": "[painter] Seal exterior penetrations at siding.",
+        "count": 3
+      }
+    ],
+    "HBFI|25.1": [
+      {
+        "text": "[tile] Repair crooked tile finish in front bath.",
+        "count": 2
+      }
+    ],
+    "HBFI|25.6": [
+      {
+        "text": "[tile] Fill tile transition to threshold at garage front.",
+        "count": 2
+      }
+    ],
+    "HBFI|26.7": [
+      {
+        "text": "[trim/carpentry] Adjust hinge pins to be flush with top of door hinge as needed.",
+        "count": 3
+      }
+    ],
+    "HBFI|26.8": [
+      {
+        "text": "[trim/carpentry] Install weatherstripping at gaps in master shower.",
+        "count": 2
+      }
+    ],
+    "HBFI|27.2": [
+      {
+        "text": "[window] Adjust front bedroom window for smooth locking operation.",
+        "count": 2
+      }
+    ],
+    "HBFI|27.3": [
+      {
+        "text": "[window] Install all missing window screens.",
+        "count": 2
+      }
+    ],
+    "HBFI|3.4": [
+      {
+        "text": "[appliances] Adjust kitchen vent hood to be flush with ceiling.",
+        "count": 5
+      }
+    ],
+    "HBFI|6.1": [
+      {
+        "text": "[landscaping] Clean trash and debris throughout as needed; no progress as of 4/17.",
+        "count": 3
+      }
+    ],
+    "HBFI|6.2": [
+      {
+        "text": "[cleaning] Clean residue from windows as needed.",
+        "count": 2
+      },
+      {
+        "text": "[cleaning] Clean residue from fixtures as needed.",
+        "count": 2
+      },
+      {
+        "text": "[cleaning] Clean house throughout.",
+        "count": 2
+      }
+    ],
+    "HBFI|9.6": [
+      {
+        "text": "[electrician] Repair non-operating GFCI outlet at rear.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Repair non-operating GFCI outlets at left, front, and rear.",
+        "count": 2
+      }
+    ],
+    "HER|11.7": [
+      {
+        "text": "[hvac] Total duct leakage passed when tested at final.",
+        "count": 2
+      }
+    ],
+    "HER|3.1": [
+      {
+        "text": "[insulation] Replace fallen batt insulation.",
+        "count": 4
+      },
+      {
+        "text": "[insulation] Fill gaps in insulation.",
+        "count": 3
+      },
+      {
+        "text": "[insulation] Install insulation behind ladder blocks.",
+        "count": 2
+      }
+    ],
+    "HER|4.1": [
+      {
+        "text": "[drywall] Install plywood behind tub/shower.",
+        "count": 5
+      }
+    ],
+    "HER|4.3": [
+      {
+        "text": "[framer] Remove blocks under insulation to create a six-sided air barrier.",
+        "count": 2
+      }
+    ],
+    "HER|4.9": [
+      {
+        "text": "[insulation] Relocate ladder blocks to reduce thermal bridging.",
+        "count": 3
+      }
+    ],
+    "HER|7.7": [
+      {
+        "text": "[window] Seal rough opening around windows.",
+        "count": 5
+      },
+      {
+        "text": "[window] Repair broken window.",
+        "count": 2
+      }
+    ],
+    "HET|1.18": [
+      {
+        "text": "[hvac] HET out of maximum CFM range. Condition did not change at reinspect.",
+        "count": 2
+      }
+    ],
+    "HET|1.7": [
+      {
+        "text": "[hvac] Adjust upstairs rear left bedroom air balance to meet allowable room pressure tolerance per details.",
+        "count": 2
+      }
+    ],
+    "HET|2.17": [
+      {
+        "text": "[insulation] Blower door test failed due to excessive air leakage.",
+        "count": 2
+      }
+    ],
+    "HET|3.8": [
+      {
+        "text": "[builder] See item 4.5.",
+        "count": 2
+      },
+      {
+        "text": "[builder] See energy final report.",
+        "count": 2
+      },
+      {
+        "text": "[builder] See item 5.5.",
+        "count": 2
+      }
+    ],
+    "HET|4.19": [
+      {
+        "text": "[hvac] Review ACCA report for verification of completed testing.",
+        "count": 2
+      }
+    ],
+    "HET|4.5": [
+      {
+        "text": "[electrician] Relocate power cord trapped under beam to allow plugging in.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Adjust pressure to between 0.1 and 0.6 in. w.c.",
+        "count": 2
+      }
+    ],
+    "IEF|4.6": [
+      {
+        "text": "[hvac] Install programmable thermostat upstairs.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Install programmable thermostat downstairs.",
+        "count": 2
+      }
+    ],
+    "IEF|4.7": [
+      {
+        "text": "[hvac] Record upstairs thermostat serial number.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Record downstairs thermostat serial number.",
+        "count": 2
+      }
+    ],
+    "IEF|5.1": [
+      {
+        "text": "[hvac] Unit: Carrier.",
+        "count": 2
+      }
+    ],
+    "IEF|6.1": [
+      {
+        "text": "[hvac] Unit: Carrier.",
+        "count": 2
+      }
+    ],
+    "IEF|7.1": [
+      {
+        "text": "[hvac] Unit: Carrier.",
+        "count": 2
+      }
+    ],
+    "IEF|8.1": [
+      {
+        "text": "[insulation] Install insulation in attic per IECC.",
+        "count": 2
+      }
+    ],
+    "IEF|8.3": [
+      {
+        "text": "[builder] Install missing certification per code.",
+        "count": 2
+      }
+    ],
+    "IEF|9.3": [
+      {
+        "text": "[hvac] Install air-tight cover on whole house fan per item 9.3.",
+        "count": 2
+      }
+    ],
+    "IER|1.8": [
+      {
+        "text": "Summary for Apr 2, 2026 |||| [insulation] 1 item || 4.8 - fill low spots",
+        "count": 23
+      },
+      {
+        "text": "Summary for Apr 9, 2026 |||| [insulation] 1 item || 3.1 - | [insulation] carefully cut and install Batts in such a way as to not compress Batts and lower Rvakue",
+        "count": 2
+      },
+      {
+        "text": "Summary for Apr 16, 2026 |||| [framer] 2 items || 3.1 - add blue board at UP ATTIC ACCESS || 3.1 - TPLY over Batts where no drywall will be installed to create 6 sided barrier, UP CHASES |||| [insulation] 1 item || 3.1 - poly seams and joints in bottom of chases upstairs, TOP OF STAIRS",
+        "count": 2
+      }
+    ],
+    "IER|1.9": [
+      {
+        "text": "[builder] Contractor making repairs on site.",
+        "count": 2
+      }
+    ],
+    "IER|11.1": [
+      {
+        "text": "[builder] Correct report; accidentally submitted HERS Energy Rough report.",
+        "count": 2
+      }
+    ],
+    "IER|11.12": [
+      {
+        "text": "[builder] Texted builder ahead of time regarding attic windows - blackened.",
+        "count": 2
+      }
+    ],
+    "IER|11.2": [
+      {
+        "text": "[hvac] Test total duct leakage at final.",
+        "count": 4
+      },
+      {
+        "text": "[insulation] Install 7\" thick insulation at garage attic walls.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Install insulation to required depth at front attic wall up gable.",
+        "count": 2
+      }
+    ],
+    "IER|11.5": [
+      {
+        "text": "[hvac] Total duct leakage test passed at final.",
+        "count": 7
+      }
+    ],
+    "IER|11.6": [
+      {
+        "text": "[insulation] Correct shallow insulation thickness at living area to match observed 2 inches per item 11.6.",
+        "count": 2
+      }
+    ],
+    "IER|12.1": [
+      {
+        "text": "[insulation] Ensure R-Value certificate states accurate information according to insulation values provided by Esperanza Homes.",
+        "count": 10
+      },
+      {
+        "text": "[insulation] Verify foam thickness at Master Bed and Master Bath per item 12.1.",
+        "count": 5
+      },
+      {
+        "text": "[insulation] Verify foam thickness at Great Room per item 12.1.",
+        "count": 4
+      }
+    ],
+    "IER|12.2": [
+      {
+        "text": "[plumber] Install depth markers.",
+        "count": 5
+      },
+      {
+        "text": "[hvac] Relocate ducts to provide required separation.",
+        "count": 2
+      },
+      {
+        "text": "Not present.",
+        "count": 2
+      }
+    ],
+    "IER|13.1": [
+      {
+        "text": "[insulation] R21 spray foam application substitutes for required R38 per insulator letter.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Seal all exterior penetrations; autofail.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Seal all exterior penetrations; autofail.",
+        "count": 2
+      }
+    ],
+    "IER|2.4": [
+      {
+        "text": "[insulation] Repair fallen insulation.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Fill gaps with insulation. MASTER",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Fill gaps with insulation. FAMILY",
+        "count": 2
+      }
+    ],
+    "IER|3.1": [
+      {
+        "text": "[insulation] Correct thin areas of insulation throughout; check all areas.",
+        "count": 10
+      },
+      {
+        "text": "[insulation] Correct shallow insulation as needed throughout; check all areas.",
+        "count": 7
+      },
+      {
+        "text": "[insulation] Touch up low spots of spray foam insulation as marked.",
+        "count": 6
+      }
+    ],
+    "IER|3.2": [
+      {
+        "text": "[insulation] Verify sloped ceiling R-value in Garver Heights per plan.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Install 7\" thick insulation throughout shallow areas of sloped ceilings.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] No sloped ceilings.",
+        "count": 2
+      }
+    ],
+    "IER|3.3": [
+      {
+        "text": "[insulation] Correct shallow insulation throughout per details.",
+        "count": 5
+      }
+    ],
+    "IER|4.1": [
+      {
+        "text": "TPLY behind tubs, Polyseal TPLY behind tubs to floor",
+        "count": 2
+      }
+    ],
+    "IER|4.5": [
+      {
+        "text": "[insulation] Install missing foam at staircase walls per details.",
+        "count": 5
+      }
+    ],
+    "IER|4.6": [
+      {
+        "text": "[framer] Install TPLY to double wall in DINING.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Install TPLY to double walls for 6-sided air barrier OR double up batts in DINING.",
+        "count": 2
+      },
+      {
+        "text": "[drywall] Install TPLY under stairs.",
+        "count": 2
+      }
+    ],
+    "IER|4.7": [
+      {
+        "text": "[drywall] Fire block chase at left.",
+        "count": 2
+      },
+      {
+        "text": "[drywall] Fire block chase at right.",
+        "count": 2
+      }
+    ],
+    "IER|4.8": [
+      {
+        "text": "[insulation] Adjust low gable foam at front elevation.",
+        "count": 4
+      },
+      {
+        "text": "[insulation] Foam seal lumber gap at family room left.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install TPLY around chase on exterior wall.",
+        "count": 2
+      }
+    ],
+    "IER|4.9": [
+      {
+        "text": "[siding] Install fallen batts throughout.",
+        "count": 2
+      },
+      {
+        "text": "[siding] Install fallen batts at left.",
+        "count": 2
+      }
+    ],
+    "IER|6.3": [
+      {
+        "text": "[drywall] Install fallen batts at left.",
+        "count": 2
+      }
+    ],
+    "IER|7.1": [
+      {
+        "text": "[hvac] Terminate poly liner (TPLY) at upstairs chase.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Install air barrier for cavity at right.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Install air barrier for cavity at left.",
+        "count": 2
+      }
+    ],
+    "IER|7.3": [
+      {
+        "text": "[electrician] Foam seal wires at rear.",
+        "count": 8
+      },
+      {
+        "text": "[electrician] Foam seal wires at left.",
+        "count": 5
+      },
+      {
+        "text": "[electrician] Foam seal wires at right.",
+        "count": 4
+      }
+    ],
+    "IER|7.4": [
+      {
+        "text": "[plumber] Apply additional poly seal to plumbing around the home.",
+        "count": 2
+      }
+    ],
+    "IER|7.5": [
+      {
+        "text": "[electrician] Seal wires at master.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Apply additional poly seal to wires around the home.",
+        "count": 2
+      }
+    ],
+    "IER|7.7": [
+      {
+        "text": "[window] Install foam seal at rough openings for doors.",
+        "count": 13
+      },
+      {
+        "text": "[window] Install missing foam seal at doors.",
+        "count": 2
+      },
+      {
+        "text": "[window] Install foam seal at doors.",
+        "count": 2
+      }
+    ],
+    "IER|8.4": [
+      {
+        "text": "[hvac] Repair compressed fresh air duct to allow full verification.",
+        "count": 2
+      }
+    ],
+    "IER|8.5": [
+      {
+        "text": "[hvac] Repair kinked ducts.",
+        "count": 2
+      }
+    ],
+    "ME|1.19": [
+      {
+        "text": "[pest control] 1 item || 2.43 - Install termite mitigation prior to insulation installation.",
+        "count": 6
+      },
+      {
+        "text": "[roofer] 1 item || 2.39 - Install shed/rake roof flashing per plan.",
+        "count": 4
+      },
+      {
+        "text": "[framer] 4 items || 2.45 - Install HTT5K hold-downs per shearwall plans at garage and HTT4 at rear wall. || 2.45 - Nail all stud packs at hold-downs with 3x3 staggered nailing. || 2.45 - Install GTC per plan as marked. || 2.45 - Clip trusses at load-bearing walls.",
+        "count": 2
+      }
+    ],
+    "ME|2.15": [
+      {
+        "text": "[roofer] No action required per plan.",
+        "count": 10
+      },
+      {
+        "text": "[roofer] Install ridge vents and air hawks per plan.",
+        "count": 2
+      },
+      {
+        "text": "[roofer] Install missing air hawk at rear per plan.",
+        "count": 2
+      }
+    ],
+    "ME|2.17": [
+      {
+        "text": "[electrician] Install smoke alarm wiring at upper rear right bedroom, not found 4/10.",
+        "count": 2
+      }
+    ],
+    "ME|2.18": [
+      {
+        "text": "[window] Install tempered glass at stairs as glazing is adjacent to landing at bottom of stairway, within 60 inches horizontally of bottom tread, and less than 36 inches above landing (IRC R308.4.7).",
+        "count": 3
+      }
+    ],
+    "ME|2.19": [
+      {
+        "text": "[siding] Cover raw wood at rear.",
+        "count": 3
+      },
+      {
+        "text": "[siding] Cover raw wood at left.",
+        "count": 2
+      },
+      {
+        "text": "[siding] Cover raw wood at front left.",
+        "count": 2
+      }
+    ],
+    "ME|2.2": [
+      {
+        "text": "[framer] Install fireblocking at utility.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install fireblocking at pantry.",
+        "count": 3
+      },
+      {
+        "text": "[framer] Install fireblocking at master closet chase.",
+        "count": 2
+      }
+    ],
+    "ME|2.3": [
+      {
+        "text": "[window] Install missing windows.",
+        "count": 3
+      }
+    ],
+    "ME|2.31": [
+      {
+        "text": "[builder] Install construction locks on exterior doors per management.",
+        "count": 7
+      },
+      {
+        "text": "[window] Poly seal door jamb.",
+        "count": 2
+      }
+    ],
+    "ME|2.33": [
+      {
+        "text": "[siding] Siding installed.",
+        "count": 2
+      },
+      {
+        "text": "[builder] Cannot verify brace wall type and nailing pattern where covered by siding (proceed).",
+        "count": 2
+      }
+    ],
+    "ME|2.39": [
+      {
+        "text": "[roofer] Repair flashing drainage plane at front.",
+        "count": 9
+      },
+      {
+        "text": "[roofer] Complete rake flashing to brick support detail at front.",
+        "count": 2
+      },
+      {
+        "text": "[roofer] Install shed/rake roof flashing per details.",
+        "count": 2
+      }
+    ],
+    "ME|2.42": [
+      {
+        "text": "[siding] Covered areas by siding not inspected.",
+        "count": 3
+      },
+      {
+        "text": "[siding] Apply flashing at visible exterior wall penetrations (several places). No progress 4/2.",
+        "count": 2
+      }
+    ],
+    "ME|2.43": [
+      {
+        "text": "[insulation] Install termite mitigation prior to spray foam installation.",
+        "count": 13
+      },
+      {
+        "text": "[pest control] Install pest control; no progress observed.",
+        "count": 8
+      },
+      {
+        "text": "[pest control] Install missing termite treatment.",
+        "count": 6
+      }
+    ],
+    "ME|2.44": [
+      {
+        "text": "[concrete] Cut and grout cables damaged by energy rough.",
+        "count": 5
+      },
+      {
+        "text": "[concrete] Stress cables.",
+        "count": 3
+      }
+    ],
+    "ME|2.45": [
+      {
+        "text": "[framer] Repair incorrect TPLY and nailing at street-facing shearwall; install red TPLY with 3:3 nailing per plan.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Repair shearwall nailing per plan or remove siding to verify/correct, or relocate shearwall to inside face.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Verify clip rafter repair at attic entry; currently covered.",
+        "count": 2
+      }
+    ],
+    "ME|2.5": [
+      {
+        "text": "[framer] Install catwalk (minimum 24\" width).",
+        "count": 2
+      }
+    ],
+    "ME|2.6": [
+      {
+        "text": "[framer] Double up joist under furnace as it is not in engineer-designated location.",
+        "count": 4
+      }
+    ],
+    "ME|3.2": [
+      {
+        "text": "[hvac] Insulate dryer duct from wire.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Repair compressed duct at upper guest bath.",
+        "count": 2
+      }
+    ],
+    "ME|3.7": [
+      {
+        "text": "[hvac] Complete vent termination at left, right, and several other places; no progress as of 4/2.",
+        "count": 2
+      }
+    ],
+    "ME|4.15": [
+      {
+        "text": "[plumber] Insulate gap pipes from wires at pantry.",
+        "count": 2
+      },
+      {
+        "text": "[plumber] Insulate gap pipes from wires at kitchen.",
+        "count": 2
+      }
+    ],
+    "ME|4.17": [
+      {
+        "text": "[hvac] Install pathway for AC drain to laundry box.",
+        "count": 6
+      },
+      {
+        "text": "[hvac] Relocate AC drain to laundry box for two-story configuration.",
+        "count": 3
+      }
+    ],
+    "ME|4.18": [
+      {
+        "text": "[plumber] Install wrap or sleeve for gas pipe.",
+        "count": 3
+      }
+    ],
+    "ME|4.4": [
+      {
+        "text": "[plumber] Adjust drain arms to provide proper slope for fall. / Master",
+        "count": 2
+      }
+    ],
+    "ME|5.11": [
+      {
+        "text": "[builder] Texted builder 30+ minutes prior to arrival; upon arrival, energy rough 1st inspection complete with outstanding repair items on BMEP report.",
+        "count": 5
+      },
+      {
+        "text": "[electrician] Install missing conduit at AC condenser.",
+        "count": 2
+      },
+      {
+        "text": "[builder] Texted builder 1 hour before arrival and spoke with builder on site.",
+        "count": 2
+      }
+    ],
+    "ME|5.8": [
+      {
+        "text": "[electrician] Install nail guards on wires in garage.",
+        "count": 2
+      }
+    ],
+    "ME|6.1": [
+      {
+        "text": "[drywall] Install missing space behind master shower pan for fire-rated drywall assembly per plot plan/arch plans.",
+        "count": 3
+      }
+    ],
+    "ME|6.4": [
+      {
+        "text": "[drywall] Seal penetration with approved firestop material at pantry per approved firestop system.",
+        "count": 2
+      }
+    ],
+    "ME|6.9": [
+      {
+        "text": "[drywall] Seal penetration with approved firestop material at left kitchen per item 6.9.",
+        "count": 2
+      }
+    ],
+    "MP|1.19": [
+      {
+        "text": "Summary for Mar 25, 2026 |||| [framer] 2 items || 3.11 - ceiling joist not to plan at up front bed closet || 3.15 - nail 3 ply beams on both sides/ Patio |||| [windstorm] 4 items || 6.1 - repair SW at master, master closet || 6.1 - Add Red SW panels per plans/ Utility || 6.3 - block ad nail mstc's at master closet || 6.4 - Per manu and per details 1,2,5,and 6 - no less than 2 studs should be nailed together 3\" o.c staggered at all hold-downs./ Garage, Study",
+        "count": 3
+      },
+      {
+        "text": "Summary for Mar 24, 2026 |||| [framer] 3 items || 2.2 - Frame kneewall at REAR LIVING as marked || 6.1 - add missing shots at FRO RIGHT BEDROOM CLOSET as aked || 6.6 - Install Detail 8 portal frame per plan; nail header and stud packs. |||| [mason] 1 item || 2.25 - paint backer board |||| [plumber] 1 item || 9.4 - painter was spraying and had all taped up, unable to confirm water |||| [siding] 1 item || 2.22 - Tape flashing at front per details.",
+        "count": 2
+      },
+      {
+        "text": "Summary for Mar 19, 2026 |||| [framer] 7 items || 2.2 - build chase chase, UP RIGHT FRONT BEDROOM || 3.15 - add Flatlock connectors to H3 beam at FRONT OF GARAGE, per plan || 3.6 - add missing brace at MASTER BBAATH as marked || 4.1 - add E1 strap art TRIPLE per plan, GARAGE || 4.1 - add missing wweb stifner per plan GARAGE || 4.10 - complete cantilever stairs to match detail, see attached || 5.5 - Nail sole plate with minimum three face nails at 16 inches o.c. per details as needed. |||| [hvac] 1 item || 8.2 - correct duct nstall, too tight a radius per IECC |||| [pest] 1 item || 2.23 - Install pest control.",
+        "count": 2
+      }
+    ],
+    "MP|10.1": [
+      {
+        "text": "[electrician] Install ground rod.",
+        "count": 2
+      }
+    ],
+    "MP|10.11": [
+      {
+        "text": "[insulation] See note 6.5 regarding insulation.",
+        "count": 8
+      },
+      {
+        "text": "[insulation] Refer to marked-up plans for insulation locations.",
+        "count": 6
+      },
+      {
+        "text": "[insulation] House is already insulated; visible areas inspected.",
+        "count": 2
+      }
+    ],
+    "MP|10.2": [
+      {
+        "text": "[electrician] Install additional receptacle at 2nd sink within 36\" as required at FRONT BATH per details.",
+        "count": 2
+      }
+    ],
+    "MP|10.3": [
+      {
+        "text": "[electrician] Secure loose low voltage wires.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Secure loose low voltage wire.",
+        "count": 2
+      }
+    ],
+    "MP|11.9": [
+      {
+        "text": "Texted builder ahead of time",
+        "count": 4
+      },
+      {
+        "text": "Builder was notified prior to arrival",
+        "count": 2
+      }
+    ],
+    "MP|2.1": [
+      {
+        "text": "[insulation] House is partially batted; inspected accessible areas.",
+        "count": 3
+      },
+      {
+        "text": "[window] Install missing operable window in front left bedroom.",
+        "count": 2
+      },
+      {
+        "text": "[window] Install and flash windows.",
+        "count": 2
+      }
+    ],
+    "MP|2.14": [
+      {
+        "text": "[roofer] Correct deficiencies at flashing drainage plane.",
+        "count": 3
+      },
+      {
+        "text": "[roofer] Repair drainage plane at flashing.",
+        "count": 2
+      }
+    ],
+    "MP|2.16": [
+      {
+        "text": "[hvac] Confirm installation of air hawks, soffit vents, and baffles.",
+        "count": 5
+      },
+      {
+        "text": "[hvac] No information provided; verify 5 air vents installed per plan.",
+        "count": 2
+      }
+    ],
+    "MP|2.2": [
+      {
+        "text": "[framer] Install fire block at stairs.",
+        "count": 6
+      },
+      {
+        "text": "[framer] Install fire block at tub locations for subfloor penetrations in garage.",
+        "count": 5
+      },
+      {
+        "text": "[framer] Note: Fire wall not part of inspection.",
+        "count": 4
+      }
+    ],
+    "MP|2.22": [
+      {
+        "text": "[siding] Quick-flash all penetrations.",
+        "count": 8
+      },
+      {
+        "text": "[siding] Correct water plane at front.",
+        "count": 4
+      },
+      {
+        "text": "[siding] Add and flash garage trimmers.",
+        "count": 2
+      }
+    ],
+    "MP|2.23": [
+      {
+        "text": "[insulation] Install pest control treatment.",
+        "count": 13
+      },
+      {
+        "text": "[insulation] House is insulated; inspected only what could be seen.",
+        "count": 6
+      },
+      {
+        "text": "[insulation] Install pest control treatment prior to installing batts.",
+        "count": 6
+      }
+    ],
+    "MP|2.24": [
+      {
+        "text": "[concrete] Stress and cut PT cables.",
+        "count": 10
+      },
+      {
+        "text": "[concrete] Stress and cut PT cables. No progress 2/25.",
+        "count": 2
+      },
+      {
+        "text": "[concrete] Stress and cut PT cables. No progress 3/6.",
+        "count": 2
+      }
+    ],
+    "MP|2.25": [
+      {
+        "text": "[insulation] House insulated. Only visible items inspected.",
+        "count": 8
+      },
+      {
+        "text": "[drywall] Foam seal perimeters and joints of chases (CANNOT C/P PER BILLIE).",
+        "count": 2
+      }
+    ],
+    "MP|2.5": [
+      {
+        "text": "[framer] Install missing hangers for attic access opening.",
+        "count": 2
+      }
+    ],
+    "MP|3.11": [
+      {
+        "text": "[framer] Install missing joists at garage per span tables or plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install doubled joists at garage bridge per span tables or plans.",
+        "count": 2
+      }
+    ],
+    "MP|3.15": [
+      {
+        "text": "[framer] Install two rows of nails at maximum 24\" o.c. along length of multi-ply beams and headers from both sides per detail sheet 1, section 4.7.3.",
+        "count": 4
+      },
+      {
+        "text": "[builder] Verify and correct header not per plan at master bath.",
+        "count": 3
+      },
+      {
+        "text": "[framer] Install missing beam as marked in garage with supporting studs/cripples per plan.",
+        "count": 2
+      }
+    ],
+    "MP|3.2": [
+      {
+        "text": "[framer] Contact engineer for repair detail for over-notched rafter at garage (provide email correspondence with repair detail or upload repair detail for this address prior to reinspection).",
+        "count": 2
+      }
+    ],
+    "MP|3.3": [
+      {
+        "text": "[framer] Install joist hangers as marked at attic access per placement plans.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install joist hangers as marked at garage per placement plans.",
+        "count": 3
+      },
+      {
+        "text": "[framer] Install missing joist hangers at master per placement plans.",
+        "count": 2
+      }
+    ],
+    "MP|3.4": [
+      {
+        "text": "[framer] Complete D2 and D3 details at family per plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Add double rafters per span tables or plans.",
+        "count": 2
+      }
+    ],
+    "MP|3.6": [
+      {
+        "text": "[framer] Install special call-out for double T brace per details.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install missing hip brace at garage.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install missing hip brace up rear right bedroom.",
+        "count": 2
+      }
+    ],
+    "MP|3.7": [
+      {
+        "text": "[framer] Install collar ties in garage per details.",
+        "count": 2
+      }
+    ],
+    "MP|4.1": [
+      {
+        "text": "[builder] Provide plans.",
+        "count": 15
+      },
+      {
+        "text": "[framer] Install web stiffeners.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Install missing JB1.",
+        "count": 2
+      }
+    ],
+    "MP|4.5": [
+      {
+        "text": "[framer] Install hanger as marked in DINING per placement plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install I-joist hangers as needed to match floor system plan; powder covered, cannot confirm.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install missing hangers per placement plans.",
+        "count": 2
+      }
+    ],
+    "MP|4.6": [
+      {
+        "text": "[framer] Install Detail E-2 (Shearwall Strap Detail) in kitchen.",
+        "count": 2
+      }
+    ],
+    "MP|5.1": [
+      {
+        "text": "[framer] Install fully nailed strap at right garage top plate splice.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install structural plates as marked (minimum 16 nails each) at garage top plate splices x2.",
+        "count": 2
+      }
+    ],
+    "MP|5.14": [
+      {
+        "text": "[framer] Nail stud packs at built corners per nailing schedule FR0.2 as marked.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Build and nail stud packs 3:3 staggered as marked in kitchen.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install 2 jack studs at garage.",
+        "count": 2
+      }
+    ],
+    "MP|5.15": [
+      {
+        "text": "[framer] Secure HTT5 uplift straps and clips per details.",
+        "count": 2
+      }
+    ],
+    "MP|5.5": [
+      {
+        "text": "[framer] Install shots at bottom plate splices as marked (3 each side per ENGINEER).",
+        "count": 8
+      },
+      {
+        "text": "[framer] Install shots at sill splices front bedroom.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install shots at sill splices garage.",
+        "count": 2
+      }
+    ],
+    "MP|5.6": [
+      {
+        "text": "[framer] Install studs under beam(s) at front left.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install stud shoes in master bath.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install studs 16\" o.c. as marked per plans in master bath.",
+        "count": 2
+      }
+    ],
+    "MP|6.1": [
+      {
+        "text": "[framer] Improve 3:3 nailing as marked on all, per marked plans.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Install 2 Hilti shots every 4 ft to all exterior BWP per note 6 of Sill Plate Anchorage Schedule as marked; all needed.",
+        "count": 4
+      },
+      {
+        "text": "[framer] Install shots at all exterior shear/brace walls.",
+        "count": 4
+      }
+    ],
+    "MP|6.3": [
+      {
+        "text": "[framer] Install minimum 2 shots per 4' section at all BWP locations per plans.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install minimum 2 shots per 4' section at all BWP locations per plans.",
+        "count": 2
+      }
+    ],
+    "MP|6.5": [
+      {
+        "text": "[framer] Install nails at 6\" o.c. to all upstairs interior BWP sole plates. Do not insulate or must raise insulation at all BWP's upstairs prior to energy reinspection.",
+        "count": 5
+      },
+      {
+        "text": "[framer] Install two face nails in ladder blocking.",
+        "count": 2
+      }
+    ],
+    "MP|6.6": [
+      {
+        "text": "[framer] Shim gaps at portal frame.",
+        "count": 7
+      },
+      {
+        "text": "[framer] Add portal straps per detail 8.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Portal frame per CI-PFH detail was not attempted. Reframe return walls and add connectors per detail at left garage; still missing at left side.",
+        "count": 2
+      }
+    ],
+    "MP|6.7": [
+      {
+        "text": "[drywall] Install TPLY behind tubs and foam seal.",
+        "count": 2
+      }
+    ],
+    "MP|6.8": [
+      {
+        "text": "Not inspected where covered by siding, proceed",
+        "count": 22
+      },
+      {
+        "text": "area covered by siding not inspected",
+        "count": 6
+      }
+    ],
+    "MP|7.1": [
+      {
+        "text": "[mason] Install brick ties per details.",
+        "count": 6
+      },
+      {
+        "text": "[mason] Install poly at brick ledges per details.",
+        "count": 2
+      },
+      {
+        "text": "[roofer] Note: Roofs not complete at front lower and side entry.",
+        "count": 2
+      }
+    ],
+    "MP|7.12": [
+      {
+        "text": "[framer] Cover raw wood on front patio.",
+        "count": 4
+      },
+      {
+        "text": "[painter] Paint exposed wood.",
+        "count": 2
+      }
+    ],
+    "MP|7.6": [
+      {
+        "text": "[window] Repair missing UP fixes at windows; still incomplete at entry as of 3/27.",
+        "count": 4
+      },
+      {
+        "text": "[window] Replace incorrect screws used for windows throughout home.",
+        "count": 3
+      },
+      {
+        "text": "[window] Install poly flashing at windows located in brick areas.",
+        "count": 2
+      }
+    ],
+    "MP|7.7": [
+      {
+        "text": "[framer] Add construction locks and correct per management.",
+        "count": 7
+      },
+      {
+        "text": "[insulation] Foam sill at exit doors.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install and flash exit doors.",
+        "count": 2
+      }
+    ],
+    "MP|7.9": [
+      {
+        "text": "[siding] No inspection where covered by siding.",
+        "count": 3
+      },
+      {
+        "text": "[siding] No inspection where covered by siding.",
+        "count": 3
+      },
+      {
+        "text": "[siding] No inspection where covered by siding.",
+        "count": 3
+      }
+    ],
+    "MP|8.2": [
+      {
+        "text": "[hvac] Finish incomplete duct installation as marked.",
+        "count": 2
+      }
+    ],
+    "MP|8.6": [
+      {
+        "text": "[hvac] Seal flue vent penetration.",
+        "count": 4
+      }
+    ],
+    "MP|9.1": [
+      {
+        "text": "[plumber] Install nail guards at master bath plumbing pipes per code P2603.2.",
+        "count": 2
+      },
+      {
+        "text": "[plumber] Install proper protection plates at marked plumbing pipe locations per code P2603.2 (steel plate shall extend not less than 2 inches above sole plates and below top plates).",
+        "count": 2
+      }
+    ],
+    "MP|9.13": [
+      {
+        "text": "[plumber] Wrap hose bibs at brick locations per details.",
+        "count": 2
+      },
+      {
+        "text": "[plumber] Wrap hose bibs at brick locations. No progress.",
+        "count": 2
+      }
+    ],
+    "MP|9.15": [
+      {
+        "text": "[electrician] Insulate wires from gas pipes as marked.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Insulate wires from gas pipes as marked in kitchen.",
+        "count": 2
+      }
+    ],
+    "MP|9.16": [
+      {
+        "text": "[plumber] Install missing plumbing roof jacks.",
+        "count": 3
+      },
+      {
+        "text": "[plumber] Install missing plumbing roof jacks.",
+        "count": 2
+      },
+      {
+        "text": "[electrician] Insulate wires from gas pipes in kitchen.",
+        "count": 2
+      }
+    ],
+    "MP|9.18": [
+      {
+        "text": "[plumber] Install missing tub at master.",
+        "count": 2
+      }
+    ],
+    "MP|9.4": [
+      {
+        "text": "[plumber] Provide water and pressure for pipe test.",
+        "count": 12
+      },
+      {
+        "text": "[plumber] Provide water and install pressure gauge at waterline.",
+        "count": 10
+      },
+      {
+        "text": "[plumber] Provide water to house for pipe test.",
+        "count": 6
+      }
+    ],
+    "PLY|1.8": [
+      {
+        "text": "[siding] Seal pinholes in cladding per 7.8.",
+        "count": 2
+      },
+      {
+        "text": "[siding] Seal pinhole penetrations in TPLY and all daylight penetrations per 4.9.",
+        "count": 2
+      }
+    ],
+    "PLY|2.3": [
+      {
+        "text": "[insulation] House insulated prior to inspection; some deficiencies may be covered. Reinspect at time of pressure testing.",
+        "count": 4
+      }
+    ],
+    "PLY|3.2": [
+      {
+        "text": "[insulation] Install blue board at corners and headers.",
+        "count": 3
+      }
+    ],
+    "PLY|4.1": [
+      {
+        "text": "[drywall] Foam seal TPLY to wall behind tubs.",
+        "count": 2
+      }
+    ],
+    "PLY|4.8": [
+      {
+        "text": "[framer] Block and seal garage rim/band joist with conditioned space per details.",
+        "count": 2
+      }
+    ],
+    "PLY|4.9": [
+      {
+        "text": "[siding] Seal pinhole penetrations in TPLY and all daylight penetrations.",
+        "count": 3
+      },
+      {
+        "text": "[siding] Seal painted pinhole penetrations in TPLY and all daylight penetrations.",
+        "count": 3
+      },
+      {
+        "text": "[siding] Seal pinhole penetrations in TPLY and all daylight penetrations.",
+        "count": 2
+      }
+    ],
+    "PLY|6.2": [
+      {
+        "text": "[insulation] Install double baffles at all available cavities at eaves per IRC Sec. R806.",
+        "count": 2
+      }
+    ],
+    "PLY|7.1": [
+      {
+        "text": "[hvac] Seal fresh air chase.",
+        "count": 2
+      },
+      {
+        "text": "[hvac] Seal dryer duct.",
+        "count": 2
+      }
+    ],
+    "PLY|7.2": [
+      {
+        "text": "[plumber] Install foam seal at pipes in kitchen left.",
+        "count": 2
+      }
+    ],
+    "PLY|7.3": [
+      {
+        "text": "[electrician] Seal electrical boxes.",
+        "count": 4
+      },
+      {
+        "text": "[electrician] Foam seal exterior receptacles.",
+        "count": 3
+      },
+      {
+        "text": "[electrician] Foam seal wire penetrations at exterior wall intersections.",
+        "count": 3
+      }
+    ],
+    "PLY|7.7": [
+      {
+        "text": "[window] Caulk window sills.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Seal door jambs to rough openings at both doors.",
+        "count": 2
+      },
+      {
+        "text": "[insulation] Seal door jambs to rough opening and header.",
+        "count": 2
+      }
+    ],
+    "PLY|7.8": [
+      {
+        "text": "[siding] Airseal pinholes in cladding.",
+        "count": 6
+      },
+      {
+        "text": "[siding] Airseal pinholes in cladding.",
+        "count": 5
+      },
+      {
+        "text": "[siding] Seal pinholes in cladding.",
+        "count": 2
+      }
+    ],
+    "PLY|8.1": [
+      {
+        "text": "[insulation] Install batts; address items on energy rough report.",
+        "count": 3
+      }
+    ],
+    "PPE|1.1": [
+      {
+        "text": "[builder] See attachment.",
+        "count": 3
+      }
+    ],
+    "STR|1.3": [
+      {
+        "text": "[concrete] Stress cables per details.",
+        "count": 2
+      }
+    ],
+    "STR|1.4": [
+      {
+        "text": "[builder] Corey walked with inspector during this inspection.",
+        "count": 2
+      }
+    ],
+    "SWI|1.19": [
+      {
+        "text": "[framer] Add nuts and washers to anchor bolts per 2.3.",
+        "count": 2
+      }
+    ],
+    "SWI|2.3": [
+      {
+        "text": "[framer] Install nuts and washers on anchor bolts per details.",
+        "count": 3
+      }
+    ],
+    "TFF|1.19": [
+      {
+        "text": "[builder] Install wind speed rating sticker per item 2.5.",
+        "count": 4
+      },
+      {
+        "text": "[builder] Install garage door installation instructions per item 2.5.",
+        "count": 2
+      },
+      {
+        "text": "[windstorm] Install missing jamb screws at top of door corners 4 in. and 14 in. o.c. and side jamb per item 2.4.",
+        "count": 2
+      }
+    ],
+    "TFF|2.4": [
+      {
+        "text": "[framer] Install screws 14\" o.c. at exterior door jambs.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Install screws 14\" o.c. at exterior door jambs.",
+        "count": 2
+      }
+    ],
+    "TFF|2.5": [
+      {
+        "text": "[framer] Install missing fasteners at garage door struts.",
+        "count": 2
+      }
+    ],
+    "TPC|2.3": [
+      {
+        "text": "[framer] Install joist hangers per placement plans.",
+        "count": 2
+      }
+    ],
+    "TPC|2.4.a": [
+      {
+        "text": "[framer] Install double rafters in garage per span tables.",
+        "count": 23
+      },
+      {
+        "text": "[framer] Install 2-2x6 rafters at front left per span tables.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Install six nails on each side of rafters for this wind zone at front bedroom per plan.",
+        "count": 9
+      }
+    ],
+    "TPC|2.9.a": [
+      {
+        "text": "[framer] Install missing double 2x6 ceiling joists per plan x2 left and missing load bearing studs.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Nail triple beams 24 in. O.C. both sides per plan; incomplete garage.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Frame attic access per plan in garage; install double joists and hangers.",
+        "count": 9
+      }
+    ],
+    "TPC|4.1.a": [
+      {
+        "text": "[framer] Strap top plates where splices are less than 24\" per Master.",
+        "count": 9
+      },
+      {
+        "text": "[framer] Install straps at spliced top plates per entry.",
+        "count": 9
+      }
+    ],
+    "TPC|4.11": [
+      {
+        "text": "[framer] Install LPT4 clips at top plate splices.",
+        "count": 2
+      }
+    ],
+    "TPC|4.5.a": [
+      {
+        "text": "[framer] Install studs under beams.",
+        "count": 36
+      },
+      {
+        "text": "[framer] Install cripple studs over window header in master bedroom.",
+        "count": 10
+      },
+      {
+        "text": "[framer] Install cripple studs above window at stairs.",
+        "count": 9
+      }
+    ],
+    "TPC|5.1.a": [
+      {
+        "text": "[framer] Install A35 clips at 24\" o.c. along garage shearwall for 3\" edge-nailed shearwall only.",
+        "count": 29
+      },
+      {
+        "text": "[framer] Limit maximum penetration through sheathing to 18\" with minimum 12\" edge distance in study.",
+        "count": 18
+      },
+      {
+        "text": "[framer] Fasten top of shearwalls to full-length rafter extending to ridge, see SW3.",
+        "count": 18
+      }
+    ],
+    "TPC|5.2": [
+      {
+        "text": "[framer] Install missing strap at interior shear wall per details.",
+        "count": 2
+      }
+    ],
+    "TPC|5.5": [
+      {
+        "text": "[framer] Relocate straps down from top of header per detail for garage portal.",
+        "count": 2
+      }
+    ],
+    "TPC|7.1": [
+      {
+        "text": "[framer] Do not cover deficiency; correct and recall inspection.",
+        "count": 2
+      },
+      {
+        "text": "[framer] Superintendent requested nail pattern verification on OSB prior to house wrap.",
+        "count": 2
+      }
+    ],
+    "TRDI|1.19": [
+      {
+        "text": "Summary for Mar 27, 2026 |||| [framer] 1 item || 2.3 - decking should be cut in such a way as to be supported by 3 rafters, front left",
+        "count": 2
+      },
+      {
+        "text": "Summary for Mar 26, 2026 |||| [framer] 1 item || 2.3 - decking should be cut in such a way as to be supported by 3 rafters",
+        "count": 2
+      },
+      {
+        "text": "Summary for Apr 2, 2026 |||| [roofer] 2 items || 2.3 - panel should be re-cut and installed so that the shortest of the panels still spans AT LEAST three rafter spans/ Right front || 2.3 - panel should be re-cut and installed so that the shortest of the panels still spans AT LEAST three rafter spans/ Front",
+        "count": 2
+      }
+    ],
+    "TRDI|2.2": [
+      {
+        "text": "[roofer] Install Foamseal roof with foil side down.",
+        "count": 3
+      }
+    ]
+  }
+}

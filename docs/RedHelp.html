@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Red - User Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px;
+            line-height: 1.65;
+            color: #333;
+        }
+        h1 {
+            color: #8B0000;
+            border-bottom: 3px solid #8B0000;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #8B0000;
+            margin-top: 36px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #2E86AB;
+            margin-top: 22px;
+        }
+        h4 {
+            color: #555;
+            margin-top: 16px;
+        }
+        .shortcut {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 14px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #8B0000;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .tip {
+            background: #e8f4f8;
+            border-left: 4px solid #2E86AB;
+            padding: 10px 15px;
+            margin: 14px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 14px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .new-badge {
+            display: inline-block;
+            background: #1E40AF;
+            color: white;
+            font-size: 0.7em;
+            font-weight: bold;
+            padding: 1px 6px;
+            border-radius: 3px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', monospace;
+        }
+        .banner-green {
+            background: #E8F5E9;
+            border: 2px solid #66BB6A;
+            border-radius: 4px;
+            padding: 6px 12px;
+            display: inline-block;
+            margin: 4px 0;
+            font-weight: bold;
+            color: #1B5E20;
+        }
+        .banner-red {
+            background: #FFEBEE;
+            border: 2px solid #EF5350;
+            border-radius: 4px;
+            padding: 6px 12px;
+            display: inline-block;
+            margin: 4px 0;
+            font-weight: bold;
+            color: #C62828;
+        }
+        .banner-gray {
+            background: #F5F5F5;
+            border: 2px solid #BDBDBD;
+            border-radius: 4px;
+            padding: 6px 12px;
+            display: inline-block;
+            margin: 4px 0;
+            color: #757575;
+        }
+        .banner-amber {
+            background: #FFF8E1;
+            border: 2px solid #F9A825;
+            border-radius: 4px;
+            padding: 6px 12px;
+            display: inline-block;
+            margin: 4px 0;
+            font-weight: bold;
+            color: #7B5800;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin: 14px 0;
+        }
+        .feature-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 14px;
+            background: #fafafa;
+        }
+        .feature-box h4 {
+            margin: 0 0 8px 0;
+            color: #8B0000;
+        }
+        @media print {
+            body { padding: 20px; max-width: 100%; }
+            .feature-grid { display: block; }
+            .feature-box { margin-bottom: 14px; page-break-inside: avoid; }
+            h2 { page-break-before: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>🔴 Red — User Guide</h1>
+<p><strong>Professional Language Assistant for Construction Evaluation, Notation &amp; Trade Assignment</strong></p>
+<p>Version 1.7.46 &nbsp;|&nbsp; Full Inspection Systems &nbsp;|&nbsp; Updated April 2026</p>
+
+<hr>
+
+<h2>Quick Start</h2>
+<ol>
+    <li>Click <strong>📂 Open INS</strong> (or press <span class="shortcut">Alt+O</span>) to load an inspection file</li>
+    <li>Select a checklist item from the left panel</li>
+    <li>Set the <strong>Status</strong> (Pass / Fail / NI / Yes / No — depends on item type)</li>
+    <li>Select the responsible <strong>Trade</strong></li>
+    <li>Add photos and comments as needed</li>
+    <li>Click <strong>✓ Apply</strong> or press <span class="shortcut">Enter</span></li>
+    <li>Click <strong>💾 Save</strong> when done, or RED auto-saves when you close</li>
+</ol>
+
+<div class="tip">
+    <strong>💡 Sunlight tip:</strong> Selected rows in the inspection picker use high-contrast inverse colors (black background / white text) so they're easy to see in bright sunlight.
+</div>
+
+<hr>
+
+<h2>Keyboard Shortcuts</h2>
+
+<h3>Navigation</h3>
+<table>
+    <tr><th>Key</th><th>Action</th></tr>
+    <tr><td><span class="shortcut">↑</span> / <span class="shortcut">↓</span></td><td>Navigate checklist items (up/down)</td></tr>
+    <tr><td><span class="shortcut">←</span> / <span class="shortcut">→</span></td><td>Navigate photos when item has multiple</td></tr>
+    <tr><td><span class="shortcut">Tab</span></td><td>Move between controls in optimized order</td></tr>
+    <tr><td><span class="shortcut">Space</span></td><td>Activate focused button</td></tr>
+    <tr><td><span class="shortcut">Escape</span></td><td>Close overlay / dismiss suggestion panel / return to tree</td></tr>
+</table>
+
+<h3>Actions</h3>
+<table>
+    <tr><th>Key</th><th>Action</th></tr>
+    <tr><td><span class="shortcut">Enter</span></td><td>Apply changes to current item</td></tr>
+    <tr><td><span class="shortcut">F1</span></td><td>Open this Help guide</td></tr>
+    <tr><td><span class="shortcut">Alt+O</span></td><td>Open INS file</td></tr>
+    <tr><td><span class="shortcut">Alt+S</span></td><td>Save file</td></tr>
+    <tr><td><span class="shortcut">Alt+A</span></td><td>Apply template</td></tr>
+    <tr><td><span class="shortcut">Alt+T</span></td><td>Save template</td></tr>
+    <tr><td><span class="shortcut">Alt+D</span></td><td>View documents / See All PDFs</td></tr>
+    <tr><td><span class="shortcut">Alt+F</span></td><td>Select photo file</td></tr>
+    <tr><td><span class="shortcut">Alt+M</span></td><td>Open camera</td></tr>
+    <tr><td><span class="shortcut">Alt+L</span></td><td>Delete current photo</td></tr>
+    <tr><td><span class="shortcut">Alt+C</span></td><td>Clear comment</td></tr>
+    <tr><td><span class="shortcut">Alt+Y</span></td><td>Apply changes (same as Enter)</td></tr>
+    <tr><td><span class="shortcut">Alt+U</span></td><td>Duplicate item</td></tr>
+    <tr><td><span class="shortcut">Alt+R</span></td><td>Remove duplicated item</td></tr>
+    <tr><td><span class="shortcut">Alt+V</span></td><td>Save current comment to My Saved Comments</td></tr>
+    <tr><td><span class="shortcut">Alt+G</span></td><td>Get AI suggestions</td></tr>
+    <tr><td><span class="shortcut">Alt+N</span></td><td>Transcribe label text (energy inspections)</td></tr>
+</table>
+
+<h3>Quick Suggestions (when suggestion overlay is visible)</h3>
+<table>
+    <tr><th>Key</th><th>Action</th></tr>
+    <tr><td><span class="shortcut">1</span></td><td>Select first suggestion</td></tr>
+    <tr><td><span class="shortcut">2</span></td><td>Select second suggestion</td></tr>
+    <tr><td><span class="shortcut">3</span></td><td>Select third suggestion</td></tr>
+</table>
+
+<hr>
+
+<h2>Opening the Inspection Picker</h2>
+<p>Click <strong>📂 Open INS</strong> (or <span class="shortcut">Alt+O</span>) to open the Inspection Picker — a scrollable list of inspection files in your MyList folder.</p>
+
+<h3>Picker Columns</h3>
+<table>
+    <tr><th>Column</th><th>What It Shows</th></tr>
+    <tr><td><strong>Address</strong></td><td>Street address + subdivision name (e.g., "1420 Oakridge Ct, Ellerden Section 1")</td></tr>
+    <tr><td><strong>Type</strong></td><td>Inspection type (IER, CPP, BF, etc.) with color-coded text per type</td></tr>
+    <tr><td><strong>Date</strong></td><td>Inspection date, color-coded by date group (today = white)</td></tr>
+    <tr><td><strong>Builder</strong></td><td>Builder name with color-coded text</td></tr>
+    <tr><td><strong>Filename</strong></td><td>INS filename without extension</td></tr>
+    <tr><td><strong>Signed</strong></td><td><strong>S</strong> (green) = signed &nbsp;|&nbsp; <strong>Y</strong> (orange) = edits present &nbsp;|&nbsp; <strong>N</strong> (gray) = untouched</td></tr>
+    <tr><td><strong>📞</strong></td><td>Notify builder of your arrival via SMS QR code</td></tr>
+</table>
+
+<h3>Picker Features</h3>
+<ul>
+    <li><strong>Sort by column</strong> — click any header to sort ascending/descending (arrow shows direction)</li>
+    <li><strong>Search</strong> — type in the search box to filter by address, type, builder, or filename</li>
+    <li><strong>Browse Folder</strong> — click 📁 Browse... to load files from a different folder</li>
+    <li><strong>Double-tap or Enter</strong> to open the selected inspection</li>
+    <li><strong>Selected row</strong> shows <strong>black background / white text</strong> on all columns — high contrast, easy to see in bright sunlight</li>
+    <li><strong>Swipe to scroll</strong> — drag the list with your finger or stylus</li>
+</ul>
+
+<h3>Notify Builder (QR Code)</h3>
+<p>Tap the <strong>📞</strong> button next to any inspection to send a pre-written arrival notice to the builder's phone — without typing on your phone.</p>
+<ol>
+    <li>Tap 📞 — a window appears with a QR code and a message preview</li>
+    <li>Point your phone camera at the QR code — your SMS app opens with the message already written</li>
+    <li>Tap <strong>Send</strong> on your phone — done</li>
+</ol>
+<p>The auto-generated message includes the contact's name, property address, lot number, inspection type, inspector name, and an estimated 20-minute arrival notice.</p>
+<p><em>The 📞 button only appears when a contact phone number is on file for the inspection.</em></p>
+
+<hr>
+
+<h2>Left Panel — Checklist</h2>
+
+<h3>Header Area</h3>
+<p>At the top of the left panel you'll find:</p>
+<ul>
+    <li><strong>"Insp Items"</strong> label showing item totals and your fail count vs. team average (e.g., <code>12 / 18.5</code>)</li>
+    <li><strong>Trip #N badge</strong> — when the filename shows this is a return visit (e.g., Trip #2), this badge appears in the header</li>
+    <li><strong>MegaStats button</strong> — a clickable button labeled "<em>N</em> stats" (see MegaStats section below)</li>
+</ul>
+
+<h3>Search &amp; Filter Buttons</h3>
+<table>
+    <tr><th>Button</th><th>What It Does</th></tr>
+    <tr><td><strong>🔍</strong> Search box</td><td>Type to filter items by name or number in real time</td></tr>
+    <tr><td><strong>ALL</strong></td><td>Clear all filters — show every item</td></tr>
+    <tr><td><strong>OFI</strong></td><td>Only Fail Items — show just the failures</td></tr>
+    <tr><td><strong>REQ</strong></td><td>Required Items Only — show only mandatory (*) items</td></tr>
+    <tr><td><strong>INC</strong></td><td>Incomplete Required — show only required items that still have no value</td></tr>
+</table>
+
+<div class="tip">
+    <strong>💡 Tip:</strong> Use <strong>INC</strong> at the start of an inspection to instantly see which required fields still need your attention. The counter next to "Insp Items" tells you how many incomplete required items remain.
+</div>
+
+<h3>Checklist Tree</h3>
+<ul>
+    <li><strong>Color coding</strong> of each item row tells you its status at a glance (see Status Color table below)</li>
+    <li><strong>Section counters</strong> show your fail count / team average for each section (e.g., <code>3 / 5.2</code>)</li>
+    <li><strong>Per-item stats icons</strong> — ⭐ 😃 ↓ ↓↓ ↓↓↓ appear next to items where your rate differs significantly from the team</li>
+    <li>Tap or click any item to open its editor on the right</li>
+</ul>
+
+<h3>Bottom Controls</h3>
+<ul>
+    <li><strong>◀ ▶ section arrows</strong> — jump to the previous or next section (wraps around)</li>
+    <li><strong>A↓ / A↑</strong> — decrease or increase the checklist font size (saved automatically)</li>
+    <li><strong>💬 Messages</strong> — re-displays any inspection rules or notes from when the file was loaded</li>
+    <li><strong>📄 See All PDFs (N)</strong> — opens a document viewer listing all associated PDFs for this job number</li>
+    <li><strong>Plan button</strong> (Slab Eng / EC Plan / Eng Plan / etc.) — opens the primary engineering or plan document; label changes based on inspection type</li>
+    <li><strong>◀ Trip N</strong> (Prior Report) — appears when a prior visit to this property exists; tap to open that earlier inspection for reference</li>
+</ul>
+
+<hr>
+
+<h2>Right Panel — Item Editor</h2>
+
+<h3>Value / Status Area</h3>
+<p>The top section of the editor shows the <strong>STATUS</strong> controls, which vary by item type:</p>
+<table>
+    <tr><th>Item Type</th><th>Controls Shown</th></tr>
+    <tr><td>Pass/Fail items</td><td>Pass, Fail, NI buttons</td></tr>
+    <tr><td>Yes/No items</td><td>Yes, No, N/A buttons</td></tr>
+    <tr><td>Numeric items (numberpad)</td><td>0–9 number pad + decimal + fractions</td></tr>
+    <tr><td>Text/lookup items</td><td>Editable text box + suggestion buttons</td></tr>
+    <tr><td>Dropdown items</td><td>Scrollable option buttons</td></tr>
+</table>
+
+<h4>🗑️ Clear Value Button (wastebasket)</h4>
+<p>Whenever a value is present on any item, a small <strong>🗑️ wastebasket button</strong> appears to the right of the value area. Tap it to instantly clear the value so you can re-enter it or let the EC / Plan data fill it in.</p>
+<p>The wastebasket appears for <em>any item that has a value</em> — Pass/Fail buttons, text fields, lookup items, and number pad items alike.</p>
+
+<h4>NI Button</h4>
+<p>For items that support it, the <strong>NI</strong> button (Not Inspected) appears next to the text box. Tap it to record that this item was not inspected.</p>
+
+<h3>Trade / Prefix Area</h3>
+<p>The <strong>TRADE [required]</strong> section shows trade buttons (Framing, Electrical, Plumbing, HVAC, etc.). Select exactly one trade — it becomes the prefix for the comment. Tap <strong>+</strong> to add a custom trade name that persists across sessions.</p>
+
+<h3>Comment Area</h3>
+<ul>
+    <li>Type your observation in the multi-line text box</li>
+    <li>The <strong>preview panel</strong> (live) shows what the final comment will look like with prefix and suffix</li>
+    <li>Tap <strong>🗑️ Clear</strong> (<span class="shortcut">Alt+C</span>) to erase the comment</li>
+    <li>Tap <strong>✓ Apply</strong> (<span class="shortcut">Alt+Y</span> or <span class="shortcut">Enter</span>) to save the comment to the item</li>
+</ul>
+
+<h3>Photo Area</h3>
+<ul>
+    <li><strong>📁 File</strong> (<span class="shortcut">Alt+F</span>) — import a photo from files</li>
+    <li><strong>📷 Camera</strong> (<span class="shortcut">Alt+M</span>) — capture directly from the device camera; shows <em>"📷 3 photo(s)"</em> when photos already exist</li>
+    <li><strong>🗑️ Delete</strong> (<span class="shortcut">Alt+L</span>) — remove the currently displayed photo</li>
+    <li><strong>◀ ▶</strong> arrows navigate between multiple photos; counter shows <em>"Photo 1 of 3"</em></li>
+    <li>Tap any photo to open the <strong>Image Editor</strong> (see below)</li>
+</ul>
+
+<div class="tip">
+    <strong>💡 Multi-window camera:</strong> When you have two RED windows open and switch windows, the camera in the first window automatically closes. Re-tap Camera in the new window to capture photos for that inspection only.
+</div>
+
+<h3>Location / Suffix Area</h3>
+<p>Optional multi-select location tags (Kitchen, Master Bath, Garage, etc.) are added as a suffix to the comment. Tap multiple to select all that apply. Tap <strong>📅</strong> to append the current date/time. Tap <strong>+</strong> to add a custom location.</p>
+
+<h3>My Saved Comments</h3>
+<p>The <strong>📁 MY SAVED COMMENTS</strong> section shows comments you've previously saved for this item type. Tap any saved comment to load it. Tap <strong>+ Save Current</strong> (<span class="shortcut">Alt+V</span>) to add the current comment to your library.</p>
+
+<hr>
+
+<h2>Image Editor</h2>
+<p>Tap any photo in the editor to open it fullscreen for adjustment and annotation:</p>
+<ul>
+    <li><strong>Brightness/Lift</strong> — drag up to brighten, drag down to darken</li>
+    <li><strong>Sharpness</strong> — drag left/right to adjust sharpness</li>
+    <li><strong>Pen Markup</strong> — toggle pen mode to draw arrows, circles, or notes directly on the image</li>
+    <li><strong>Undo</strong> — reset all changes back to the original</li>
+    <li><strong>Save</strong> — apply edits and return to the main view</li>
+    <li><strong>Cancel</strong> (or <span class="shortcut">Escape</span>) — discard changes</li>
+</ul>
+<div class="tip">
+    <strong>💡 Note:</strong> Photos are automatically brightened (+25%) when first captured or imported. Sharpening has been removed for faster processing.
+</div>
+
+<hr>
+
+<h2>AI Features</h2>
+
+<h3>Get 3 AI Suggestions (<span class="shortcut">Alt+G</span>)</h3>
+<p>With a photo attached, tap <strong>Get 3</strong> to have AI analyze the image and generate three professional inspection comment suggestions. Each suggestion uses standard inspection terminology. Tap any suggestion to insert it into the comment box, or press <span class="shortcut">1</span>, <span class="shortcut">2</span>, <span class="shortcut">3</span> on the keyboard.</p>
+
+<h3>Quick Suggestions (Auto-Overlay)</h3>
+<p>When the comments box is <strong>empty</strong> and you navigate to an item, a suggestion overlay automatically appears showing the most common comments written by the team for this specific item (sorted by frequency). Press <span class="shortcut">1</span>, <span class="shortcut">2</span>, or <span class="shortcut">3</span> to instantly insert, or <span class="shortcut">Escape</span> to dismiss.</p>
+
+<h3>Transcribe — Read Labels into the Value Field (<span class="shortcut">Alt+N</span>)</h3>
+<p>On <strong>energy-related inspections</strong> (IER, HER, QIER, HET, IEF, HEF, IAP, AFI), a <strong>Transcribe</strong> button appears in the AI section. Tap it to have AI read text from the photo and place it directly into the Value field — perfect for reading equipment labels, nameplates, and R-value stickers without manual typing.</p>
+
+<p><strong>Great for:</strong></p>
+<ul>
+    <li>Equipment model and serial numbers</li>
+    <li>HVAC capacity and efficiency ratings (SEER, tonnage)</li>
+    <li>Water heater labels (gallon capacity, fuel type)</li>
+    <li>Insulation R-value stickers</li>
+    <li>Window U-factor and SHGC stickers</li>
+    <li>Any nameplate with data you need to record</li>
+</ul>
+
+<h4>Auto-Fill Adjacent Items</h4>
+<p>When you transcribe a label that contains multiple values (for example, a window sticker showing "U-Factor: 0.28 / SHGC: 0.22"), RED automatically fills the value in the current item <em>and</em> checks adjacent items to fill related values. For example, transcribing on item 2.2 (U-factor) may also populate item 2.3 (SHGC) if both values appear on the same label.</p>
+
+<p><strong>Tips for best results:</strong></p>
+<ul>
+    <li>📸 Hold the camera so text is <strong>upright and level</strong> — not tilted or at an angle</li>
+    <li>Get close enough that the text is clearly legible</li>
+    <li>Avoid glare on shiny labels — tilt slightly to reduce reflections</li>
+    <li>Make sure the full label is in frame</li>
+    <li>Good lighting helps — use your phone flashlight in dark spaces</li>
+</ul>
+
+<div class="tip">
+    <strong>💡 Tip:</strong> After Transcribe fills a value, do a quick sanity check. AI is very accurate but not perfect — one glance catches the occasional misread digit.
+</div>
+
+<hr>
+
+<h2>Energy Compliance (EC) Banner <span class="new-badge">NEW since v1.4</span></h2>
+<p>On energy inspections, a banner appears above the item editor that shows design values extracted from the Energy Compliance (EC) report PDF. This lets you instantly compare what was designed against what you observed in the field.</p>
+
+<h3>Which Inspection Types Show the EC Banner</h3>
+<table>
+    <tr><th>Code</th><th>Inspection Name</th></tr>
+    <tr><td>IER / HER / QIER</td><td>Energy Star Rough (insulation)</td></tr>
+    <tr><td>IEF / HEF</td><td>Energy Star Final (floor / equipment)</td></tr>
+    <tr><td>HET</td><td>Energy Star Final Testing (blower door / duct leakage)</td></tr>
+    <tr><td>IAP</td><td>Indoor Air Plus</td></tr>
+    <tr><td>AFI</td><td>ACCA 310 Field Inspection</td></tr>
+    <tr><td>PLY / PS / ACI</td><td>Polyseal / Performance path inspections</td></tr>
+</table>
+
+<h3>Banner Colors</h3>
+<p>The banner changes color based on how the measured (field) value compares to the design value from the EC report:</p>
+<ul>
+    <li><span class="banner-green">✔ Green</span> — Measured value matches design requirement</li>
+    <li><span class="banner-red">✗ Red — MISMATCH</span> — Value is blank when one is required, or is out of acceptable range</li>
+    <li><span class="banner-gray">Gray — No data</span> — No design value mapped to this item</li>
+    <li><span class="banner-amber">⚠ Amber</span> — EC report found but data could not be fully extracted (tap for details)</li>
+</ul>
+
+<h3>Red Flash / Strobe</h3>
+<p>When the banner transitions to <strong>red</strong> for the first time on an item (mismatch detected), it <strong>strobes red/white five times</strong> to catch your attention before settling red. This strobe only fires when switching from non-red to red — if the banner was already red when you navigated to the item, it does not strobe again.</p>
+
+<h3>What the Banner Shows</h3>
+<p>The banner displays data chips for the fields relevant to the current item:</p>
+<ul>
+    <li><strong>U-factor:</strong> design value from EC report (e.g., "U-factor: 0.28")</li>
+    <li><strong>SHGC:</strong> design solar heat gain coefficient (e.g., "SHGC: 0.22")</li>
+    <li><strong>R-values:</strong> ceiling, wall, duct, pipe, attic</li>
+    <li><strong>HERS Index:</strong> overall home energy rating score</li>
+    <li><strong>Blower Door:</strong> maximum allowed air leakage in CFM</li>
+    <li><strong>Duct Leakage:</strong> maximum allowed duct leakage in CFM</li>
+    <li><strong>Fresh Air:</strong> minimum required ventilation CFM</li>
+    <li><strong>SEER:</strong> minimum required AC efficiency</li>
+    <li><strong>Floor Area / Volume / Bedrooms:</strong> for final energy form items</li>
+</ul>
+
+<h3>Comparison Logic</h3>
+<table>
+    <tr><th>Item Type</th><th>Comparison</th><th>Why</th></tr>
+    <tr><td>U-factor (IER 2.2)</td><td>Must match design spec (±5%)</td><td>Installed windows must match the energy model</td></tr>
+    <tr><td>SHGC (IER 2.3)</td><td>Must match design spec (±5%)</td><td>Installed windows must match the energy model</td></tr>
+    <tr><td>R-values (insulation)</td><td>Actual ≥ design minimum</td><td>More insulation than designed is acceptable</td></tr>
+    <tr><td>Blower Door, Duct Leakage</td><td>Actual ≤ design maximum</td><td>Lower leakage than designed is acceptable</td></tr>
+    <tr><td>SEER, Fresh Air</td><td>Actual ≥ design minimum</td><td>Better efficiency / more ventilation is acceptable</td></tr>
+    <tr><td>Floor Area, Bedrooms</td><td>Close match (within 5%)</td><td>Must match the home that was modeled</td></tr>
+    <tr><td>Energy Star Program, WH Fuel</td><td>Text contains design value</td><td>Must match program type / fuel type</td></tr>
+</table>
+
+<div class="tip">
+    <strong>💡 U-factor &amp; SHGC:</strong> These use a close-match comparison (within 5% of the design value). If your field value is 0.20 and the design says 0.22, that flags red — even though 0.20 is technically "better" energy-wise, the installed window doesn't match what was modeled. Check with the builder if different windows were substituted.
+</div>
+
+<h3>⬇ Apply EC Button</h3>
+<p>When the EC banner is green and the current item has no value yet, the <strong>⬇ Apply EC</strong> button appears. Tap it to instantly fill the current item's value from the EC report. If the item already has a value, the button is grayed out (non-destructive — it won't overwrite your work).</p>
+
+<h3>Tapping the Banner</h3>
+<p>Tap anywhere on the EC banner to open a detail overlay showing every data point extracted from the EC report — HERS index, all R-values, duct specs, blower door, floor area, IECC version, and more. Useful for cross-checking multiple items at once.</p>
+
+<hr>
+
+<h2>Slab / Structural Banner (CPP Inspections) <span class="new-badge">NEW since v1.4</span></h2>
+<p>On <strong>CPP</strong> (Concrete Pre-Pour) inspections, a separate banner shows values extracted from the <strong>foundation detail sheet</strong> or other structural plan PDF. This allows you to compare your field observations against the engineering plan without switching documents.</p>
+
+<h3>What It Extracts</h3>
+<ul>
+    <li><strong>Cable count</strong> — total post-tension cables, split into F2B (front-to-back) and R2L (right-to-left) directions</li>
+    <li><strong>Slab thickness</strong> — design thickness in inches</li>
+    <li><strong>Beam dimensions</strong> — width × depth</li>
+    <li><strong>Holddown count</strong> — seismic anchor quantity</li>
+</ul>
+
+<h3>Cable Count Comparison</h3>
+<p>Cable counts are the most critical slab measurement. RED compares your recorded count to the plan:</p>
+<ul>
+    <li><span class="banner-green">Green</span> — count matches plan (within ±1 cable per direction)</li>
+    <li><span class="banner-red">Red — MISMATCH</span> — count is wrong (triggers strobe flash)</li>
+</ul>
+
+<h3>⬇ Apply Plan Button</h3>
+<p>When slab data is available and the current item has no value, the <strong>⬇ Apply Plan</strong> button fills the item automatically. For item 5.1.b (cable count), it also writes a note in the comments field with the directional breakdown.</p>
+
+<h3>Tapping the Slab Banner</h3>
+<p>Tap the banner to see the full extracted slab data — cable counts, slab thickness, beam specs, holddown count, and the PDF it was read from. A link to the raw OCR text is also provided for troubleshooting.</p>
+
+<h3>Plan PDF Revision Selection (CPP)</h3>
+<p>When multiple plan revisions exist for a job number, <strong>right-click</strong> the Slab Eng button to select which revision to use. The most current revision is selected automatically by default.</p>
+
+<hr>
+
+<h2>MegaStats Panel <span class="new-badge">NEW since v1.4</span></h2>
+<p>The <strong>MegaStats</strong> button in the left panel header (labeled "<em>N</em> stats") opens an overlay showing the items most commonly found by the entire team on this inspection type — giving you a quick reference for what to focus on during your inspection.</p>
+
+<h3>What You See</h3>
+<p>For each high-frequency item, the panel shows:</p>
+<ul>
+    <li>The item number and name</li>
+    <li>A <strong>bar chart</strong> showing the team catch rate (how often this item is flagged as a fail)</li>
+    <li>Your personal catch rate vs. the team rate — so you can see where you're strong and where you might have a blind spot</li>
+    <li><strong>Quick comments</strong> — the most common comment written for this item across all inspectors</li>
+</ul>
+
+<h3>Notes</h3>
+<ul>
+    <li>Section 1 (administrative) items are excluded — those are checkoffs, not real inspection findings</li>
+    <li>Only items with a team catch rate of 3% or higher appear (items rarely caught aren't shown)</li>
+    <li>Up to 15 items are shown, sorted by team catch rate (highest first)</li>
+    <li>Swipe up/down within the overlay to scroll through all items</li>
+    <li>Tap the <strong>✕</strong> button or the dark backdrop to close the panel</li>
+</ul>
+
+<div class="tip">
+    <strong>💡 Tip:</strong> Open MegaStats at the start of an inspection as a quick reminder of what the team consistently finds on this form type. It's especially helpful for inspection types you don't do every day.
+</div>
+
+<hr>
+
+<h2>Trip Number &amp; Prior Reports <span class="new-badge">NEW since v1.4</span></h2>
+
+<h3>Trip Number Badge</h3>
+<p>When an inspection file name indicates this is a return visit (e.g., trip 2 or trip 3), a <strong>Trip #N</strong> badge appears in the left panel header. This is a quick visual reminder that you're on a re-inspection.</p>
+
+<h3>Prior Report Button</h3>
+<p>When a previous trip to the same property exists in your MyList folder, a <strong>◀ Trip N</strong> button appears at the bottom of the left panel. Tap it to open that earlier inspection in a second RED window for side-by-side comparison — useful for verifying that items that failed on the prior visit have been corrected.</p>
+
+<hr>
+
+<h2>Inspector Statistics</h2>
+
+<h3>Understanding Your Stats</h3>
+<p>RED tracks your fail counts across all your inspections and compares them to the team average — helping you identify blind spots and see where you're thorough.</p>
+
+<h4>Section-Level Counters</h4>
+<p>Each section header shows a counter like <code>(3 / 5.2)</code>:</p>
+<ul>
+    <li><strong>First number (3)</strong> — your current fail count for this section</li>
+    <li><strong>Second number (5.2)</strong> — the team average fails per inspection for this section</li>
+</ul>
+
+<h4>Inspection-Level Counter</h4>
+<p>At the top next to "Insp Items" you'll see a total like <code>(12 / 18.5)</code> — your total fails vs. the team average for the whole inspection.</p>
+
+<h4>Per-Item Indicators</h4>
+<table>
+    <tr><th>Indicator</th><th>Meaning</th></tr>
+    <tr><td>⭐</td><td>100%+ above team average — exceptional attention to detail</td></tr>
+    <tr><td>😃</td><td>10%+ above team average — above average</td></tr>
+    <tr><td>↓</td><td>40–59% below team average — worth a closer look</td></tr>
+    <tr><td>↓↓</td><td>60–79% below team average — blind spot</td></tr>
+    <tr><td>↓↓↓</td><td>80%+ below team average — significant blind spot</td></tr>
+</table>
+
+<h3>Stats Scope (Global / Builder / Neighborhood)</h3>
+<p>The title bar shows three clickable mode labels. Tap one to change the comparison scope:</p>
+<table>
+    <tr><th>Mode</th><th>Compares Against</th></tr>
+    <tr><td><strong>Global</strong></td><td>All inspections, all builders — full team average</td></tr>
+    <tr><td><strong>Builder Client</strong></td><td>Only inspections for the same builder (e.g., DR Horton, Pulte)</td></tr>
+    <tr><td><strong>Neighborhood</strong></td><td>Only inspections in the same subdivision — hyper-local comparison</td></tr>
+</table>
+<p>The active mode shows in <strong>white text with an underline</strong>. Section counters and item indicators update immediately. If there isn't enough data for Builder or Neighborhood mode, RED falls back to Global automatically.</p>
+
+<hr>
+
+<h2>Required Field Indicators</h2>
+<p>RED uses color to highlight missing required fields so nothing gets overlooked:</p>
+<table>
+    <tr><th>Color</th><th>Meaning</th></tr>
+    <tr><td style="background:#FFD6DD; padding: 8px;">Saturated Red background</td><td>Required field is MISSING (no value or no photo yet)</td></tr>
+    <tr><td style="background:#F0F8FF; padding: 8px;">Light Blue background</td><td>Field is filled, or not required</td></tr>
+</table>
+<p>Both the VALUE section and the PHOTO section show a red background when their required content is missing. The moment you supply the value or photo, the background changes to blue.</p>
+
+<hr>
+
+<h2>Templates</h2>
+
+<h3>Creating a Template (<span class="shortcut">Alt+T</span>)</h3>
+<ol>
+    <li>Open an inspection and set your preferred default values for each item</li>
+    <li>Click <strong>Save Template</strong> or press <span class="shortcut">Alt+T</span></li>
+    <li>Enter a name (e.g., "Standard Pre-Pour", "Reinspection Defaults")</li>
+    <li>The template saves the status values only — not comments or photos</li>
+</ol>
+
+<h3>Applying a Template (<span class="shortcut">Alt+A</span>)</h3>
+<ol>
+    <li>Open a new inspection file</li>
+    <li>If a matching template exists, you'll be prompted automatically on load</li>
+    <li>Or click <strong>Apply Template</strong> / press <span class="shortcut">Alt+A</span> at any time</li>
+    <li>Select from your saved templates for this form type</li>
+    <li>All status values are applied instantly</li>
+</ol>
+
+<div class="tip">
+    <strong>💡 Tips:</strong> Templates are per form type — different inspection types have separate template libraries. Create multiple templates for different scenarios (e.g., "New Construction" vs. "Reinspection"). Stored locally in <code>%LOCALAPPDATA%\Red\templates.json</code>.
+</div>
+
+<hr>
+
+<h2>Fail-to-Pass Smart Cleanup</h2>
+<p>When you change an item from <strong>Fail → Pass</strong> (common on re-inspections), RED asks:</p>
+<blockquote>
+    <strong>"Do you want to remove picture and comment as well?"</strong><br>
+    [Yes] &nbsp; [No — leave comment and image]
+</blockquote>
+<ul>
+    <li><strong>Yes:</strong> clears the comment and photos — <em>unless the item requires a photo</em>, in which case the required photo is protected and stays attached</li>
+    <li><strong>No:</strong> nothing is removed — comment and photos stay in place</li>
+</ul>
+<div class="tip">
+    <strong>💡 Tip:</strong> When a photo is required, RED shows a warning: <em>"⚠️ Picture is REQUIRED and will NOT be deleted."</em> You can safely click Yes knowing the required photo remains.
+</div>
+
+<hr>
+
+<h2>Multiple Inspections (Multi-Window)</h2>
+
+<h3>Opening a Second Inspection Simultaneously</h3>
+<ol>
+    <li>With an inspection open, click <strong>📂 Open INS</strong></li>
+    <li>A dialog asks:
+        <ul>
+            <li><strong>Yes</strong> — keep this one open and launch a <em>new RED window</em></li>
+            <li><strong>No</strong> — close this one and open the new file here</li>
+            <li><strong>Cancel</strong> — never mind</li>
+        </ul>
+    </li>
+</ol>
+
+<table>
+    <tr><th>Rule</th><th>Why</th></tr>
+    <tr><td>❌ Cannot open the <strong>same file</strong> in two windows</td><td>Prevents conflicting edits to the same report</td></tr>
+    <tr><td>❌ Cannot open two inspections of the <strong>same type</strong> simultaneously</td><td>Stats and templates are type-specific — duplicate types would cause confusion</td></tr>
+    <tr><td>✅ Can open <strong>different types</strong> side by side (e.g., IER + CPP)</td><td>Each window tracks its own type independently</td></tr>
+</table>
+
+<div class="warning">
+    <strong>⚠️ Remember:</strong> RED auto-saves when you close a window — but if you have two windows open, you must save/close each one separately.
+</div>
+
+<hr>
+
+<h2>Layout &amp; Customization</h2>
+
+<h3>Resizing Panels</h3>
+<p>A <strong>draggable divider</strong> sits between the left checklist panel and the right editor panel. Drag it left or right to adjust widths. Your preferred split is saved and restored automatically.</p>
+
+<h3>Checklist Font Size</h3>
+<p>Use <strong>A↓</strong> and <strong>A↑</strong> at the bottom-left to decrease or increase the checklist text size. Your preference is saved automatically.</p>
+
+<h3>Section Navigation</h3>
+<p>The <strong>◀</strong> and <strong>▶</strong> buttons at the bottom-left jump between major form sections without scrolling. Wraps around (last → first, first → last).</p>
+
+<hr>
+
+<h2>Item Duplication</h2>
+<p>Some defects need to be recorded multiple times (e.g., the same framing issue in three locations). Use <strong>➕ Duplicate</strong> (<span class="shortcut">Alt+U</span>) to clone the current item. The duplicate appears in the same section and can have its own value, comment, photo, and location tags. Use <strong>➖ Remove</strong> (<span class="shortcut">Alt+R</span>) to delete a duplicate (originals cannot be removed).</p>
+
+<hr>
+
+<h2>Status Colors in the Checklist Tree</h2>
+<table>
+    <tr><th>Row Color</th><th>Meaning</th></tr>
+    <tr><td style="background:#d4edda; padding:8px;">Green background</td><td>Pass, ✓, OK, Yes — item complete and passing</td></tr>
+    <tr><td style="background:#f8d7da; padding:8px;">Red background</td><td>Fail, ✗, defect found — item needs attention</td></tr>
+    <tr><td style="background:#e9ecef; padding:8px;">Gray background</td><td>Pending, N/A, NI — not yet evaluated</td></tr>
+    <tr><td style="background:#fff3cd; padding:8px;">Yellow / orange text</td><td>Required item incomplete (watch the INC filter)</td></tr>
+</table>
+
+<hr>
+
+<h2>Plan Documents</h2>
+<p>The plan button in the left panel (labeled dynamically based on inspection type) opens the primary engineering or plan document. RED automatically selects the best match from the PDFs associated with the job number, using a scoring system:</p>
+<table>
+    <tr><th>Inspection Type</th><th>Preferred Document</th></tr>
+    <tr><td>CPP</td><td>Foundation Detail Sheet (FD prefix)</td></tr>
+    <tr><td>IER / HER / HET / IEF / IAP</td><td>Energy Compliance (EC) report</td></tr>
+    <tr><td>AFI</td><td>Engineering with detail sheet</td></tr>
+    <tr><td>BF / BWT / FWI</td><td>Architectural plan</td></tr>
+    <tr><td>CPR / STR</td><td>FD plan</td></tr>
+    <tr><td>PPE</td><td>FFP plan (framing)</td></tr>
+    <tr><td>FS / FSF / ME / MP / COH / SWI / TPC / SCI / TFF / TRDI / TRSI</td><td>Engineering plan</td></tr>
+    <tr><td>SRP</td><td>Repair design document</td></tr>
+</table>
+
+<hr>
+
+<h2>File Management</h2>
+
+<h3>File Locations</h3>
+<ul>
+    <li><strong>Inspections:</strong> <code>~/Dropbox/Inspections/MyList/</code></li>
+    <li><strong>Templates:</strong> <code>%LOCALAPPDATA%\Red\templates.json</code></li>
+    <li><strong>Saved Comments:</strong> <code>%LOCALAPPDATA%\InspectionEditor\userdata\&lt;username&gt;\</code></li>
+    <li><strong>Custom Trades &amp; Locations:</strong> <code>%LOCALAPPDATA%\InspectionEditor\userdata\&lt;username&gt;\</code></li>
+    <li><strong>Settings:</strong> <code>[App Folder]\settings.txt</code></li>
+    <li><strong>Picker settings:</strong> <code>[App Folder]\inspection_picker_settings.json</code></li>
+</ul>
+
+<h3>Auto-Save on Close</h3>
+<p>RED automatically saves your work when you close the application if there are unsaved changes. You can also save manually at any time with <strong>💾 Save</strong> or <span class="shortcut">Alt+S</span>.</p>
+
+<hr>
+
+<h2>Efficient Workflow Tips</h2>
+
+<h3>Speed Run Method</h3>
+<ol>
+    <li>Open inspection with <span class="shortcut">Alt+O</span></li>
+    <li>Apply template if prompted</li>
+    <li>Check MegaStats panel to see what the team commonly finds on this form</li>
+    <li>Use INC filter to see which required fields still need values</li>
+    <li>Use <span class="shortcut">↓</span> to move through items one by one</li>
+    <li>For each defect: Tab to Status → Space on Fail → Tab to Trade → Space → Tab to Comments → type or use suggestions → Enter</li>
+    <li>Save with <span class="shortcut">Alt+S</span></li>
+</ol>
+
+<h3>Energy Inspections — EC Banner Workflow</h3>
+<ol>
+    <li>Open the IER / HET / IEF file</li>
+    <li>EC data loads automatically in the background</li>
+    <li>Navigate to items 2.2 (U-factor) and 2.3 (SHGC) — tap <strong>⬇ Apply EC</strong> if the fields are empty and the EC data matched</li>
+    <li>For insulation items, check the banner color — green means it matches the design, red means it doesn't</li>
+    <li>If a banner flashes red, record the actual measured value and note the discrepancy in the comment</li>
+</ol>
+
+<h3>CPP Slab Inspection Workflow</h3>
+<ol>
+    <li>Open CPP file — the slab banner loads automatically</li>
+    <li>Count F2B and R2L cables on the slab</li>
+    <li>Navigate to the cable count items — the banner shows the design count</li>
+    <li>If counts match, tap <strong>⬇ Apply Plan</strong> to fill the value; banner turns green</li>
+    <li>If counts differ, record your actual count — banner turns red (and strobes) as a flag</li>
+</ol>
+
+<h3>Use OFI for Review</h3>
+<p>Before saving, click <strong>OFI</strong> to see only your failures and do a final review of each one — comments, photos, trades all correct.</p>
+
+<h3>Use INC + MegaStats Together</h3>
+<p>Open MegaStats to see the most commonly flagged items, then switch to INC to make sure all required fields are filled before you leave the site.</p>
+
+<hr>
+
+<p style="text-align:center; color:#666; margin-top:50px;">
+    <strong>Red</strong> v1.7.46 &nbsp;|&nbsp; Full Inspection Systems &nbsp;|&nbsp; April 2026<br>
+    For support, contact Trent Fuller.
+</p>
+
+</body>
+</html>

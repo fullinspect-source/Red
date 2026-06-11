@@ -1,0 +1,35 @@
+INS Type,Alias 1,offer file,Includes free reinspections,Expiration Stage,Energineer Review,Pass,Complete,Correct And Proceed,Fail - Next action: Failed items to be inspected at next inspection,Fail - Next action: Request a reinspection. (PO required)
+AFI,ACCA 310 Field Inspection,Engineering (with detail sheets),,,No,Yes,No,Yes,No,Yes
+BC,Builder Confirmation,Architectural Plan,,,No,Yes,No,Yes,No,Yes
+BF,BMEP Final,Architectural Plan,,,No,Yes,No,No,Yes,Yes
+BWT,New Home Orientation,Architectural Plan,,,No,No,Yes,No,No,No
+COH,Flashing Sheathing Framing (COH),Engineering (with detail sheets),,IER or HER,No,Yes,No,Yes,Yes,Yes
+CPP,Concrete Pre-pour,FD suffix,,CPR,No,Yes,No,Yes,Yes,Yes
+CPR,Concrete Pour,FD suffix,CPP,,No,Yes,No,Yes,No,Yes
+FS,Frame,Engineering (with detail sheets),,,No,Yes,No,Yes,Yes,Yes
+FSF,Flashing Sheathing Framing,Engineering (with detail sheets),,IER or HER,No,Yes,No,Yes,Yes,Yes
+FWI,Stage Three Fire,Architectural Plan,,,No,Yes,No,Yes,No,Yes
+HEF,Final Energy Star,EC suffix,BF or TFF,,No,Yes,No,Yes,No,Yes
+HER,HERS Energy Rough,EC suffix,ME or MP or COH or FSF or TPC,,No,Yes,No,Yes,No,Yes
+HET,Energy Star Final Testing,EC suffix,,,No,Yes,No,No,No,Yes
+IAP,Indoor Air Plus,EC suffix,,,No,Yes,No,No,No,Yes
+IEF,Energy Star Final,EC suffix,BF or TFF,,No,Yes,No,Yes,No,Yes
+IER,Energy Star Rough,EC suffix,ME or MP or COH or FSF or TPC,,No,Yes,No,Yes,No,Yes
+ME,BMEP Rough,Engineering (with detail sheets),FSF or TPC,IER or HER,No,Yes,No,Yes,Yes,Yes
+MP,BMEP Rough,Engineering (with detail sheets),FSF or TPC,IER or HER,No,Yes,No,Yes,Yes,Yes
+PLY,Polyseal,EC suffix,,,No,Yes,No,Yes,No,Yes
+PPE,Concrete Post Pour Elevations,FFP suffix,,,No,No,Yes,No,No,No
+QIER,Energy Rough,EC suffix,ME or MP or COH or FSF or TPC,,No,Yes,No,Yes,No,Yes
+SCI,Special Consult,Engineering,,,Yes,No,No,No,No,No
+SRP,Slab Repair Pre Pour,repair design,,,No,Yes,No,Yes,No,Yes
+STR,Stressing,FD suffix,,,No,Yes,No,No,No,Yes
+SWI,Shearwall Inspection,Engineering (with detail sheets),,,No,Yes,No,Yes,No,Yes
+TFF,TDI Final Frame,Engineering,,IEF or HEF,No,Yes,No,No,Yes,Yes
+TPC,TDI Pre Cornice,Engineering (with detail sheets),,IER or HER,No,Yes,No,No,Yes,Yes
+TRDI,TDI Roof Decking Inspection,Engineering,,,No,Yes,No,No,No,Yes
+TRSI,TDI Roof Shingle Inspection,Engineering,,,No,Yes,No,No,No,Yes
+,,,,,,,,,,
+https://docs.google.com/spreadsheets/d/1tuT8L7OFWzebwsJ0qe9tegxwier-knASgWpp70qJbqY/export?format=csv,,,,,,,,,,
+,,run logic in this column when loading new INS file - to decide what button does at bottom of left pane,"run logic in this column when loading new INS file - loads an list of ""other inspections"" to offer the user to load in new Red window along with the selected one when simultaneous free reinspections are elgiable. - display in the Acknowledgement window ... each with a ""yes"" or ""no"" checkbox to either load at same time or not load at same time according to user selection. ","run logic in this column when selecting results during close of a report, but probably run the logic in the background ahead of time so it doesn't cause a pause to discover what to do",run logic in this column when selecting results during close of a report,run logic in this column when selecting results during close of a report,run logic in this column when selecting results during close of a report,run logic in this column when selecting results during close of a report,run logic in this column when selecting results during close of a report,run logic in this column when selecting results during close of a report
+,,,This service comes with this eligable free reinspection,"No available free reinspection at ""next phase"" because next phase is already completed.",,"Not offering Pass as a result since something on the checklist says it is ""fail""",,"Not offering C/P as a result since everything on the checklist says it is ""pass""","Not offering C/P as a result since everything on the checklist says it is ""pass""","Not offering C/P as a result since everything on the checklist says it is ""pass"""
+the CODEs above are in the inspection file-names,,"this was wired up already, but I'd like to make it configurable here rather than rely on how it is currently hard-coded.  So please code RED to use this breakdow to make the button at the bottom of the left pane map to the specific document above","example - when openning a CPR report - Fail - Next action: Failed items to be inspected at next inspection  may be result you can read at the top of the job file - inspection folder at the top of any CPP report already found in the folder -  in the / dropbox/ inspections / jobs / [job id] / inspections . and if there is a CPP in the MYLIST folder adjacent to the CPR that is being openning , AND if the CPP report in that folder has that exact type of fail written on the report, then update the acknowledgement popup on load with the message at the cell above this cell.  user will need to select ""yes"" or 'No"" .. to either open or not open the CPP report as well.   However, if it is supposed to have a CPP to do alongside this one but there isn't one found in the MYLIST folder .. Then do the same yes/no item but gray out the buttons since there is no way to open alongside when that file is not in the MYLIST ... rather an ""alert"" with a special ICON should be presented ... User must acknoledge that the selected service INCLUDES a free reinspection [ list the free rinspection it comes with ] but that is not loaded in MYLIST so it cannot be openned currently.   ","what this means is that if there exists a PDF file with one of the INS code matching in the / dropbox/ inspections / jobs / [job id] / inspections folder, then override what is written in column H and make it No even if column H is Yes.  so let's say the user is doing a CPP report - but CPR is already done ... the above message should be displayed in the grayed out result button .. for example, Instead of offering : ""Fail - Next action: Failed items to be inspected at next inspection"" just present the message above.",whether or not to display this option as a result when closing a INS file,"whether or not to display this option as a result when closing a INS file. but gray it out when there are one or more fail items on the checklist. Instead , present the message in the cell above.  Disregard ""no"" values. Only regard ""fail"" values.",whether or not to display this option as a result when closing a INS file,"whether or not to display this option as a result when closing a INS file. but gray it out when there are no fail items on the checklist. Instead , present the message in the cell above. Disregard ""no"" values. Only regard ""fail"" values.","whether or not to display this option as a result when closing a INS file. but gray it out when there are no fail items on the checklist. Instead , present the message in the cell above. Disregard ""no"" values. Only regard ""fail"" values.","whether or not to display this option as a result when closing a INS file. but gray it out when there are no fail items on the checklist. Instead , present the message in the cell above. Disregard ""no"" values. Only regard ""fail"" values."

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>RED Training Video Script</title>
+<style>
+body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; max-width: 750px; margin: 40px auto; line-height: 1.6; color: #222; }
+h1 { color: #8B0000; border-bottom: 3px solid #8B0000; padding-bottom: 8px; }
+h2 { color: #8B0000; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+.time { background: #8B0000; color: white; padding: 2px 10px; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
+.action { color: #2E86AB; font-style: italic; margin: 4px 0 4px 20px; }
+.narration { margin: 6px 0 6px 20px; }
+.tip { background: #e8f4f8; border-left: 4px solid #2E86AB; padding: 8px 14px; margin: 10px 20px; font-size: 0.95em; }
+.note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 8px 14px; margin: 10px 20px; font-size: 0.95em; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th { background: #8B0000; color: white; padding: 8px; text-align: left; }
+td { border: 1px solid #ddd; padding: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🔴 RED — Training Video Script</h1>
+<p><strong>Duration:</strong> ~15 minutes<br>
+<strong>Audience:</strong> Field inspectors using RED for the first time<br>
+<strong>Format:</strong> Screen recording with voiceover</p>
+
+<hr>
+
+<h2>INTRO — What is RED?</h2>
+<p><span class="time">0:00 – 0:45</span></p>
+
+<p class="action">[Show RED splash screen / app icon]</p>
+
+<p class="narration">"This is RED — our inspection editor for working with INS files. It replaces the need to hand-edit inspection data and gives you tools for photos, comments, templates, and AI suggestions — all in one place."</p>
+
+<p class="narration">"By the end of this video, you'll know how to install RED, open an inspection, work through a checklist, add photos and comments, use templates to save time, and save your work. Let's get started."</p>
+
+<hr>
+
+<h2>SECTION 1 — Installation</h2>
+<p><span class="time">0:45 – 2:00</span></p>
+
+<p class="action">[Show the RED zip file in shared folder]</p>
+
+<p class="narration">"RED comes as a standalone zip file — no installation wizard, no .NET runtime needed. Here's all you do:"</p>
+
+<p class="action">[Screen: extract zip to a folder on the tablet/laptop]</p>
+
+<ol>
+<li><strong>Download</strong> the latest RED zip from the shared drive.</li>
+<li><strong>Extract</strong> it to a folder — your Desktop, Documents, wherever you like.</li>
+<li><strong>Open the folder</strong> and double-click <code>InspectionEditor.exe</code>.</li>
+</ol>
+
+<p class="narration">"That's it. First time you launch, it'll ask for your API key — that's for the AI features. Paste it in and hit Save. You only do this once."</p>
+
+<p class="action">[Show settings window → paste API key → Save]</p>
+
+<p class="narration">"If you also get a license activation prompt, you'll see a machine code. Send that to your admin and they'll give you a license file. Drop it in the same folder as the app."</p>
+
+<div class="tip"><strong>Tip for video:</strong> Have the zip pre-downloaded so this section stays quick. Show the whole process but don't dwell on it.</div>
+
+<hr>
+
+<h2>SECTION 2 — Opening an Inspection</h2>
+<p><span class="time">2:00 – 3:30</span></p>
+
+<p class="action">[Click 📂 Open INS button on toolbar]</p>
+
+<p class="narration">"Click Open INS — or hit Alt+O. This opens the inspection picker."</p>
+
+<p class="action">[Show the Inspection Picker window]</p>
+
+<p class="narration">"You'll see all the INS files in your Review folder — address, type, date, builder, and filename. You can sort any column by clicking the header."</p>
+
+<p class="action">[Click the Address column header to sort, then click again to reverse]</p>
+
+<p class="narration">"Use the search box to filter. If I type an address or inspection type, the list narrows down instantly."</p>
+
+<p class="action">[Type a partial address in search → show list filtering]</p>
+
+<p class="narration">"See the 📞 phone icon? That's the notify button. If there's a contact phone number on file, it's green — tap it and it gives you a QR code. Scan it with your phone and it opens a pre-written text message to the builder letting them know you're on your way. If there's no phone number, the button is grayed out."</p>
+
+<p class="action">[Click a green 📞 button → show QR window briefly → close it]</p>
+
+<p class="narration">"Double-click an inspection — or select it and hit Enter — to open it."</p>
+
+<p class="action">[Double-click to open an inspection]</p>
+
+<div class="note"><strong>Note:</strong> If the inspection has rules that require acknowledgment, a rules screen will pop up. Read each rule, check the boxes, and click Acknowledge to proceed.</div>
+
+<hr>
+
+<h2>SECTION 3 — The Main Screen Layout</h2>
+<p><span class="time">3:30 – 4:30</span></p>
+
+<p class="action">[Inspection is now open — show the full main window]</p>
+
+<p class="narration">"Here's your workspace. On the left is the checklist tree — every section and item from the INS file. On the right is where you do your work: status, trade, photos, and comments."</p>
+
+<p class="narration">"At the top of the left pane, you've got a search/filter box and two filter buttons:"</p>
+
+<ul>
+<li><strong>OFI</strong> — Only Fail Items. Filters to just the items you've marked as failures. Great for reviewing your work.</li>
+<li><strong>REQ</strong> — Required Items. Shows only mandatory items marked with an asterisk.</li>
+</ul>
+
+<p class="narration">"Notice the color coding in the tree. Green means pass, red means fail, gray means pending or not inspected. You can see at a glance where you stand."</p>
+
+<p class="action">[Point out a few colored items in the tree]</p>
+
+<p class="narration">"You might also see little indicators next to some items — smiley faces or arrows. Those are inspector performance indicators. A 😃 means you tend to catch this one more than average. Arrows pointing down mean it's a blind spot. It's nudging you to pay extra attention."</p>
+
+<hr>
+
+<h2>SECTION 4 — Working a Checklist Item (Core Workflow)</h2>
+<p><span class="time">4:30 – 8:00</span></p>
+
+<p class="narration">"Let me walk you through a typical item. This is the bread and butter of RED."</p>
+
+<h3>Step 1: Select an Item</h3>
+<p class="action">[Click on a checklist item in the tree — e.g. a framing or insulation item]</p>
+
+<p class="narration">"Click any item in the tree, or use the arrow keys to navigate up and down."</p>
+
+<h3>Step 2: Set the Status</h3>
+<p class="action">[Click the "Fail" button in the Status section]</p>
+
+<p class="narration">"Set the status — Pass, Fail, or NI for Not Inspected. For this one, we're marking it as a fail."</p>
+
+<h3>Step 3: Select the Trade</h3>
+<p class="action">[Click a trade button — e.g. "Framer"]</p>
+
+<p class="narration">"Pick the responsible trade. This adds a prefix to your comment — [framer], [plumber], whatever applies. You can only pick one trade per comment."</p>
+
+<p class="narration">"If you need a trade that's not listed, hit the + button to add a custom one. It'll stick around for future use."</p>
+
+<h3>Step 4: Take or Attach a Photo</h3>
+<p class="action">[Click 📸 Camera button or 📁 File button]</p>
+
+<p class="narration">"Add a photo — use the camera button to capture directly, or the file button to pick an existing image. You can attach multiple photos to one item. Use the left/right arrows to flip through them."</p>
+
+<p class="action">[Show photo appearing in the preview area. Click photo to open editor briefly.]</p>
+
+<p class="narration">"Click the photo to open the image editor. You can adjust brightness, sharpness, or draw on the image with the pen tool to mark up defects. Save when you're done."</p>
+
+<h3>Step 5: Add a Comment</h3>
+<p class="action">[Click into the comments box — show the Quick Suggestions overlay appearing]</p>
+
+<p class="narration">"When the comments box is empty, you'll see a suggestions overlay — these are the most common comments your team uses for this specific item. Press 1, 2, or 3 to pick one instantly."</p>
+
+<p class="action">[Press "1" to select the top suggestion]</p>
+
+<p class="narration">"Or just start typing your own comment. You can also click a saved comment if you've saved any."</p>
+
+<h3>Step 5b: AI Suggestions (Optional)</h3>
+<p class="action">[Click "Get 3" button with a photo attached]</p>
+
+<p class="narration">"If you've got a photo attached, hit Get 3 — that's Alt+G. The AI analyzes the photo and gives you three professional comment suggestions. Click one to use it. This is great when you're not sure how to word something."</p>
+
+<p class="action">[Show 3 suggestions appearing → click one]</p>
+
+<h3>Step 5c: Location Tags (Optional)</h3>
+<p class="action">[Click a location button like "(kitchen)" or "(garage)"]</p>
+
+<p class="narration">"Optionally, add a location tag. These are suffixes — kitchen, garage, master bath. You can select multiple. There's also a date stamp button if you need a timestamp."</p>
+
+<h3>Step 6: Apply</h3>
+<p class="action">[Click ✓ Apply or press Enter]</p>
+
+<p class="narration">"When you're done with the item, click Apply or just hit Enter. The preview at the bottom shows exactly what gets saved — trade prefix, your comment, and location suffix all assembled together."</p>
+
+<p class="narration">"Then move to the next item and repeat. Arrow down, set status, add details, apply."</p>
+
+<div class="tip"><strong>Speed tip:</strong> Use Tab to move between sections — Status → Trade → Photo → Comments → Apply. Combined with keyboard shortcuts, you can fly through items without touching the mouse.</div>
+
+<hr>
+
+<h2>SECTION 5 — Templates (Save Time on Repeat Forms)</h2>
+<p><span class="time">8:00 – 9:30</span></p>
+
+<p class="action">[Open a fresh inspection of the same type]</p>
+
+<p class="narration">"If you do the same type of inspection regularly, templates are a huge time saver. Here's how they work."</p>
+
+<h3>Saving a Template</h3>
+<p class="action">[With an inspection open that has statuses set, click Save Template or Alt+T]</p>
+
+<p class="narration">"After you've set your default pass/fail pattern on an inspection, hit Alt+T to save it as a template. Give it a name — like 'Standard Pre-Pour' or 'Energy Rough Defaults.' It saves the status values only — not your photos or comments."</p>
+
+<h3>Applying a Template</h3>
+<p class="action">[Open a new inspection of same form type → show prompt to apply template]</p>
+
+<p class="narration">"Next time you open an inspection of the same form type, RED will ask if you want to apply your template. Hit yes, and all the statuses populate instantly. Now you just work the exceptions — the items that differ from your defaults."</p>
+
+<p class="narration">"You can also apply manually anytime with Alt+A."</p>
+
+<hr>
+
+<h2>SECTION 6 — Duplicating Items</h2>
+<p><span class="time">9:30 – 10:15</span></p>
+
+<p class="action">[Select a failed item in the tree]</p>
+
+<p class="narration">"Sometimes you find the same defect in multiple locations. Instead of cramming everything into one comment, use the Duplicate button — that's the ➕ icon, or Alt+U."</p>
+
+<p class="action">[Click ➕ Duplicate → show the cloned item appear in the tree]</p>
+
+<p class="narration">"It creates a copy of the item. Now you can give each instance its own photo, comment, and location tag. Much cleaner for the report."</p>
+
+<p class="narration">"If you duplicate by mistake, select it and hit Alt+R to remove the duplicate."</p>
+
+<hr>
+
+<h2>SECTION 7 — Saving Your Work</h2>
+<p><span class="time">10:15 – 11:00</span></p>
+
+<p class="action">[Click 💾 Save on toolbar]</p>
+
+<p class="narration">"When you're done — or anytime during your inspection — hit Save. That's Alt+S. RED writes your changes back to the INS file."</p>
+
+<div class="note"><strong>⚠️ Important:</strong> RED does not auto-save. Always save before closing. Make it a habit — save after every few items if you want to be safe.</div>
+
+<p class="narration">"RED also creates a versioned summary each time you save — so if you save multiple times on the same day, it updates the existing summary. If you come back another day, it creates a new dated entry. Your history accumulates."</p>
+
+<hr>
+
+<h2>SECTION 8 — Documents Viewer</h2>
+<p><span class="time">11:00 – 11:45</span></p>
+
+<p class="action">[Click 📄 Docs button or Alt+D]</p>
+
+<p class="narration">"The Docs button opens related engineering documents for the property — plans, specs, revisions. RED filters them automatically so you see what's relevant."</p>
+
+<p class="narration">"This is handy for energy inspections or anytime you need to reference plans without leaving the app."</p>
+
+<hr>
+
+<h2>SECTION 9 — Transcribe (Energy Inspections)</h2>
+<p><span class="time">11:45 – 12:30</span></p>
+
+<p class="action">[Open an energy inspection item with a photo of a label/nameplate]</p>
+
+<p class="narration">"For energy inspections, there's a Transcribe button — Alt+N. Take a photo of an equipment label, a rating plate, or a sticker, and hit Transcribe. The AI reads the text off the image and drops it into your comment."</p>
+
+<p class="action">[Click Transcribe → show extracted text appearing]</p>
+
+<p class="narration">"Model numbers, serial numbers, specs — no more squinting and hand-typing. Just snap and transcribe."</p>
+
+<hr>
+
+<h2>SECTION 10 — Keyboard Shortcuts & Speed Tips</h2>
+<p><span class="time">12:30 – 13:30</span></p>
+
+<p class="narration">"Let me show you how to move fast. Here are the shortcuts that matter most:"</p>
+
+<table>
+<tr><th>Shortcut</th><th>What It Does</th></tr>
+<tr><td>Alt+O</td><td>Open inspection</td></tr>
+<tr><td>Alt+S</td><td>Save</td></tr>
+<tr><td>↑ / ↓</td><td>Navigate items</td></tr>
+<tr><td>← / →</td><td>Navigate photos</td></tr>
+<tr><td>Enter</td><td>Apply changes</td></tr>
+<tr><td>Alt+G</td><td>AI suggestions (with photo)</td></tr>
+<tr><td>Alt+N</td><td>Transcribe label (energy)</td></tr>
+<tr><td>Alt+T</td><td>Save template</td></tr>
+<tr><td>Alt+A</td><td>Apply template</td></tr>
+<tr><td>Alt+U</td><td>Duplicate item</td></tr>
+<tr><td>Alt+F</td><td>Select photo file</td></tr>
+<tr><td>Alt+M</td><td>Open camera</td></tr>
+<tr><td>1, 2, 3</td><td>Pick quick suggestion</td></tr>
+<tr><td>F1</td><td>Open help guide</td></tr>
+</table>
+
+<p class="narration">"The power user flow is: arrow down to an item, Tab through status → trade → photo → comments, Enter to apply, arrow to next. Once you get the rhythm, you'll fly through inspections."</p>
+
+<p class="action">[Demo the speed workflow: ↓ → Space on Fail → Tab → Space on Trade → Tab → type comment → Enter → ↓ → repeat for 2-3 items quickly]</p>
+
+<hr>
+
+<h2>SECTION 11 — Review & Wrap Up</h2>
+<p><span class="time">13:30 – 14:30</span></p>
+
+<p class="action">[Click OFI button to filter to fails only]</p>
+
+<p class="narration">"Before you finish, click OFI to see just your failures. Review them — make sure every fail has a trade, a comment, and ideally a photo. This is your QC pass."</p>
+
+<p class="action">[Scroll through the filtered list briefly]</p>
+
+<p class="narration">"When everything looks good, save one more time and you're done. The INS file is ready to upload."</p>
+
+<hr>
+
+<h2>CLOSING</h2>
+<p><span class="time">14:30 – 15:00</span></p>
+
+<p class="action">[Show RED main screen]</p>
+
+<p class="narration">"That's RED. To recap:"</p>
+
+<ol>
+<li><strong>Extract the zip</strong> and run the exe — no installer needed.</li>
+<li><strong>Open your inspection</strong> from the picker.</li>
+<li><strong>Work each item:</strong> status, trade, photo, comment, apply.</li>
+<li><strong>Use templates</strong> for repeat form types.</li>
+<li><strong>Use AI</strong> for photo suggestions and label transcription.</li>
+<li><strong>Save often.</strong></li>
+<li><strong>Review with OFI</strong> before you finish.</li>
+</ol>
+
+<p class="narration">"Hit F1 anytime for the full help guide. If you have questions, reach out to your admin. Happy inspecting."</p>
+
+<p class="action">[Fade out on RED logo / splash screen]</p>
+
+<hr>
+<p style="text-align:center; color:#888; margin-top:30px;">RED Training Video Script — Full Inspection Systems — February 2026</p>
+
+</body>
+</html>

@@ -1,0 +1,45 @@
+Subject: RED 2.0 is ready — faster field workflow + easier tablet controls
+
+Hi everyone,
+
+RED 2.0 is the next major RED update. It is a big UI and workflow upgrade built around faster field inspection work, especially on Surface/tablet screens.
+
+Quick overview video:
+https://youtu.be/JXIrZ8zW_g8
+
+Install/update link:
+https://github.com/fullinspect-source/Red/releases/latest/download/update_red.bat
+
+Before you run it:
+1. Close RED completely.
+2. Click the update link above to download `update_red.bat`.
+3. Run the file.
+4. If Windows warns you, choose **More info** and then **Run anyway**.
+5. If it asks for Administrator permission, click **Yes**.
+
+The updater is designed to preserve your RED license, settings, saved comments, prefixes/suffixes, and user data. It also backs up the existing RED files before installing RED 2.0.
+
+What is new in RED 2.0:
+
+- Bigger, touch-friendly My List rows.
+- My List remembers your window, columns, grouping, sorting, and search layout.
+- You can group My List by builder, subdivision, inspection type, or no grouping.
+- The inspection editor now uses a full-width running checklist instead of the old split layout.
+- Only one checklist item expands at a time, so the screen stays cleaner.
+- Tap or swipe right to open item tools; swipe left to close them.
+- Better touch scrolling throughout.
+- Status/value controls are right-justified for easier right-handed tablet use.
+- Section headers can temporarily collapse and have bulk NI/Pass buttons.
+- The comments drawer includes prefixes, suffixes, quick comments, saved comments, clear/trash, and the red-flag escalation marker.
+- Photo, camera, and file tools are built into the item tools.
+- AI tools are still there: Get 3, transcription, tone options, and fact-checking.
+- Design extraction from EC reports and foundation/slab engineering PDFs can show values directly beside the checklist item when applicable.
+- Extracted design values can be clicked into report fields.
+- New experimental numberpad tool with a touch-friendly keypad and slider.
+- RED remembers preferences for tool drawers, font size, window placement, and other UI settings.
+- Classic UI is still available inside the editor as a fallback during the transition.
+
+If anything does not look right, stop and send me a screenshot or call/text me. Do not delete your RED folder or Dropbox inspection files.
+
+thanks,
+Trent F

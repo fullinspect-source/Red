@@ -1,0 +1,182 @@
+<Window x:Class="InspectionEditor.NotifyQRWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="📱 Notify Builder"
+        Height="660" Width="880"
+        MinWidth="700" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#F5F5F5">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="📱 Notify Builder — Scan to Send"
+                   FontSize="17"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,16"/>
+
+        <!-- Two QR panels -->
+        <Grid Grid.Row="1" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: Standard arrival notice -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    BorderBrush="#4CAF50"
+                    BorderThickness="1.5"
+                    CornerRadius="8"
+                    Padding="14">
+                <StackPanel>
+                    <TextBlock Text="Standard Arrival Notice"
+                               FontWeight="SemiBold" FontSize="13"
+                               Foreground="#2E7D32"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,10"/>
+                    <Border Background="#F9F9F9" BorderBrush="#DDD" BorderThickness="1"
+                            CornerRadius="6" Padding="10" HorizontalAlignment="Center"
+                            Margin="0,0,0,8">
+                        <Image x:Name="StandardQRImage"
+                               Width="190" Height="190"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <TextBlock Text="Scan with phone camera → opens SMS"
+                               FontSize="11" Foreground="#666"
+                               HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <Border Background="#E8F5E9" BorderBrush="#A5D6A7"
+                            BorderThickness="1" CornerRadius="5" Padding="10">
+                        <StackPanel>
+                            <TextBlock Text="Message:"
+                                       FontWeight="SemiBold" FontSize="10"
+                                       Foreground="#2E7D32" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="MessagePreview"
+                                       TextWrapping="Wrap" FontSize="11"
+                                       Foreground="#333"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- RIGHT: Custom message -->
+            <Border Grid.Column="2"
+                    Background="White"
+                    BorderBrush="#1976D2"
+                    BorderThickness="1.5"
+                    CornerRadius="8"
+                    Padding="14">
+                <StackPanel>
+                    <TextBlock Text="Your Custom Message"
+                               FontWeight="SemiBold" FontSize="13"
+                               Foreground="#1565C0"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,10"/>
+                    <Border Background="#F9F9F9" BorderBrush="#DDD" BorderThickness="1"
+                            CornerRadius="6" Padding="10" HorizontalAlignment="Center"
+                            Margin="0,0,0,8">
+                        <Image x:Name="CustomQRImage"
+                               Width="190" Height="190"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <TextBlock Text="Scan with phone camera → opens SMS"
+                               FontSize="11" Foreground="#666"
+                               HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <!-- Prefix (read-only) + editable body -->
+                    <Border Background="#E3F2FD" BorderBrush="#90CAF9"
+                            BorderThickness="1" CornerRadius="5" Padding="10"
+                            Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="Message prefix (auto):"
+                                       FontWeight="SemiBold" FontSize="10"
+                                       Foreground="#1565C0" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="CustomMessagePrefix"
+                                       TextWrapping="Wrap" FontSize="11"
+                                       Foreground="#555"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Your personal note (tap to edit):"
+                               FontSize="11" Foreground="#444"
+                               Margin="0,0,0,4"/>
+                    <TextBox x:Name="CustomMessageBox"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="False"
+                             FontSize="12"
+                             Padding="8"
+                             MinHeight="52"
+                             MaxHeight="80"
+                             BorderBrush="#90CAF9"
+                             BorderThickness="1"
+                             VerticalScrollBarVisibility="Auto"
+                             TextChanged="CustomMessageBox_TextChanged"
+                             Margin="0,0,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SavedIndicator"
+                                   Grid.Column="0"
+                                   Text="✓ Message saved"
+                                   FontSize="11" Foreground="#388E3C"
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="Save"
+                                    Click="SaveCustomMessage_Click"
+                                    Background="#1976D2" Foreground="White"
+                                    BorderThickness="0" Padding="12,6"
+                                    FontSize="12" Cursor="Hand"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Save this note for future use"/>
+                            <Button Content="Clear"
+                                    Click="ClearCustomMessage_Click"
+                                    Background="#E0E0E0" Foreground="#444"
+                                    BorderThickness="0" Padding="10,6"
+                                    FontSize="12" Cursor="Hand"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Contact info -->
+        <Border Grid.Row="2"
+                Background="White"
+                BorderBrush="#DDD"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12"
+                Margin="0,0,0,14">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Sending to: "
+                           FontWeight="SemiBold" FontSize="12"
+                           Foreground="#555"/>
+                <TextBlock x:Name="ContactInfo"
+                           FontSize="12" Foreground="#333"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Close -->
+        <Button Grid.Row="3"
+                Content="_Close"
+                Click="CloseButton_Click"
+                Width="100"
+                Padding="12,8"
+                Background="#E0E0E0"
+                BorderThickness="0"
+                HorizontalAlignment="Center"
+                Cursor="Hand"
+                IsCancel="True"/>
+    </Grid>
+</Window>

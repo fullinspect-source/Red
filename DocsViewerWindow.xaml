@@ -1,0 +1,75 @@
+<Window x:Class="InspectionEditor.DocsViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Project Documents" Height="550" Width="700"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        MinHeight="400" MinWidth="500"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    
+    <Window.Resources>
+        <Style x:Key="RevisionButton" TargetType="ToggleButton">
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#E8E8E8"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="MinWidth" Value="45"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="#2E86AB"/>
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="BorderBrush" Value="#1A5276"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock x:Name="JobIdText" FontSize="16" FontWeight="Bold" Foreground="#2E86AB"/>
+            <TextBlock x:Name="AddressText" FontSize="12" Foreground="#666" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <!-- Revision Filter Buttons -->
+        <Border Grid.Row="1" Background="#F5F5F5" Padding="8" Margin="0,0,0,10" CornerRadius="4">
+            <StackPanel>
+                <TextBlock Text="ENGINEERING REVISION" FontWeight="SemiBold" FontSize="11" Foreground="#555" Margin="0,0,0,6"/>
+                <StackPanel x:Name="RevisionButtonsPanel" Orientation="Horizontal">
+                    <!-- Revision buttons added dynamically -->
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Documents List -->
+        <Border Grid.Row="2" BorderBrush="#DDD" BorderThickness="1" CornerRadius="4">
+            <ScrollViewer x:Name="DocsScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
+                          CanContentScroll="False"
+                          PreviewMouseLeftButtonDown="ScrollViewer_PreviewMouseLeftButtonDown"
+                          PreviewMouseMove="ScrollViewer_PreviewMouseMove"
+                          PreviewMouseLeftButtonUp="ScrollViewer_PreviewMouseLeftButtonUp">
+                <StackPanel x:Name="DocsListPanel" Margin="5">
+                    <!-- Documents added dynamically -->
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Close Button -->
+        <Button Grid.Row="3" Content="_Close" Click="CloseButton_Click"
+                HorizontalAlignment="Right" Margin="0,10,0,0"
+                Padding="20,8" FontSize="13"
+                Background="#666" Foreground="White" BorderThickness="0"
+                IsCancel="True"/>
+    </Grid>
+</Window>

@@ -1,0 +1,69 @@
+<Window x:Class="InspectionEditor.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Red" 
+        Height="400" 
+        Width="600"
+        WindowStyle="None"
+        WindowStartupLocation="CenterScreen"
+        AllowsTransparency="True"
+        Background="Transparent">
+    <Border Background="#8B0000" CornerRadius="10" BorderBrush="#600000" BorderThickness="3">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- App Name -->
+            <TextBlock Grid.Row="1" 
+                       Text="RED" 
+                       FontSize="72" 
+                       FontWeight="Bold" 
+                       Foreground="White" 
+                       HorizontalAlignment="Center"
+                       Margin="0,20,0,10"/>
+
+            <!-- Subtitle -->
+            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="20,0,20,10">
+                <TextBlock Text="A Professional Language Assistant for" 
+                           FontSize="14" 
+                           Foreground="#FFD0D0" 
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+                <TextBlock Text="Construction Evaluation, Notation &amp; Trade Assignment" 
+                           FontSize="14" 
+                           Foreground="#FFD0D0" 
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="0,0,0,15"/>
+                <TextBlock x:Name="StatusText"
+                           FontSize="12"
+                           Foreground="#FFA0A0"
+                           HorizontalAlignment="Center"
+                           FontStyle="Italic"
+                           Text="Starting up..."/>
+            </StackPanel>
+
+            <!-- Copyright -->
+            <StackPanel Grid.Row="3" HorizontalAlignment="Center" Margin="20,10,20,10">
+                <TextBlock Text="© 2026 Trent Fuller  ·  281-220-6309" 
+                           FontSize="13" 
+                           FontWeight="SemiBold"
+                           Foreground="#FFB0B0" 
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Use by permission only" 
+                           FontSize="11" 
+                           Foreground="#FF9090" 
+                           HorizontalAlignment="Center"
+                           FontStyle="Italic"
+                           Margin="0,3,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

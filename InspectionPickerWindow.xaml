@@ -1,0 +1,1056 @@
+<Window x:Class="InspectionEditor.InspectionPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RED 2.0 - My List"
+        Height="900" Width="1400"
+        MinHeight="680" MinWidth="1040"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        Closing="Window_Closing"
+        Background="#F6F7F8"
+        FontFamily="Segoe UI"
+        FontSize="15"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+        <Style x:Key="ColumnHeaderStyle" TargetType="GridViewColumnHeader">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#ECEFF1"/>
+            <Setter Property="BorderBrush" Value="#D0D5DA"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="QuietButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="Background" Value="#E8ECEF"/>
+            <Setter Property="BorderBrush" Value="#D1D7DD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="15"/>
+        </Style>
+
+        <Style x:Key="SideTabStyle" TargetType="Button">
+            <Setter Property="Height" Value="58"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Background" Value="#F8FAFB"/>
+            <Setter Property="BorderBrush" Value="#D2D8DE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="TabChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="0,1,1,1"
+                                CornerRadius="0,10,10,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabChrome" Property="Background" Value="#FFFFFF"/>
+                                <Setter TargetName="TabChrome" Property="BorderBrush" Value="#A7B0B8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="18"/>
+            <ColumnDefinition Width="170"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0">
+            <Grid x:Name="MyListPanel">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="My List"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="#1F2933"/>
+                        <TextBlock x:Name="FolderPathText"
+                                   Text="Loading..."
+                                   Foreground="#66737F"
+                                   FontSize="14"
+                                   Margin="0,5,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <TextBlock Text="Text"
+                                   Foreground="#66737F"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <Button Content="A-"
+                                Click="DecreaseFontButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"
+                                Padding="10,7"
+                                Margin="0,0,6,0"
+                                ToolTip="Decrease list text size"/>
+                        <Button Content="A+"
+                                Click="IncreaseFontButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"
+                                Padding="10,7"
+                                Margin="0,0,6,0"
+                                ToolTip="Increase list text size"/>
+                        <Button Content="Reset"
+                                Click="ResetFontButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"
+                                Padding="12,7"
+                                Margin="0,0,10,0"
+                                ToolTip="Reset list text size"/>
+                        <Button x:Name="ShowSearchButton"
+                                Content="Search"
+                                Click="ShowSearchButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"
+                                Padding="12,7"
+                                Margin="0,0,10,0"
+                                Visibility="Collapsed"
+                                ToolTip="Show search bar"/>
+                        <Button x:Name="BrowseFolderButton"
+                                Content="Browse..."
+                                Click="BrowseFolderButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border x:Name="SearchBarBorder"
+                        Grid.Row="1"
+                        Background="White"
+                        BorderBrush="#CBD2D9"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Search"
+                                   VerticalAlignment="Center"
+                                   Margin="14,0,10,0"
+                                   FontSize="14"
+                                   Foreground="#66737F"/>
+                        <TextBox x:Name="SearchBox"
+                                 Grid.Column="1"
+                                 BorderThickness="0"
+                                 VerticalAlignment="Center"
+                                 FontSize="17"
+                                 Padding="4,13"
+                                 TextChanged="SearchBox_TextChanged">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Style.Triggers>
+                                        <Trigger Property="Text" Value="">
+                                            <Setter Property="Background">
+                                                <Setter.Value>
+                                                    <VisualBrush AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                                        <VisualBrush.Visual>
+                                                            <TextBlock Text="Search by address, builder, type, or file..."
+                                                                       Foreground="#9AA5B1"
+                                                                       FontSize="17"
+                                                                       Margin="4,0,0,0"/>
+                                                        </VisualBrush.Visual>
+                                                    </VisualBrush>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <Button x:Name="ClearSearchButton"
+                                Grid.Column="2"
+                                Content="Clear"
+                                Click="ClearSearchButton_Click"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="#66737F"
+                                FontSize="14"
+                                Padding="14,8"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed"
+                                Cursor="Hand"/>
+                        <Button x:Name="HideSearchButton"
+                                Grid.Column="3"
+                                Content="Hide"
+                                Click="HideSearchButton_Click"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="#66737F"
+                                FontSize="14"
+                                Padding="14,8"
+                                VerticalAlignment="Center"
+                                Cursor="Hand"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="2"
+                        BorderBrush="#D0D5DA"
+                        BorderThickness="1"
+                        Background="White"
+                        CornerRadius="6">
+                    <ListView x:Name="InspectionListView"
+                              BorderThickness="0"
+                              SelectionMode="Single"
+                              MouseDoubleClick="InspectionListView_MouseDoubleClick"
+                              SelectionChanged="InspectionListView_SelectionChanged"
+                              KeyDown="InspectionListView_KeyDown"
+                              GridViewColumnHeader.Click="GridViewColumnHeader_Click"
+                              ScrollViewer.CanContentScroll="False"
+                              ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                              ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                              VirtualizingPanel.ScrollUnit="Pixel"
+                              PreviewMouseLeftButtonDown="InspectionListView_PreviewMouseLeftButtonDown"
+                              PreviewMouseMove="InspectionListView_PreviewMouseMove"
+                              PreviewMouseLeftButtonUp="InspectionListView_PreviewMouseLeftButtonUp">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn x:Name="AddressColumn" Header="Address" Width="430">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="AddrBorder"
+                                                    Background="{Binding RowBackground}"
+                                                    CornerRadius="4"
+                                                    Padding="8,7"
+                                                    Margin="-4,0,6,0">
+                                                <TextBlock Text="{Binding Address}" TextTrimming="CharacterEllipsis"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="TypeColumn" Header="Type" Width="220">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock x:Name="TypeText"
+                                                       Text="{Binding InspectionTypeName}"
+                                                       Foreground="{Binding RowForeground}"
+                                                       FontWeight="SemiBold"
+                                                       Padding="8,7"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="DateColumn" Header="Date" Width="96">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="DateBorder"
+                                                    Background="{Binding DateBackground}"
+                                                    CornerRadius="4"
+                                                    Padding="8,7"
+                                                    Margin="0,0,6,0">
+                                                <TextBlock Text="{Binding DateDisplay}" TextTrimming="CharacterEllipsis"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="BuilderColumn" Header="Builder" Width="180">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock x:Name="BuilderText"
+                                                       Text="{Binding Builder}"
+                                                       Foreground="{Binding BuilderForeground}"
+                                                       FontWeight="SemiBold"
+                                                       Padding="8,7"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="FilenameColumn" Header="Attempt#" Width="110">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding AttemptNumberDisplay}"
+                                                       Padding="8,7"
+                                                       Foreground="#003A8C"
+                                                       HorizontalAlignment="Center"
+                                                       TextAlignment="Center"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="OpenColumn" Header="Open" Width="76">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}">
+                                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            <Setter Property="ToolTip" Value="Shows when another inspection of this type is already open"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding OpenStatus}"
+                                                       Foreground="#B71C1C"
+                                                       FontWeight="Bold"
+                                                       Padding="8,7"
+                                                       HorizontalAlignment="Center"
+                                                       ToolTip="Another inspection of this type is already open. Close it before opening this one."/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="SignedColumn" Header="Signed" Width="78">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}">
+                                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            <Setter Property="ToolTip" Value="S = Signed; Y = Has edits; N = Untouched"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding EditStatus}"
+                                                       FontWeight="Bold"
+                                                       Padding="8,7"
+                                                       HorizontalAlignment="Center"
+                                                       ToolTip="S = Signed; Y = Has edits; N = Untouched">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#7B8794"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding EditStatus}" Value="Y">
+                                                                <Setter Property="Foreground" Value="#E65100"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding EditStatus}" Value="S">
+                                                                <Setter Property="Foreground" Value="#2E7D32"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn x:Name="CallColumn" Header="Call" Width="92">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}">
+                                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                            <Setter Property="ToolTip" Value="Notify builder of arrival"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="Call"
+                                                    Click="NotifyButton_Click"
+                                                    Tag="{Binding}"
+                                                    BorderThickness="0"
+                                                    Padding="9,6"
+                                                    FontSize="13"
+                                                    FontWeight="SemiBold"
+                                                    IsEnabled="{Binding CanNotify}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Background" Value="#3FA34D"/>
+                                                        <Setter Property="Foreground" Value="White"/>
+                                                        <Setter Property="Cursor" Value="Hand"/>
+                                                        <Setter Property="ToolTip" Value="Send arrival notification"/>
+                                                        <Style.Triggers>
+                                                            <Trigger Property="IsEnabled" Value="False">
+                                                                <Setter Property="Background" Value="#ECEFF1"/>
+                                                                <Setter Property="Foreground" Value="#9AA5B1"/>
+                                                                <Setter Property="Cursor" Value="Arrow"/>
+                                                                <Setter Property="ToolTip" Value="No contact phone available or this inspection type is already open"/>
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                        <ListView.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Expander IsExpanded="True"
+                                                              Margin="0,0,0,8"
+                                                              HorizontalAlignment="Stretch"
+                                                              HorizontalContentAlignment="Stretch">
+                                                        <Expander.Header>
+                                                            <Border Background="#DDE3E8"
+                                                                    BorderBrush="#C4CDD5"
+                                                                    BorderThickness="0,0,0,1"
+                                                                    HorizontalAlignment="Stretch"
+                                                                    Width="{Binding ActualWidth, ElementName=InspectionListView}"
+                                                                    Padding="12,8">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding Name}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="#1F2933"/>
+                                                                    <TextBlock Text="  "/>
+                                                                    <TextBlock Text="{Binding ItemCount, StringFormat=({0} hidden when collapsed)}"
+                                                                               Foreground="#66737F"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Expander.Header>
+                                                        <ItemsPresenter HorizontalAlignment="Stretch"/>
+                                                    </Expander>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </ListView.GroupStyle>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <EventSetter Event="MouseLeftButtonUp" Handler="InspectionListViewItem_MouseLeftButtonUp"/>
+                                <Setter Property="Background" Value="#F3F6F8"/>
+                                <Setter Property="Padding" Value="8,7"/>
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="{x:Type ListViewItem}">
+                                            <Border x:Name="RowChrome"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    Padding="{TemplateBinding Padding}"
+                                                    SnapsToDevicePixels="True">
+                                                <Grid Background="{TemplateBinding Background}">
+                                                    <GridViewRowPresenter Content="{TemplateBinding Content}"
+                                                                          Columns="{Binding Path=View.Columns, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                                          HorizontalAlignment="Stretch"
+                                                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                                </Grid>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="RowChrome" Property="Background" Value="#F2F5F7"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTypeAlreadyOpen}" Value="True">
+                                        <Setter Property="Background" Value="#E4E8EC"/>
+                                        <Setter Property="Foreground" Value="#7B8794"/>
+                                        <Setter Property="Opacity" Value="0.62"/>
+                                        <Setter Property="Cursor" Value="Arrow"/>
+                                        <Setter Property="ToolTip" Value="Another inspection of this type is already open. Close it before opening another one."/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#F2F5F7"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                </Border>
+
+                <Grid Grid.Row="3" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="StatusText"
+                               Grid.Column="0"
+                               Text="Loading..."
+                               Foreground="#66737F"
+                               VerticalAlignment="Center"
+                               FontSize="15"/>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed">
+                        <Button x:Name="OpenButton"
+                                Content="Open"
+                                Click="OpenButton_Click"
+                                IsDefault="True"
+                                MinWidth="112"
+                                Padding="18,11"
+                                Background="#990000"
+                                Foreground="White"
+                                BorderThickness="0"
+                                FontWeight="SemiBold"
+                                FontSize="16"
+                                IsEnabled="False"/>
+                        <Button x:Name="CancelButton"
+                                Content="Close"
+                                Click="CancelButton_Click"
+                                IsCancel="True"
+                                MinWidth="112"
+                                Padding="18,11"
+                                Margin="10,0,0,0"
+                                Background="#E3E7EA"
+                                BorderThickness="0"
+                                FontSize="16"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <Grid x:Name="SettingsPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,0,0,18">
+                    <TextBlock Text="Settings"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="#1F2933"/>
+                    <TextBlock Text="Preferences for this RED 2.0 Dev workstation."
+                               FontSize="15"
+                               Foreground="#66737F"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Border Background="White"
+                                BorderBrush="#D0D5DA"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="18"
+                                Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="My List View"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2933"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Text="Group the inspection list by a category, or leave it uncategorized."
+                                           Foreground="#66737F"
+                                           Margin="0,0,0,14"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Categorize by"
+                                               Foreground="#52616F"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <ComboBox x:Name="CategorizeComboBox"
+                                              Width="220"
+                                              Padding="8,6"
+                                              SelectionChanged="CategorizeComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="None" Tag="None" IsSelected="True"/>
+                                        <ComboBoxItem Content="Subdivision" Tag="Subdivision"/>
+                                        <ComboBoxItem Content="Builder" Tag="Builder"/>
+                                        <ComboBoxItem Content="Job Type" Tag="JobType"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="White"
+                                BorderBrush="#D0D5DA"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="18"
+                                Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="My List Text Size"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2933"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Text="Adjusts the row text size on the inspection list."
+                                           Foreground="#66737F"
+                                           Margin="0,0,0,14"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="A-"
+                                            Click="DecreaseFontButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}"
+                                            Margin="0,0,8,0"/>
+                                    <Button Content="A+"
+                                            Click="IncreaseFontButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}"
+                                            Margin="0,0,8,0"/>
+                                    <Button Content="Reset"
+                                            Click="ResetFontButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}"/>
+                                    <TextBlock x:Name="FontSizeSettingText"
+                                               VerticalAlignment="Center"
+                                               Margin="14,0,0,0"
+                                               Foreground="#52616F"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="White"
+                                BorderBrush="#D0D5DA"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="18"
+                                Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="My List Columns"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2933"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Text="Show, hide, resize, and sort columns. The layout is saved for this workstation."
+                                           Foreground="#66737F"
+                                           Margin="0,0,0,14"/>
+                                <UniformGrid Columns="4">
+                                    <CheckBox x:Name="AddressColumnCheckBox" Content="Address" Margin="0,0,16,10" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="TypeColumnCheckBox" Content="Type" Margin="0,0,16,10" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="DateColumnCheckBox" Content="Date" Margin="0,0,16,10" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="BuilderColumnCheckBox" Content="Builder" Margin="0,0,16,10" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="FilenameColumnCheckBox" Content="Attempt#" Margin="0,0,16,0" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="OpenColumnCheckBox" Content="Open" Margin="0,0,16,0" IsChecked="False" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="SignedColumnCheckBox" Content="Signed" Margin="0,0,16,0" IsChecked="False" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="CallColumnCheckBox" Content="Call" Margin="0,0,16,0" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="White"
+                                BorderBrush="#D0D5DA"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="18"
+                                Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Custom Text Message"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2933"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Text="This note is appended to the automatic SMS prefix in the builder notification QR screen."
+                                           Foreground="#66737F"
+                                           Margin="0,0,0,14"/>
+                                <TextBox x:Name="CustomNotifyMessageBox"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         MinHeight="120"
+                                         FontSize="16"
+                                         Padding="12"
+                                         BorderBrush="#CBD2D9"
+                                         BorderThickness="1"
+                                         VerticalScrollBarVisibility="Auto"
+                                         TextChanged="CustomNotifyMessageBox_TextChanged"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="Save Message"
+                                            Click="SaveCustomNotifyMessageButton_Click"
+                                            Background="#990000"
+                                            Foreground="White"
+                                            BorderThickness="0"
+                                            FontWeight="SemiBold"
+                                            Padding="16,9"
+                                            FontSize="15"/>
+                                    <Button Content="Clear"
+                                            Click="ClearCustomNotifyMessageButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}"
+                                            Margin="10,0,0,0"/>
+                                    <TextBlock x:Name="CustomNotifySavedText"
+                                               Text="Saved"
+                                               Foreground="#2E7D32"
+                                               VerticalAlignment="Center"
+                                               Margin="12,0,0,0"
+                                               Visibility="Collapsed"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="White"
+                                BorderBrush="#D0D5DA"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="Reset RED Preferences"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2933"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Text="Restores saved window size, column layout, font settings, and remembered inline tools to the post-install defaults."
+                                           TextWrapping="Wrap"
+                                           Foreground="#66737F"
+                                           Margin="0,0,0,14"/>
+                                <Button Content="Reset App Preferences"
+                                        Click="ResetAppPreferencesButton_Click"
+                                        Background="#FDECEC"
+                                        Foreground="#991B1B"
+                                        BorderBrush="#F5A3A3"
+                                        BorderThickness="1"
+                                        FontWeight="SemiBold"
+                                        Padding="16,9"
+                                        FontSize="15"
+                                        HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid x:Name="AboutPanel" Visibility="Collapsed">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock x:Name="AboutLogo"
+                                   Text="🔴 Red"
+                                   FontSize="48"
+                                   FontWeight="Bold"
+                                   Foreground="#8B0000"
+                                   HorizontalAlignment="Center"
+                                   Cursor="Hand"
+                                   Background="Transparent"
+                                   Padding="20,10"
+                                   MouseLeftButtonDown="AboutLogo_MouseLeftButtonDown"/>
+                        <TextBlock x:Name="AboutTagline"
+                                   Text="Professional Language Assistant&#10;for Construction Evaluation, Notation &amp; Trade Assignment"
+                                   FontSize="11"
+                                   Foreground="#666"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="400"
+                                   Margin="0,5,0,20"
+                                   Visibility="Collapsed"
+                                   Opacity="0">
+                            <TextBlock.RenderTransform>
+                                <TranslateTransform x:Name="AboutTaglineTranslate" Y="-20"/>
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                        <!--<Border Background="#8B0000"
+                                CornerRadius="10"
+                                BorderBrush="#600000"
+                                BorderThickness="3"
+                                Padding="42,28"
+                                MaxWidth="620">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="AboutLogo"
+                                           Text="RED"
+                                           FontSize="72"
+                                           FontWeight="Bold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           Cursor="Hand"
+                                           Background="Transparent"
+                                           Padding="20,8"
+                                           MouseLeftButtonDown="AboutLogo_MouseLeftButtonDown"/>
+                                <StackPanel x:Name="AboutTaglinePanel"
+                                            Visibility="Collapsed"
+                                            Opacity="0"
+                                            HorizontalAlignment="Center">
+                                    <TextBlock Text="A Professional Language Assistant for"
+                                               FontSize="14"
+                                               Foreground="#FFD0D0"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Construction Evaluation, Notation &amp; Trade Assignment"
+                                               FontSize="14"
+                                               Foreground="#FFD0D0"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,12"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding Source={x:Static Application.Current}, Path=MainWindow.Title}"
+                                           Visibility="Collapsed"/>
+                                <TextBlock x:Name="AboutVersionText"
+                                           Text="RED 2.0 Dev"
+                                           FontSize="16"
+                                           Foreground="#FFB0B0"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,6"/>
+                                <TextBlock Text="© 2026 Trent Fuller  ·  281-220-6309"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FFB0B0"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Use by permission only"
+                                           FontSize="11"
+                                           Foreground="#FF9090"
+                                           HorizontalAlignment="Center"
+                                           FontStyle="Italic"
+                                           Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Border>-->
+
+                        <Border x:Name="AboutUpdatePanel"
+                                Visibility="Collapsed"
+                                Margin="0,12,0,0"
+                                Width="520"
+                                Background="White"
+                                BorderBrush="#DDD"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="18,14">
+                            <StackPanel>
+                                <TextBlock x:Name="AboutUpdateStatusText"
+                                           Text="Checking for updates..."
+                                           FontSize="12"
+                                           Foreground="#666"
+                                           TextAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,10"/>
+                                <Grid x:Name="AboutUpdateResultsGrid" Visibility="Collapsed" Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="72"/>
+                                        <ColumnDefinition Width="72"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="6"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="5"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="5"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="Had"
+                                               FontSize="10" FontWeight="SemiBold" Foreground="#999"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Now"
+                                               FontSize="10" FontWeight="SemiBold" Foreground="#999"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0"
+                                               Text="RED" FontSize="12" FontWeight="Bold"
+                                               Foreground="#8B0000" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutRedHadText" Grid.Row="2" Grid.Column="1"
+                                               FontSize="12" Foreground="#555" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutRedNowText" Grid.Row="2" Grid.Column="2"
+                                               FontSize="12" Foreground="#555" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutRedStatusText" Grid.Row="2" Grid.Column="3"
+                                               FontSize="11" VerticalAlignment="Center"
+                                               TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0"
+                                               Text="My Stats" FontSize="12" FontWeight="Bold"
+                                               Foreground="#1565C0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutStatsHadText" Grid.Row="4" Grid.Column="1"
+                                               FontSize="12" Foreground="#555" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutStatsNowText" Grid.Row="4" Grid.Column="2"
+                                               FontSize="12" Foreground="#555" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutStatsStatusText" Grid.Row="4" Grid.Column="3"
+                                               FontSize="11" VerticalAlignment="Center"
+                                               TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0"
+                                               Text="Team" FontSize="12" FontWeight="Bold"
+                                               Foreground="#6A1B9A" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutTeamStatsHadText" Grid.Row="6" Grid.Column="1"
+                                               FontSize="12" Foreground="#555" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutTeamStatsNowText" Grid.Row="6" Grid.Column="2"
+                                               FontSize="12" Foreground="#555" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AboutTeamStatsStatusText" Grid.Row="6" Grid.Column="3"
+                                               FontSize="11" VerticalAlignment="Center"
+                                               TextWrapping="Wrap"/>
+                                </Grid>
+                                <ProgressBar x:Name="AboutUpdateProgressBar"
+                                             Height="5"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="0"
+                                             Background="#E0E0E0"
+                                             Foreground="#8B0000"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Triple-click RED to force a manual dataset refresh."
+                                   FontSize="13"
+                                   Foreground="#66737F"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,14,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid x:Name="OrdersPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Orders"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="#1F2933"/>
+                        <TextBlock x:Name="OrdersStatusText"
+                                   Text="Live Dallas orders feed is not wired yet. Inspect2022's offline job cache is not shown here because it can include stale/non-schedule jobs."
+                                   FontSize="15"
+                                   Foreground="#66737F"
+                                   Margin="0,5,0,0"/>
+                    </StackPanel>
+                    <Button x:Name="RefreshOrdersButton"
+                            Grid.Column="1"
+                            Content="Refresh Orders"
+                            Click="RefreshOrdersButton_Click"
+                            Style="{StaticResource QuietButtonStyle}"
+                            Margin="12,6,0,0"
+                            VerticalAlignment="Top"/>
+                </Grid>
+
+                <ListView x:Name="OrdersListView"
+                          Grid.Row="1"
+                          Background="White"
+                          BorderBrush="#D0D5DA"
+                          BorderThickness="1"
+                          FontSize="{Binding ElementName=InspectionListView, Path=FontSize}"
+                          ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                          ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                          PreviewMouseLeftButtonDown="InspectionListView_PreviewMouseLeftButtonDown"
+                          PreviewMouseMove="InspectionListView_PreviewMouseMove"
+                          PreviewMouseLeftButtonUp="InspectionListView_PreviewMouseLeftButtonUp">
+                    <ListView.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.ContainerStyle>
+                                <Style TargetType="{x:Type GroupItem}">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                <Expander IsExpanded="True"
+                                                          Background="Transparent"
+                                                          BorderThickness="0">
+                                                    <Expander.Header>
+                                                        <Border Background="#D7DEE4"
+                                                                BorderBrush="#C5CDD4"
+                                                                BorderThickness="0,0,0,1"
+                                                                Padding="14,10"
+                                                                MinWidth="{Binding ElementName=OrdersListView, Path=ActualWidth, Mode=OneWay}">
+                                                            <TextBlock FontWeight="SemiBold"
+                                                                       Foreground="#1F2933">
+                                                                <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                                <Run Text="  "/>
+                                                                <Run Text="{Binding ItemCount, StringFormat=({0} orders), Mode=OneWay}"
+                                                                     Foreground="#66737F"/>
+                                                            </TextBlock>
+                                                        </Border>
+                                                    </Expander.Header>
+                                                    <ItemsPresenter/>
+                                                </Expander>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </GroupStyle.ContainerStyle>
+                        </GroupStyle>
+                    </ListView.GroupStyle>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Background" Value="#FFFFFF"/>
+                            <Setter Property="MinHeight" Value="48"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.View>
+                        <GridView ColumnHeaderContainerStyle="{StaticResource ColumnHeaderStyle}">
+                            <GridViewColumn Header="Job" Width="120" DisplayMemberBinding="{Binding JobNumber}"/>
+                            <GridViewColumn Header="Address" Width="250" DisplayMemberBinding="{Binding Address}"/>
+                            <GridViewColumn Header="Subdivision" Width="250" DisplayMemberBinding="{Binding Subdivision}"/>
+                            <GridViewColumn Header="Builder" Width="230" DisplayMemberBinding="{Binding Builder}"/>
+                            <GridViewColumn Header="City" Width="150" DisplayMemberBinding="{Binding City}"/>
+                            <GridViewColumn Header="Service" Width="190" DisplayMemberBinding="{Binding Service}"/>
+                            <GridViewColumn Header="Schedule Date" Width="150" DisplayMemberBinding="{Binding ScheduleDateText}"/>
+                            <GridViewColumn Header="Assigned" Width="150" DisplayMemberBinding="{Binding Assigned}"/>
+                            <GridViewColumn Header="Note" Width="240" DisplayMemberBinding="{Binding Note}"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Column="2"
+                Background="#EEF2F5"
+                BorderBrush="#D0D5DA"
+                BorderThickness="1,1,0,1"
+                CornerRadius="10,0,0,10"
+                Padding="0,16,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <Button x:Name="MyListTabButton"
+                            Content="My List"
+                            Click="MyListTabButton_Click"
+                            Margin="-12,0,0,10"
+                            Style="{StaticResource SideTabStyle}"/>
+                    <Button x:Name="OrdersTabButton"
+                            Content="ORDERS"
+                            Click="OrdersTabButton_Click"
+                            Margin="-12,0,0,10"
+                            Style="{StaticResource SideTabStyle}"/>
+                    <Button x:Name="SettingsTabButton"
+                            Content="Settings"
+                            Click="SettingsTabButton_Click"
+                            Margin="-12,0,0,10"
+                            Style="{StaticResource SideTabStyle}"/>
+                    <Button x:Name="AboutTabButton"
+                            Content="About"
+                            Click="AboutTabButton_Click"
+                            Margin="-12,0,0,10"
+                            Style="{StaticResource SideTabStyle}"/>
+                </StackPanel>
+
+                <Button Grid.Row="2"
+                        Content="Close App"
+                        Click="CancelButton_Click"
+                        Margin="0,12,0,0"
+                        Padding="16,11"
+                        Background="#FFFFFF"
+                        BorderBrush="#C4CDD5"
+                        BorderThickness="1"
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Cursor="Hand"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
