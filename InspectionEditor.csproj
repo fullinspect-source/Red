@@ -12,10 +12,10 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
-    <Product>RED 2.0</Product>
+    <Product>RED 2.0.1</Product>
   </PropertyGroup>
 
   <ItemGroup>

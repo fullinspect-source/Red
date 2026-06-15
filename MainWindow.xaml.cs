@@ -30,6 +30,8 @@ namespace InspectionEditor
     public partial class MainWindow : Window
     {
         private static readonly string AppVersion = AppIdentity.Version;
+        private static readonly TimeSpan AppUpdateCheckInterval = TimeSpan.FromHours(12);
+        private static readonly string LastAppUpdateCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
         
         private InspectionFile? _currentInspection;
         private Item? _currentItem;
@@ -201,9 +203,6 @@ namespace InspectionEditor
             this.Closing += MainWindow_Closing;
             this.Activated += MainWindow_Activated;
             this.Deactivated += MainWindow_Deactivated;
-            this.PreviewMouseLeftButtonDown += MainWindow_GlobalPreviewMouseLeftButtonDown;
-            this.PreviewMouseMove += MainWindow_GlobalPreviewMouseMove;
-            this.PreviewMouseLeftButtonUp += MainWindow_GlobalPreviewMouseLeftButtonUp;
             
             // Load user preferences
             LoadPreferences();
@@ -417,6 +416,31 @@ namespace InspectionEditor
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
+            // Before close, offer the same trade-summary generation that the Save button provides.
+            if (_hasUnsavedChanges && _currentInspection != null && ShouldPromptForTradeSummaryOnClose())
+            {
+                var summaryResult = MessageBox.Show(
+                    "Items with [trade] prefixes detected.\n\n" +
+                    "• Yes = Generate timestamped summary and close\n" +
+                    "• No = Close without new summary",
+                    "Generate New Summary?",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (summaryResult == MessageBoxResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (summaryResult == MessageBoxResult.Yes)
+                {
+                    SyncCurrentItemFromUI();
+                    GenerateSummaryInternal();
+                    _hasUnsavedChanges = true;
+                }
+            }
+
             // Save first so result/status data is current before deciding whether to prompt.
             if (_hasUnsavedChanges && _currentInspection != null)
             {
@@ -441,6 +465,27 @@ namespace InspectionEditor
             // Clean up camera session
             _cameraService.PhotoCaptured -= OnPhotoCaptured;
             _cameraService.StopSession();
+        }
+
+        private bool ShouldPromptForTradeSummaryOnClose()
+        {
+            if (_currentInspection?.Sections == null) return false;
+
+            string todaySummaryPrefix = $"Summary for {DateTime.Now:MMM d, yyyy}";
+            bool hasTradeItems = _currentInspection.Sections
+                .SelectMany(s => s.Items)
+                .Any(item => !string.IsNullOrWhiteSpace(item.Comments) &&
+                             item.Comments.TrimStart().StartsWith("[") &&
+                             !item.Comments.TrimStart().StartsWith("Summary for", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasTradeItems) return false;
+
+            bool alreadyHasTodaySummary = _currentInspection.Sections
+                .SelectMany(s => s.Items)
+                .Any(item => !string.IsNullOrWhiteSpace(item.Comments) &&
+                             item.Comments.StartsWith(todaySummaryPrefix, StringComparison.OrdinalIgnoreCase));
+
+            return !alreadyHasTodaySummary;
         }
 
         private bool ShouldShowResultPicker()
@@ -850,6 +895,37 @@ namespace InspectionEditor
             
             // Animate "Click Open INS" hint sliding in from the left
             StartWelcomeHintAnimation();
+
+            // Quiet startup app update check. v2.0.0 did not run this path reliably; v2.0.1+ checks at most every 12 hours.
+            if (ShouldRunStartupAppUpdateCheck())
+            {
+                Dispatcher.BeginInvoke(new Action(() => CheckForUpdatesAsync(silent: true)),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
+        }
+
+        private static bool ShouldRunStartupAppUpdateCheck()
+        {
+            try
+            {
+                Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
+                if (!File.Exists(LastAppUpdateCheckFile)) return true;
+                return DateTime.Now - File.GetLastWriteTime(LastAppUpdateCheckFile) >= AppUpdateCheckInterval;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static void MarkStartupAppUpdateChecked()
+        {
+            try
+            {
+                Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
+                File.WriteAllText(LastAppUpdateCheckFile, DateTime.Now.ToString("o"));
+            }
+            catch { }
         }
         
         private void StartWelcomeHintAnimation()
@@ -981,13 +1057,16 @@ namespace InspectionEditor
                 return;
             }
 
-            // Show panel and spinner
-            UpdatePanel.Visibility = Visibility.Visible;
-            UpdateResultsGrid.Visibility = Visibility.Collapsed;
-            UpdateStatusText.Visibility = Visibility.Visible;
-            UpdateStatusText.Text = "Checking for updates…";
-            UpdateProgressBar.IsIndeterminate = true;
-            UpdateProgressBar.Value = 0;
+            // Show panel and spinner for manual checks. Silent startup checks stay hidden unless an app update is found.
+            if (!silent)
+            {
+                UpdatePanel.Visibility = Visibility.Visible;
+                UpdateResultsGrid.Visibility = Visibility.Collapsed;
+                UpdateStatusText.Visibility = Visibility.Visible;
+                UpdateStatusText.Text = "Checking for updates…";
+                UpdateProgressBar.IsIndeterminate = true;
+                UpdateProgressBar.Value = 0;
+            }
 
             // ── Run RED check and stats update in parallel ──────────────
             string remoteRedVersion = "";
@@ -1028,6 +1107,27 @@ namespace InspectionEditor
             catch (Exception ex)
             {
                 redCheckError = ex.Message;
+            }
+
+            bool appUpdateAvailable = redCheckError == null &&
+                                      !string.IsNullOrEmpty(remoteRedVersion) &&
+                                      remoteRedVersion != AppVersion &&
+                                      !string.IsNullOrEmpty(redDownloadUrl);
+
+            if (silent && !appUpdateAvailable)
+            {
+                MarkStartupAppUpdateChecked();
+                return;
+            }
+
+            if (silent && appUpdateAvailable)
+            {
+                UpdatePanel.Visibility = Visibility.Visible;
+                UpdateResultsGrid.Visibility = Visibility.Collapsed;
+                UpdateStatusText.Visibility = Visibility.Visible;
+                UpdateStatusText.Text = $"RED v{remoteRedVersion} found. Updating…";
+                UpdateProgressBar.IsIndeterminate = true;
+                UpdateProgressBar.Value = 0;
             }
 
             // ── If RED needs updating, download and install ──────────────
@@ -1239,6 +1339,8 @@ namespace InspectionEditor
                 TeamStatsStatusText.Text = "✓ Up to date";
                 TeamStatsStatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 125, 50));
             }
+
+            MarkStartupAppUpdateChecked();
 
             if (redUpdated)
             {
@@ -12623,13 +12725,29 @@ namespace InspectionEditor
             // If not scrolling, let the click through normally
         }
 
+        private static DependencyObject? SafeGetVisualParent(DependencyObject? source)
+        {
+            if (source == null) return null;
+
+            try
+            {
+                if (source is Visual || source is System.Windows.Media.Media3D.Visual3D)
+                    return VisualTreeHelper.GetParent(source);
+            }
+            catch { }
+
+            if (source is FrameworkElement fe) return fe.Parent;
+            if (source is FrameworkContentElement fce) return fce.Parent;
+            return null;
+        }
+
         private Item? FindInlineItemFromSource(DependencyObject? source)
         {
             while (source != null)
             {
                 if (source is FrameworkElement { Tag: Item item })
                     return item;
-                source = VisualTreeHelper.GetParent(source);
+                source = SafeGetVisualParent(source);
             }
 
             return null;
@@ -12645,7 +12763,7 @@ namespace InspectionEditor
                     return true;
                 }
 
-                source = VisualTreeHelper.GetParent(source);
+                source = SafeGetVisualParent(source);
             }
 
             return false;
@@ -12661,7 +12779,7 @@ namespace InspectionEditor
                     return true;
                 }
 
-                source = VisualTreeHelper.GetParent(source);
+                source = SafeGetVisualParent(source);
             }
 
             return false;
@@ -12674,7 +12792,7 @@ namespace InspectionEditor
                 if (source is FrameworkElement { Tag: InlineNumberpadSliderAction })
                     return true;
 
-                source = VisualTreeHelper.GetParent(source);
+                source = SafeGetVisualParent(source);
             }
 
             return false;
@@ -12761,7 +12879,7 @@ namespace InspectionEditor
             {
                 if (ReferenceEquals(source, ancestor))
                     return true;
-                source = VisualTreeHelper.GetParent(source);
+                source = SafeGetVisualParent(source);
             }
 
             return false;
@@ -12773,7 +12891,7 @@ namespace InspectionEditor
             {
                 if (source is T target)
                     return target;
-                source = VisualTreeHelper.GetParent(source);
+                source = SafeGetVisualParent(source);
             }
 
             return null;

@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-title RED 2.0 Updater
+title RED 2.0.1 Updater
 
 :: Self-elevate to Administrator if needed
 fltmc >nul 2>&1
@@ -8,7 +8,7 @@ if not errorlevel 1 goto :elevated_start
 
 echo.
 echo  =====================================================
-echo    RED 2.0 Updater  ^|  Administrator access required
+echo    RED 2.0.1 Updater  ^|  Administrator access required
 echo  =====================================================
 echo.
 echo  This updater needs Administrator access to update C:\Red.
@@ -40,11 +40,11 @@ call :log "Backup dir: %BACKUP_DIR%"
 
 echo.
 echo  =====================================================
-echo    RED 2.0 Updater
+echo    RED 2.0.1 Updater
 echo  =====================================================
 echo.
 echo  This will close RED, back up your RED files, download
-echo  the latest RED 2.0 release, install it, repair the
+echo  the latest RED release, install it, repair the
 echo  Desktop shortcut, and launch RED.
 echo.
 echo  Backup/log folder:
@@ -79,7 +79,7 @@ if not exist "%DOWNLOAD_ZIP%" goto :download_failed
 for %%A in ("%DOWNLOAD_ZIP%") do if %%~zA LSS 1000000 goto :download_failed
 echo          Download complete.
 
-echo  [4 of 7] Extracting and verifying RED 2.0...
+echo  [4 of 7] Extracting and verifying RED...
 if exist "%EXTRACT_DIR%" rd /s /q "%EXTRACT_DIR%" >>"%LOG_FILE%" 2>&1
 mkdir "%EXTRACT_DIR%" >>"%LOG_FILE%" 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Expand-Archive -Path '%DOWNLOAD_ZIP%' -DestinationPath '%EXTRACT_DIR%' -Force" >>"%LOG_FILE%" 2>&1
@@ -91,7 +91,7 @@ if not exist "%EXTRACT_DIR%\inspector_stats.json" call :log "WARNING: inspector_
 if not exist "%EXTRACT_DIR%\inspection_types.csv" call :log "WARNING: inspection_types.csv missing from release ZIP"
 echo          Verified Red.exe.
 
-echo  [5 of 7] Installing RED 2.0...
+echo  [5 of 7] Installing RED...
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%" >>"%LOG_FILE%" 2>&1
 xcopy /E /Y /Q "%EXTRACT_DIR%\*" "%INSTALL_DIR%\" >>"%LOG_FILE%" 2>&1
 if errorlevel 1 goto :install_failed
@@ -108,11 +108,11 @@ echo          Shortcut ready.
 
 echo  [7 of 7] Launching RED...
 start "" "%INSTALL_DIR%\Red.exe"
-call :log "RED 2.0 update completed successfully"
+call :log "RED update completed successfully"
 
 echo.
 echo  =====================================================
-echo    Done. RED 2.0 is installed and launching.
+echo    Done. RED is installed and launching.
 echo.
 echo    Your license/settings/user data were backed up here:
 echo    %BACKUP_DIR%
@@ -146,7 +146,7 @@ if exist "%BACKUP_DIR%\InstallFolder-C-Red\settings.txt" (
     if errorlevel 1 (
         copy /Y "%BACKUP_DIR%\InstallFolder-C-Red\settings.txt" "%INSTALL_DIR%\settings.txt" >>"%LOG_FILE%" 2>&1
     ) else (
-        call :log "Old xAI settings.txt was not restored; packaged RED 2.0 settings.txt kept."
+        call :log "Old xAI settings.txt was not restored; packaged RED settings.txt kept."
     )
 )
 exit /b 0
