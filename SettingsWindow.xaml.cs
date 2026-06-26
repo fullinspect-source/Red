@@ -21,39 +21,26 @@ namespace InspectionEditor
         public SettingsWindow()
         {
             InitializeComponent();
-            LoadApiKey();
             SuppressAdminToolsCheckBox.IsChecked = LoadSuppressAdministrativeTools();
             SelectDefaultAiTone(LoadDefaultAiTone());
         }
 
-        private void LoadApiKey()
-        {
-            try
-            {
-                if (File.Exists(SETTINGS_FILE))
-                {
-                    ApiKeyTextBox.Text = File.ReadAllText(SETTINGS_FILE).Trim();
-                }
-            }
-            catch
-            {
-                // Ignore errors loading settings
-            }
-        }
-
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            string apiKey = ApiKeyTextBox.Text.Trim();
+            string apiKey = ApiKeyPasswordBox.Password.Trim();
 
             try
             {
-                File.WriteAllText(SETTINGS_FILE, apiKey);
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                {
+                    File.WriteAllText(SETTINGS_FILE, apiKey);
+                    ApiKey = apiKey;
+                }
                 SaveAppSettings(new RedAppSettings
                 {
                     SuppressAdministrativeTools = SuppressAdminToolsCheckBox.IsChecked != false,
                     DefaultAiTone = GetSelectedDefaultAiTone()
                 });
-                ApiKey = apiKey;
                 DialogResult = true;
                 Close();
             }

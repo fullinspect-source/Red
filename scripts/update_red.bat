@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-title RED 2.0.1 Updater
+title RED 2.0.2 Updater
 
 :: Self-elevate to Administrator if needed
 fltmc >nul 2>&1
@@ -8,7 +8,7 @@ if not errorlevel 1 goto :elevated_start
 
 echo.
 echo  =====================================================
-echo    RED 2.0.1 Updater  ^|  Administrator access required
+echo    RED 2.0.2 Updater  ^|  Administrator access required
 echo  =====================================================
 echo.
 echo  This updater needs Administrator access to update C:\Red.
@@ -40,7 +40,7 @@ call :log "Backup dir: %BACKUP_DIR%"
 
 echo.
 echo  =====================================================
-echo    RED 2.0.1 Updater
+echo    RED 2.0.2 Updater
 echo  =====================================================
 echo.
 echo  This will close RED, back up your RED files, download
@@ -146,7 +146,7 @@ if exist "%BACKUP_DIR%\InstallFolder-C-Red\settings.txt" (
     if errorlevel 1 (
         copy /Y "%BACKUP_DIR%\InstallFolder-C-Red\settings.txt" "%INSTALL_DIR%\settings.txt" >>"%LOG_FILE%" 2>&1
     ) else (
-        call :log "Old xAI settings.txt was not restored; packaged RED settings.txt kept."
+        call :log "Old xAI settings.txt was not restored; AI remains disabled until a Gemini key is added manually."
     )
 )
 exit /b 0

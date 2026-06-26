@@ -1502,15 +1502,6 @@ namespace InspectionEditor
         private void InitializeGrokClient()
         {
             string? apiKey = SettingsWindow.LoadApiKeyFromFile();
-            
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                var settingsWindow = new SettingsWindow { Owner = this };
-                if (settingsWindow.ShowDialog() == true)
-                {
-                    apiKey = settingsWindow.ApiKey;
-                }
-            }
 
             if (!string.IsNullOrEmpty(apiKey))
             {
