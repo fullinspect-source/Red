@@ -19,7 +19,7 @@ namespace InspectionEditor.Services
         
         // Gemini model choices. Fast favors touch-speed field use; careful favors richer reasoning.
         private const string FAST_MODEL = "gemini-3.1-flash-lite";
-        private const string FAST_LEGACY_MODEL = "gemini-2.5-flash-lite";
+        private const string FAST_LEGACY_MODEL = "gemini-2.5-flash";
         private const string CAREFUL_MODEL = "gemini-3.5-flash";
         private const string CAREFUL_LEGACY_MODEL = "gemini-2.5-flash";
         private const string TRANSCRIBE_MODEL = "gemini-2.5-flash";
