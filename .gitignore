@@ -20,6 +20,7 @@ bld/
 
 # User-specific files
 settings.txt
+EmbeddedApiKeyProvider.Generated.cs
 *.ins
 licenses/
 userdata/

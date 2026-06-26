@@ -80,7 +80,7 @@ namespace InspectionEditor
                 catch { }
             }
 
-            return null;
+            return EmbeddedApiKeyProvider.Load();
         }
 
         public static bool LoadSuppressAdministrativeTools()
