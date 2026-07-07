@@ -33,6 +33,7 @@ namespace InspectionEditor.Services
 
         // Air sealing
         public string? BlowerDoorMaxCfm { get; set; }     // CFM @ 50 Pa
+        public string? BlowerDoorSourceAch { get; set; }  // ACH source when CFM is calculated from volume
 
         // Ducts
         public string? DuctLeakageMaxCfm { get; set; }    // CFM @ 25 Pa (total)
@@ -267,6 +268,89 @@ namespace InspectionEditor.Services
             return Labels.TryGetValue((normCode, itemNum), out var label) ? label : null;
         }
 
+        public static string? GetValueForField(EnergyComplianceInfo info, string? fieldKey)
+        {
+            if (info == null || string.IsNullOrWhiteSpace(fieldKey)) return null;
+            return ExtractionMappingService.NormalizeFieldKey(fieldKey) switch
+            {
+                "HERSINDEX" => info.HersIndex,
+                "CONDITIONEDFLOORAREA" => info.ConditionedFloorArea,
+                "CONDITIONEDVOLUME" => info.ConditionedVolume,
+                "NUMBEROFBEDROOMS" => info.NumberOfBedrooms,
+                "BLOWERDOORMAXCFM" or "BLOWERDOORCFM50PA" => info.BlowerDoorMaxCfm,
+                "EFFECTIVEBLOWERDOORCFM" => info.EffectiveBlowerDoorCfm,
+                "DUCTLEAKAGEMAXCFM" or "DUCTLEAKAGECFM25PA" => info.DuctLeakageMaxCfm,
+                "EFFECTIVEDUCTLEAKAGECFM" => info.EffectiveDuctLeakageCfm,
+                "NUMBEROFRETURNS" => info.NumberOfReturns,
+                "SUPPLYDUCTR" => info.SupplyDuctR,
+                "RETURNDUCTR" => info.ReturnDuctR,
+                "WINDOWUFACTOR" => info.WindowUFactor,
+                "WINDOWSHGC" => info.WindowSHGC,
+                "SLOPEDCEILINGR" => info.SlopedCeilingR,
+                "ATTICCEILINGR" => info.AtticCeilingR,
+                "WALLR" => info.WallR,
+                "WALLRDETAILS" => info.WallRDetails,
+                "ATTICWALLR" => info.AtticWallR,
+                "ATTICROOFR" => info.AtticRoofR,
+                "HOTWATERPIPER" => info.HotWaterPipeR,
+                "WATERHEATERFUEL" => info.WaterHeaterFuel,
+                "WATERHEATERCAPACITY" => info.WaterHeaterCapacity,
+                "HVACCOOLINGSEER" or "COOLINGSEER" => info.HvacCoolingSeer,
+                "HVACTONNAGE" or "TONNAGE" => info.HvacTonnage,
+                "DESIGNAIRFLOWCFM" => info.DesignAirflowCfm,
+                "TARGETFRESHAIRCFM" or "FRESHAIRCFM" => info.TargetFreshAirCfm,
+                "TARGETRUNTIME" or "RUNTIME" => info.TargetRunTime,
+                "VENTFANWATTS" or "FANWATTS" => info.VentFanWatts,
+                "ENERGYSTARPROGRAM" => info.EnergyStarProgram,
+                "ENERGYSTARPROGRAMORIECCVERSION" => info.EnergyStarProgram ?? info.IECCVersion,
+                "ENERGYSTARPROGRAMORIECCVERSIONYEAR" => info.EnergyStarProgram != null
+                    ? "Energy Star"
+                    : info.IECCVersion?.Replace("IECC ", "").Replace("IECC", "").Trim(),
+                "IECCVERSION" => info.IECCVersion,
+                "IECCVERSIONYEAR" => info.IECCVersion?.Replace("IECC ", "").Replace("IECC", "").Trim(),
+                "PERFORMANCEPATH" => "Performance IECC",
+                _ => null
+            };
+        }
+
+        public static string? GetLabelForField(string? fieldKey)
+        {
+            if (string.IsNullOrWhiteSpace(fieldKey)) return null;
+            return ExtractionMappingService.NormalizeFieldKey(fieldKey) switch
+            {
+                "HERSINDEX" => "HERS",
+                "CONDITIONEDFLOORAREA" => "Floor Area",
+                "CONDITIONEDVOLUME" => "Volume",
+                "NUMBEROFBEDROOMS" => "Bedrooms",
+                "BLOWERDOORMAXCFM" or "BLOWERDOORCFM50PA" or "EFFECTIVEBLOWERDOORCFM" => "Blower Door",
+                "DUCTLEAKAGEMAXCFM" or "DUCTLEAKAGECFM25PA" or "EFFECTIVEDUCTLEAKAGECFM" => "Duct Leakage",
+                "NUMBEROFRETURNS" => "Returns",
+                "SUPPLYDUCTR" => "Supply Duct",
+                "RETURNDUCTR" => "Return Duct",
+                "WINDOWUFACTOR" => "U-factor",
+                "WINDOWSHGC" => "SHGC",
+                "SLOPEDCEILINGR" => "Sloped Ceiling",
+                "ATTICCEILINGR" => "Attic Ceiling",
+                "WALLR" or "WALLRDETAILS" => "Wall",
+                "ATTICWALLR" => "Attic Wall",
+                "ATTICROOFR" => "Attic Roof",
+                "HOTWATERPIPER" => "Pipe",
+                "WATERHEATERFUEL" => "WH Fuel",
+                "WATERHEATERCAPACITY" => "WH Capacity",
+                "HVACCOOLINGSEER" or "COOLINGSEER" => "SEER",
+                "HVACTONNAGE" or "TONNAGE" => "Tonnage",
+                "DESIGNAIRFLOWCFM" => "Design Airflow",
+                "TARGETFRESHAIRCFM" or "FRESHAIRCFM" => "Fresh Air",
+                "TARGETRUNTIME" or "RUNTIME" => "Run Time",
+                "VENTFANWATTS" or "FANWATTS" => "Fan Watts",
+                "ENERGYSTARPROGRAM" or "ENERGYSTARPROGRAMORIECCVERSION" => "Energy Star",
+                "ENERGYSTARPROGRAMORIECCVERSIONYEAR" => "IECC Code",
+                "IECCVERSION" or "IECCVERSIONYEAR" => "IECC Code",
+                "PERFORMANCEPATH" => "Type",
+                _ => null
+            };
+        }
+
         /// Applies the EC value for the given item only. Returns true if the value was set.
         public static bool ApplySingleItem(EnergyComplianceInfo info, Item item, string? inspCode)
         {
@@ -457,6 +541,36 @@ namespace InspectionEditor.Services
         {
             if (itemNum == null) return null;
             return SlabLabels.TryGetValue(itemNum, out var label) ? label : null;
+        }
+
+        internal static string? GetSlabValueForField(SlabEngineeringInfo slab, string? fieldKey)
+        {
+            if (slab == null || string.IsNullOrWhiteSpace(fieldKey)) return null;
+            return ExtractionMappingService.NormalizeFieldKey(fieldKey) switch
+            {
+                "FOUNDATIONTYPE" => slab.CableCount.HasValue ? (slab.CableCount.Value > 0 ? "Post Tensioned" : "Conventionally Reinforced") : null,
+                "CABLECOUNTTOTAL" or "CABLECOUNT" or "STRANDS" => slab.CableCount?.ToString(),
+                "SLABTHICKNESSINCHES" or "SLABTHICKNESS" => slab.SlabThicknessInches?.ToString(),
+                "BEAMWIDTHINCHES" or "BEAMWIDTH" => slab.BeamWidthInches?.ToString(),
+                "BEAMDEPTHINCHES" or "BEAMDEPTH" or "TOFBOB" => slab.BeamDepthInches?.ToString(),
+                "HOLDDOWNCOUNT" or "HOLDDOWNS" => slab.HolddownCount?.ToString(),
+                _ => null
+            };
+        }
+
+        internal static string? GetSlabLabelForField(string? fieldKey)
+        {
+            if (string.IsNullOrWhiteSpace(fieldKey)) return null;
+            return ExtractionMappingService.NormalizeFieldKey(fieldKey) switch
+            {
+                "FOUNDATIONTYPE" => "Foundation",
+                "CABLECOUNTTOTAL" or "CABLECOUNT" or "STRANDS" => "Plan total",
+                "SLABTHICKNESSINCHES" or "SLABTHICKNESS" => "Slab",
+                "BEAMWIDTHINCHES" or "BEAMWIDTH" => "Beam W",
+                "BEAMDEPTHINCHES" or "BEAMDEPTH" or "TOFBOB" => "TOF-BOB",
+                "HOLDDOWNCOUNT" or "HOLDDOWNS" => "Holddowns",
+                _ => null
+            };
         }
 
         /// <summary>
@@ -662,6 +776,46 @@ namespace InspectionEditor.Services
             };
         }
 
+        public static BannerState GetEcFieldBannerState(EnergyComplianceInfo info, string? fieldKey, string? actualValue, string? compareRule)
+        {
+            if (info == null || !info.IsLoaded) return BannerState.Gray;
+            string? designValue = GetValueForField(info, fieldKey);
+            if (string.IsNullOrWhiteSpace(designValue)) return BannerState.Gray;
+            if (string.IsNullOrWhiteSpace(actualValue)) return BannerState.Red;
+
+            var compareType = ParseCompareRule(compareRule, fieldKey);
+            return compareType switch
+            {
+                EcCompareType.TextMatch    => TextMatches(actualValue, designValue) ? BannerState.Green : BannerState.Red,
+                EcCompareType.AtMost       => NumericCompare(actualValue, designValue, (a, d) => a <= d),
+                EcCompareType.AtLeast      => NumericCompare(actualValue, designValue, (a, d) => a >= d),
+                EcCompareType.ExactOrClose => NumericOrTextClose(actualValue, designValue),
+                _                          => BannerState.Gray,
+            };
+        }
+
+        private static EcCompareType ParseCompareRule(string? compareRule, string? fieldKey)
+        {
+            string rule = ExtractionMappingService.NormalizeFieldKey(compareRule);
+            if (rule == "ATMOST" || rule == "MAX" || rule == "LESSTHANOREQUAL") return EcCompareType.AtMost;
+            if (rule == "ATLEAST" || rule == "MIN" || rule == "GREATERTHANOREQUAL") return EcCompareType.AtLeast;
+            if (rule == "TEXTMATCH" || rule == "TEXT") return EcCompareType.TextMatch;
+            if (rule == "EXACTORCLOSE" || rule == "EXACT" || rule == "CLOSE") return EcCompareType.ExactOrClose;
+
+            return ExtractionMappingService.NormalizeFieldKey(fieldKey) switch
+            {
+                "BLOWERDOORMAXCFM" or "BLOWERDOORCFM50PA" or "EFFECTIVEBLOWERDOORCFM" or
+                "DUCTLEAKAGEMAXCFM" or "DUCTLEAKAGECFM25PA" or "EFFECTIVEDUCTLEAKAGECFM" or
+                "VENTFANWATTS" or "FANWATTS" => EcCompareType.AtMost,
+                "SUPPLYDUCTR" or "RETURNDUCTR" or "SLOPEDCEILINGR" or "ATTICCEILINGR" or
+                "WALLR" or "ATTICWALLR" or "ATTICROOFR" or "HOTWATERPIPER" or
+                "HVACCOOLINGSEER" or "COOLINGSEER" or "TARGETFRESHAIRCFM" => EcCompareType.AtLeast,
+                "ENERGYSTARPROGRAM" or "IECCVERSION" or "IECCVERSIONYEAR" or "PERFORMANCEPATH" or
+                "WATERHEATERFUEL" or "WATERHEATERCAPACITY" or "TARGETRUNTIME" => EcCompareType.TextMatch,
+                _ => EcCompareType.ExactOrClose
+            };
+        }
+
         /// <summary>
         /// Returns the banner state for the current slab CPP item.
         /// cableF2B / cableR2L: inspector-entered values from items 5.1.b and 5.1.c.
@@ -706,6 +860,39 @@ namespace InspectionEditor.Services
             else
                 // Beam depth: [min, min+12"] — more than 12" over min suggests dig error
                 return (actual >= design && actual <= design + 12.0) ? BannerState.Green : BannerState.Red;
+        }
+
+        internal static BannerState GetSlabFieldBannerState(SlabEngineeringInfo slab, string? fieldKey, string? actualValue, int? cableF2B = null, int? cableR2L = null)
+        {
+            if (slab == null || string.IsNullOrWhiteSpace(fieldKey)) return BannerState.Gray;
+            string key = ExtractionMappingService.NormalizeFieldKey(fieldKey);
+
+            if (key == "CABLECOUNTTOTAL" || key == "CABLECOUNT" || key == "STRANDS")
+            {
+                if (!slab.CableCount.HasValue) return BannerState.Gray;
+                if (cableF2B == null || cableR2L == null) return BannerState.Red;
+                return cableF2B.Value + cableR2L.Value == slab.CableCount.Value ? BannerState.Green : BannerState.Red;
+            }
+
+            string? designValue = GetSlabValueForField(slab, fieldKey);
+            if (string.IsNullOrWhiteSpace(designValue)) return BannerState.Gray;
+            if (string.IsNullOrWhiteSpace(actualValue)) return BannerState.Red;
+
+            if (key == "FOUNDATIONTYPE")
+                return TextMatches(actualValue, designValue) ? BannerState.Green : BannerState.Red;
+
+            double? actualParsed = ParseNumericValue(actualValue);
+            double? designParsed = ParseNumericValue(designValue);
+            if (actualParsed == null || designParsed == null) return BannerState.Gray;
+
+            if (key == "BEAMWIDTHINCHES" || key == "BEAMWIDTH")
+                return (actualParsed.Value >= designParsed.Value && actualParsed.Value <= 18.0) ? BannerState.Green : BannerState.Red;
+            if (key == "BEAMDEPTHINCHES" || key == "BEAMDEPTH" || key == "TOFBOB")
+                return (actualParsed.Value >= designParsed.Value && actualParsed.Value <= designParsed.Value + 12.0) ? BannerState.Green : BannerState.Red;
+            if (key == "SLABTHICKNESSINCHES" || key == "SLABTHICKNESS")
+                return actualParsed.Value >= designParsed.Value ? BannerState.Green : BannerState.Red;
+
+            return NumericOrTextClose(actualValue, designValue);
         }
 
         // ---------------------------------------------------------------
@@ -932,6 +1119,7 @@ namespace InspectionEditor.Services
                     && achVal > 0 && achVal < 30)
                 {
                     info.BlowerDoorMaxCfm = ((int)Math.Round(achVal * volVal / 60.0)).ToString();
+                    info.BlowerDoorSourceAch = FormatOneDecimal(achVal);
                 }
             }
 
@@ -1040,6 +1228,7 @@ namespace InspectionEditor.Services
             // Foam-encapsulated attic wall R
             string? awNum = First(text,
                 @"Attic Wall[^\n]*R-?(\d+)",
+                @"(?:Attic|Knee)\s+Wall[^\n\r]{0,120}?R[-\s]?(\d+)",
                 @"2x4 R-?(\d+)[^\n]*FOAM[^\n]*Attic");
             if (awNum != null)
             {
@@ -1079,6 +1268,9 @@ namespace InspectionEditor.Services
 
             // Vented-attic ceiling (flat, blown/batt) → IEF 8.2
             string? flatNum = First(text,
+                @"Attic\s+Ceiling[^\n\r]{0,120}?R[-\s]?(\d+)",
+                @"Ceiling\s+(?:Attic|Flat|Vented)[^\n\r]{0,120}?R[-\s]?(\d+)",
+                @"(?:Vented\s+)?Attic\s+(?:Floor|Insulation)[^\n\r]{0,120}?R[-\s]?(\d+)",
                 @"Flat[:\s]+[^\n]*R-?(\d+)",
                 @"Ceiling[^\n]*R-?(\d+)(?!\s*FOAM)",
                 @"R-?(\d+)\s+blown",
@@ -1145,7 +1337,8 @@ namespace InspectionEditor.Services
                 System.Globalization.CultureInfo.InvariantCulture, out double runHrs))
             {
                 int pct = (int)Math.Round(runHrs / 24.0 * 100);
-                info.TargetRunTime = $"{runHrs} hrs/day ({pct}%)";
+                double minutesPerHour = runHrs * 60.0 / 24.0;
+                info.TargetRunTime = $"{FormatOneDecimal(runHrs)} hrs/day ({pct}%, {FormatOneDecimal(minutesPerHour)} min/hr)";
             }
 
             // Energy Star version
@@ -1374,6 +1567,13 @@ namespace InspectionEditor.Services
             s = s.Trim();
             if (s.EndsWith(".0")) s = s[..^2];
             return s;
+        }
+
+        private static string FormatOneDecimal(double value)
+        {
+            return Math.Abs(value - Math.Round(value)) < 0.0001
+                ? ((int)Math.Round(value)).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         /// Tries to extract an inch-thickness value (e.g. 7" or 5.5") near a label.

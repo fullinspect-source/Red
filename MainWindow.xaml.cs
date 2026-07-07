@@ -4521,7 +4521,7 @@ namespace InspectionEditor
                 chips.Children.Add(CreateInlineBadge("Comment", new SolidColorBrush(Color.FromRgb(88, 80, 141)), Brushes.White, FontWeights.SemiBold));
             if ((item.Required && string.IsNullOrWhiteSpace(value)) || (item.IsPictureRequired && item.Pictures.Count == 0))
                 chips.Children.Add(CreateInlineBadge("Required", new SolidColorBrush(Color.FromRgb(139, 0, 0)), Brushes.White, FontWeights.SemiBold));
-            var designChip = CreateInlineDesignAssistChip(item);
+            var designChip = CreateInlineDesignAssistChip(section, item);
             if (designChip != null)
                 chips.Children.Add(designChip);
             Grid.SetColumn(chips, 4);
@@ -4750,9 +4750,9 @@ namespace InspectionEditor
             panel.Children.Add(clearButton);
         }
 
-        private UIElement? CreateInlineDesignAssistChip(Item item)
+        private UIElement? CreateInlineDesignAssistChip(Section section, Item item)
         {
-            var assist = GetInlineDesignAssist(item);
+            var assist = GetInlineDesignAssist(section, item);
             if (assist == null)
                 return null;
 
@@ -4787,9 +4787,10 @@ namespace InspectionEditor
             return button;
         }
 
-        private InlineDesignAssist? GetInlineDesignAssist(Item item)
+        private InlineDesignAssist? GetInlineDesignAssist(Section section, Item item)
         {
             string? actualValue = item.Value?.ToString()?.Trim();
+            string? promptText = item.DisplayLabel ?? item.Name;
 
             if (_currentSlabInfo != null)
             {
@@ -4807,6 +4808,48 @@ namespace InspectionEditor
                     if (byNum.TryGetValue("5.1.c", out var s2sItem) &&
                         int.TryParse(s2sItem.Value?.ToString(), out int s2s))
                         cableS2S = s2s;
+                }
+
+                var slabMapping = ExtractionMappingService.Resolve(
+                    "SLAB",
+                    _currentInspectionCode,
+                    section.Number,
+                    section.Name,
+                    promptText,
+                    item.Number);
+                if (slabMapping != null)
+                {
+                    var slabMappedState = EnergyComplianceService.GetSlabFieldBannerState(
+                        _currentSlabInfo,
+                        slabMapping.FieldKey,
+                        actualValue,
+                        cableF2B,
+                        cableS2S);
+
+                    string slabFieldKey = ExtractionMappingService.NormalizeFieldKey(slabMapping.FieldKey);
+                    if (slabFieldKey == "CABLECOUNTTOTAL" && _currentSlabInfo.CableCount.HasValue)
+                    {
+                        string text = cableF2B.HasValue && cableS2S.HasValue
+                            ? $"Plan total: {_currentSlabInfo.CableCount} ({cableF2B + cableS2S})"
+                            : $"Plan total: {_currentSlabInfo.CableCount}";
+                        return new InlineDesignAssist(item, "", text, slabMappedState, CanApply: false, Source: "slab", ToolTip: "F2B plus S2S must match the plan total");
+                    }
+
+                    string? slabMappedValue = EnergyComplianceService.GetSlabValueForField(_currentSlabInfo, slabMapping.FieldKey);
+                    if (!string.IsNullOrWhiteSpace(slabMappedValue))
+                    {
+                        string? slabMappedLabel = !string.IsNullOrWhiteSpace(slabMapping.Label)
+                            ? slabMapping.Label
+                            : EnergyComplianceService.GetSlabLabelForField(slabMapping.FieldKey);
+                        return new InlineDesignAssist(
+                            item,
+                            slabMappedValue,
+                            slabMappedLabel != null ? $"{slabMappedLabel}: {slabMappedValue}" : slabMappedValue,
+                            slabMappedState,
+                            CanApply: true,
+                            Source: "slab",
+                            ToolTip: "Slab engineering value");
+                    }
                 }
 
                 var slabState = EnergyComplianceService.GetSlabItemBannerState(_currentSlabInfo, item.Number, actualValue, cableF2B, cableS2S);
@@ -4835,6 +4878,33 @@ namespace InspectionEditor
 
             if (_currentEcInfo != null && _currentEcInfo.IsLoaded)
             {
+                var ecMapping = ExtractionMappingService.Resolve(
+                    "EC",
+                    _currentInspectionCode,
+                    section.Number,
+                    section.Name,
+                    promptText,
+                    item.Number);
+                if (ecMapping != null)
+                {
+                    string? mappedValue = EnergyComplianceService.GetValueForField(_currentEcInfo, ecMapping.FieldKey);
+                    if (!string.IsNullOrWhiteSpace(mappedValue) && ShouldShowInlineEcAssist(item, mappedValue))
+                    {
+                        string? mappedLabel = !string.IsNullOrWhiteSpace(ecMapping.Label)
+                            ? ecMapping.Label
+                            : EnergyComplianceService.GetLabelForField(ecMapping.FieldKey);
+                        var mappedState = EnergyComplianceService.GetEcFieldBannerState(_currentEcInfo, ecMapping.FieldKey, actualValue, ecMapping.CompareRule);
+                        return new InlineDesignAssist(
+                            item,
+                            mappedValue,
+                            FormatInlineEcAssistText(item, mappedLabel, mappedValue),
+                            mappedState,
+                            CanApply: true,
+                            Source: "ec",
+                            ToolTip: "Energy compliance report value");
+                    }
+                }
+
                 string? ecValue = EnergyComplianceService.GetValueForItem(_currentEcInfo, _currentInspectionCode, item.Number);
                 if (!string.IsNullOrWhiteSpace(ecValue) && ShouldShowInlineEcAssist(item, ecValue))
                 {
