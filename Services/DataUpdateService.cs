@@ -66,8 +66,9 @@ namespace InspectionEditor.Services
                     if (inspectorStatsStale) staleFiles.Add("Inspector Stats");
                     if (inspectionTypesStale) staleFiles.Add("Inspection Types");
 
-                    return $"⚠️ Your {string.Join(" and ", staleFiles)} data is more than 14 days old.\n\n" +
-                           "Please connect to the internet and restart RED to get the latest datasets.";
+                    return $"Your {string.Join(" and ", staleFiles)} data is more than 14 days old.\n\n" +
+                           "RED tried to refresh the datasets at startup but they are still stale. " +
+                           "Open About and triple-click RED to retry the dataset refresh.";
                 }
             }
             catch
@@ -256,3 +257,4 @@ namespace InspectionEditor.Services
         }
     }
 }
+

@@ -101,12 +101,14 @@ namespace InspectionEditor
                 SaveSettings();
             };
             InitializeComponent();
+            Title = AppIdentity.MyListWindowTitle;
+            AboutCurrentVersionText.Text = $"{AppIdentity.DisplayName} {AppIdentity.VersionDisplay}";
+            AboutPublishedText.Text = $"Published {AppIdentity.PublishedDateText}";
             InitializeColumnLayout();
             WatchColumnWidthChanges();
             Loaded += InspectionPickerWindow_Loaded;
             if (_stayOpenHome)
             {
-                Title = $"{AppIdentity.DisplayName} - My List";
                 OpenButton.Content = "Open";
                 CancelButton.Content = "Close";
                 StatusText.Text = "Tap an inspection once to open it";
@@ -691,9 +693,23 @@ namespace InspectionEditor
 
             InspectionEditor.Services.StatsUpdateResult? statsResult = null;
             InspectionEditor.Services.StatsUpdateResult? teamStatsResult = null;
+            string remoteRedVersion = AppIdentity.Version;
+            string? redCheckError = null;
             try
             {
-                statsResult = await InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
+                using var http = new System.Net.Http.HttpClient();
+                http.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionPicker");
+                http.Timeout = TimeSpan.FromSeconds(15);
+
+                var redTask = http.GetStringAsync("https://api.github.com/repos/fullinspect-source/Red/releases/latest");
+                var statsTask = InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
+                await Task.WhenAll(redTask, statsTask);
+
+                statsResult = statsTask.Result;
+                var tagMatch = System.Text.RegularExpressions.Regex.Match(redTask.Result, "\"tag_name\":\\s*\"v?([^\"]+)\"");
+                if (tagMatch.Success)
+                    remoteRedVersion = tagMatch.Groups[1].Value;
+
                 teamStatsResult = new InspectionEditor.Services.StatsUpdateResult
                 {
                     CurrentDate = statsResult.CurrentDate,
@@ -704,6 +720,7 @@ namespace InspectionEditor
             }
             catch (Exception ex)
             {
+                redCheckError = ex.Message;
                 statsResult = new InspectionEditor.Services.StatsUpdateResult
                 {
                     CurrentDate = InspectionEditor.Services.DataUpdateService.GetLocalStatsDate(),
@@ -720,11 +737,24 @@ namespace InspectionEditor
             AboutUpdateResultsGrid.Visibility = Visibility.Visible;
 
             AboutRedHadText.Text = $"v{AppIdentity.Version}";
-            AboutRedNowText.Text = $"v{AppIdentity.Version}";
-            AboutRedStatusText.Text = AppIdentity.IsDevBuild
-                ? "Dev build: app self-update skipped"
-                : "Manual check available from classic editor";
-            AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 125, 50));
+            AboutRedNowText.Text = string.IsNullOrWhiteSpace(remoteRedVersion) ? "-" : $"v{remoteRedVersion}";
+            if (redCheckError != null)
+            {
+                AboutRedStatusText.Text = $"App check issue: {redCheckError}";
+                AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(180, 0, 0));
+            }
+            else if (remoteRedVersion != AppIdentity.Version)
+            {
+                AboutRedStatusText.Text = "New RED version available. Use update_red.bat or restart after update prompt.";
+                AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(180, 0, 0));
+            }
+            else
+            {
+                AboutRedStatusText.Text = AppIdentity.IsDevBuild
+                    ? "Dev build: app self-update skipped"
+                    : "Up to date";
+                AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 125, 50));
+            }
 
             PopulateAboutStatsRow(
                 statsResult,

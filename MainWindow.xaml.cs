@@ -2494,9 +2494,9 @@ namespace InspectionEditor
             _rulesAcknowledged = true;
 
             FileNameText.Text = $"{_currentInspection.InspectionCode} - {_currentInspection.InspectionName}";
-            Title = _readOnlyMode 
-                ? $"Red v{AppVersion} - {_currentInspection.InspectionCode} [READ-ONLY]" 
-                : $"Red v{AppVersion} - {_currentInspection.InspectionCode}";
+            Title = _readOnlyMode
+                ? $"RED {AppIdentity.VersionDisplay} - {_currentInspection.InspectionCode} [READ-ONLY]"
+                : $"RED {AppIdentity.VersionDisplay} - {_currentInspection.InspectionCode}";
             
             // Reset stats mode to Global for new inspection
             _statsMode = StatsMode.Global;
@@ -4519,8 +4519,10 @@ namespace InspectionEditor
                 chips.Children.Add(CreateInlineBadge($"Photo {item.Pictures.Count}", new SolidColorBrush(Color.FromRgb(37, 99, 235)), Brushes.White, FontWeights.SemiBold));
             if (!string.IsNullOrWhiteSpace(item.Comments))
                 chips.Children.Add(CreateInlineBadge("Comment", new SolidColorBrush(Color.FromRgb(88, 80, 141)), Brushes.White, FontWeights.SemiBold));
-            if ((item.Required && string.IsNullOrWhiteSpace(value)) || (item.IsPictureRequired && item.Pictures.Count == 0))
-                chips.Children.Add(CreateInlineBadge("Required", new SolidColorBrush(Color.FromRgb(139, 0, 0)), Brushes.White, FontWeights.SemiBold));
+            if (item.Required && string.IsNullOrWhiteSpace(value))
+                chips.Children.Add(CreateInlineBadge("Value Required", new SolidColorBrush(Color.FromRgb(139, 0, 0)), Brushes.White, FontWeights.SemiBold));
+            if (item.IsPictureRequired && item.Pictures.Count == 0)
+                chips.Children.Add(CreateInlineBadge("Photo Required", new SolidColorBrush(Color.FromRgb(180, 83, 9)), Brushes.White, FontWeights.SemiBold));
             var designChip = CreateInlineDesignAssistChip(section, item);
             if (designChip != null)
                 chips.Children.Add(designChip);
@@ -4632,25 +4634,31 @@ namespace InspectionEditor
 
             if (HasInlineValueChoiceList(item, options))
             {
-                var valueButton = new Button
+                var valueCombo = new ComboBox
                 {
-                    Content = string.IsNullOrWhiteSpace(item.Value?.ToString()) ? "" : item.Value?.ToString(),
+                    ItemsSource = GetSortedInlineValueChoices(item).ToList(),
+                    Text = item.Value?.ToString() ?? "",
                     Tag = item,
+                    IsEditable = true,
+                    IsTextSearchEnabled = false,
+                    StaysOpenOnEdit = true,
                     MinWidth = 78,
                     MaxWidth = 220,
                     Padding = new Thickness(10, 5, 10, 5),
                     Margin = new Thickness(0, 0, 5, 0),
-                    Background = string.IsNullOrWhiteSpace(item.Value?.ToString())
-                        ? Brushes.White
-                        : GetStatusBrushForValue(item.Value?.ToString() ?? ""),
-                    Foreground = string.IsNullOrWhiteSpace(item.Value?.ToString()) ? new SolidColorBrush(Color.FromRgb(15, 23, 42)) : Brushes.White,
+                    Background = Brushes.White,
+                    Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                     FontSize = Math.Max(11, _checklistFontSize - 1),
                     FontWeight = FontWeights.SemiBold,
-                    ToolTip = "Tap to show value choices"
+                    ToolTip = "Pick, type, or paste a value"
                 };
-                valueButton.Click += InlineValueChoiceButton_Click;
-                panel.Children.Add(valueButton);
+                valueCombo.SetValue(InlineValueDisplayProperty, true);
+                valueCombo.GotKeyboardFocus += InlineValueCombo_GotKeyboardFocus;
+                valueCombo.SelectionChanged += InlineValueCombo_SelectionChanged;
+                valueCombo.LostFocus += InlineValueCombo_LostFocus;
+                valueCombo.PreviewKeyDown += InlineValueCombo_PreviewKeyDown;
+                panel.Children.Add(valueCombo);
                 AddInlineClearValueButton(panel, item);
             }
             else if (options != null)
@@ -4679,7 +4687,8 @@ namespace InspectionEditor
 
             if (options == null)
             {
-                AddInlineClearValueButton(panel, item);
+                AddInlineNiValueButtonIfNeeded(panel, item);
+                AddInlineClearValueButton(panel, item, alwaysShow: true);
                 var valueBox = new TextBox
                 {
                     Text = item.Value?.ToString() ?? "",
@@ -4708,7 +4717,7 @@ namespace InspectionEditor
             var scroller = new ScrollViewer
             {
                 Content = panel,
-                MaxWidth = HasInlineValueChoiceList(item, options) ? 260 : 320,
+                MaxWidth = HasInlineValueChoiceList(item, options) ? 260 : options == null ? 430 : 320,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 PanningMode = PanningMode.HorizontalOnly,
@@ -4727,9 +4736,48 @@ namespace InspectionEditor
             return scroller;
         }
 
-        private void AddInlineClearValueButton(Panel panel, Item item)
+        private void AddInlineNiValueButtonIfNeeded(Panel panel, Item item)
         {
-            if (string.IsNullOrWhiteSpace(item.Value?.ToString()))
+            if (!ShouldOfferInlineNiValueButton(item))
+                return;
+
+            string current = item.Value?.ToString() ?? "";
+            bool selected = current.Equals("NI", StringComparison.OrdinalIgnoreCase);
+            var niButton = new Button
+            {
+                Content = "NI",
+                Tag = new InlineValueAction(item, "NI"),
+                MinWidth = 44,
+                MinHeight = 34,
+                Padding = new Thickness(9, 5, 9, 5),
+                Margin = new Thickness(0, 0, 5, 0),
+                Background = selected ? GetStatusBrushForValue("NI") : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                FontSize = Math.Max(11, _checklistFontSize - 1),
+                FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
+                FocusVisualStyle = null,
+                ToolTip = "Set value to NI",
+                Style = CreateInlineStatusButtonStyle()
+            };
+            niButton.Click += InlineStatusButton_Click;
+            panel.Children.Add(niButton);
+        }
+
+        private bool ShouldOfferInlineNiValueButton(Item item)
+        {
+            if (!item.Required)
+                return false;
+
+            string text = $"{item.Name} {item.DisplayLabel} {item.ControlName}".ToLowerInvariant();
+            return text.Contains("other comments") ||
+                   text.Contains("comment") ||
+                   text.Contains("memo");
+        }
+
+        private void AddInlineClearValueButton(Panel panel, Item item, bool alwaysShow = false)
+        {
+            if (!alwaysShow && string.IsNullOrWhiteSpace(item.Value?.ToString()))
                 return;
 
             var clearButton = new Button
@@ -5770,10 +5818,32 @@ namespace InspectionEditor
         private bool HasInlineValueSurface(Item item)
         {
             string controlName = item.ControlName?.ToLowerInvariant() ?? "";
-            return controlName.Contains("text") ||
-                   controlName.Contains("lookup") ||
-                   item.ValueList is { Count: > 0 } ||
-                   !string.IsNullOrWhiteSpace(item.Value?.ToString());
+            string[]? options = GetInlineStatusOptions(item, controlName);
+
+            if (IsInlinePhotoTextValueItem(item))
+                return true;
+
+            if (HasInlineValueChoiceList(item, options))
+                return true;
+
+            // If no fixed status buttons are rendered, the inline header renders a free-entry
+            // value box. That is exactly where Transcribe should write model/serial labels.
+            return options == null;
+        }
+
+        private bool IsInlinePhotoTextValueItem(Item item)
+        {
+            if (!item.Required || !item.IsPictureRequired)
+                return false;
+
+            string prompt = $"{item.Name} {item.DisplayLabel} {item.ControlName}".ToLowerInvariant();
+            return prompt.Contains("model/serial") ||
+                   prompt.Contains("model / serial") ||
+                   prompt.Contains("model number") ||
+                   prompt.Contains("serial number") ||
+                   prompt.Contains("serial") ||
+                   prompt.Contains("manufacturer") ||
+                   prompt.Contains("manuf.");
         }
 
         private UIElement CreateInlinePrefixSuffixStrip(Item item, IEnumerable<string> options, object selected, bool isPrefix)
@@ -7069,6 +7139,54 @@ namespace InspectionEditor
             }
         }
 
+        private void InlineValueCombo_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is FrameworkElement { Tag: Item item })
+                LoadItemEditor(item);
+        }
+
+        private void InlineValueCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is not ComboBox combo || combo.Tag is not Item item || combo.SelectedItem == null)
+                return;
+
+            CommitInlineEditableValue(item, combo.SelectedItem.ToString() ?? "");
+            e.Handled = true;
+        }
+
+        private void InlineValueCombo_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is ComboBox combo && combo.Tag is Item item)
+                CommitInlineEditableValue(item, combo.Text ?? "");
+        }
+
+        private void InlineValueCombo_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter || sender is not ComboBox combo || combo.Tag is not Item item)
+                return;
+
+            CommitInlineEditableValue(item, combo.Text ?? "");
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+
+        private void CommitInlineEditableValue(Item item, string value)
+        {
+            value = value.Trim();
+            string oldValue = item.Value?.ToString() ?? "";
+            if (string.Equals(oldValue, value, StringComparison.Ordinal))
+                return;
+
+            LoadItemEditor(item);
+            item.Value = value;
+            RecordInlineValueUsage(item, value);
+            MarkUnsaved();
+            LoadItemEditor(item);
+            RefreshEngDataPanel();
+            RefreshEcDataPanel();
+            PopulateTreeView(SearchFilterBox.Text);
+        }
+
         private void InlineValueBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
             if (sender is FrameworkElement { Tag: Item item })
@@ -7552,6 +7670,14 @@ namespace InspectionEditor
                 {
                     box.Text = value;
                     box.FontWeight = string.IsNullOrWhiteSpace(value) ? FontWeights.Normal : FontWeights.SemiBold;
+                }
+                else if (child is ComboBox combo &&
+                         ReferenceEquals(combo.Tag, item) &&
+                         combo.GetValue(InlineValueDisplayProperty) is true &&
+                         !string.Equals(combo.Text, value, StringComparison.Ordinal))
+                {
+                    combo.Text = value;
+                    combo.FontWeight = string.IsNullOrWhiteSpace(value) ? FontWeights.Normal : FontWeights.SemiBold;
                 }
 
                 UpdateInlineValueDisplays(child, item, value);
