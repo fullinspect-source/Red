@@ -137,6 +137,13 @@
                                 Margin="0,0,10,0"
                                 Visibility="Collapsed"
                                 ToolTip="Show search bar"/>
+                        <Button x:Name="RefreshMyListButton"
+                                Content="Refresh"
+                                Click="RefreshMyListButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"
+                                Padding="12,7"
+                                Margin="0,0,10,0"
+                                ToolTip="Refresh My List"/>
                         <Button x:Name="BrowseFolderButton"
                                 Content="Browse..."
                                 Click="BrowseFolderButton_Click"
@@ -743,7 +750,7 @@
                                    Padding="20,10"
                                    MouseLeftButtonDown="AboutLogo_MouseLeftButtonDown"/>
                         <TextBlock x:Name="AboutCurrentVersionText"
-                                   Text="RED v2.0.6"
+                                   Text="RED v2.0.7"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="#8B0000"

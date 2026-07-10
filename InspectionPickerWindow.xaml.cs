@@ -83,6 +83,7 @@ namespace InspectionEditor
             "red_app_settings.json");
         
         public string? SelectedFilePath { get; private set; }
+        private bool _myListTabHasBeenShown;
         
         public InspectionPickerWindow(bool stayOpenHome = false)
         {
@@ -403,11 +404,15 @@ namespace InspectionEditor
 
         private void ShowMyListTab()
         {
+            bool shouldRefresh = _myListTabHasBeenShown && IsLoaded;
+            _myListTabHasBeenShown = true;
             MyListPanel.Visibility = Visibility.Visible;
             SettingsPanel.Visibility = Visibility.Collapsed;
             OrdersPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Collapsed;
             SetActiveTab(MyListTabButton);
+            if (shouldRefresh)
+                RefreshCurrentMyListFolder();
         }
 
         private void ShowOrdersTab()
@@ -927,6 +932,25 @@ namespace InspectionEditor
                 SaveSettings();
                 LoadInspections(newPath);
             }
+        }
+
+        private void RefreshMyListButton_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshCurrentMyListFolder();
+        }
+
+        private void RefreshCurrentMyListFolder()
+        {
+            if (_isLoading)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+            {
+                LoadInspections(_currentFolderPath);
+                return;
+            }
+
+            RefreshList(SearchBox.Text);
         }
         
         private bool _isLoading = false;

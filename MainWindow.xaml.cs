@@ -7385,9 +7385,21 @@ namespace InspectionEditor
 
             string key = action.Key;
             string currentValue = action.Item.Value?.ToString() ?? "";
-            action.Item.Value = key == "CLEAR"
-                ? ""
-                : currentValue + key;
+            if (key == "CLEAR")
+            {
+                action.Item.Value = "";
+            }
+            else if (TryGetNumberpadFractionDelta(key, out double fractionDelta))
+            {
+                double currentNumber = TryParseNumberpadObservedValue(currentValue, out double parsedCurrent)
+                    ? parsedCurrent
+                    : 0;
+                action.Item.Value = FormatNumberpadEntryValue(currentNumber + fractionDelta);
+            }
+            else
+            {
+                action.Item.Value = NormalizeNumberpadEntryText(currentValue + key);
+            }
 
             if (!string.IsNullOrWhiteSpace(action.Item.Value?.ToString()))
                 RecordInlineValueUsage(action.Item, action.Item.Value?.ToString() ?? "");
@@ -7850,27 +7862,50 @@ namespace InspectionEditor
             return fallback;
         }
 
+        private bool TryGetNumberpadFractionDelta(string key, out double delta)
+        {
+            delta = key switch
+            {
+                "1/4" => 0.25,
+                "1/2" => 0.5,
+                "3/4" => 0.75,
+                _ => double.NaN
+            };
+
+            return !double.IsNaN(delta);
+        }
+
+        private string NormalizeNumberpadEntryText(string text)
+        {
+            text = (text ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+
+            if (TryParseNumberpadObservedValue(text, out double numericValue))
+                return FormatNumberpadEntryValue(numericValue);
+
+            return text;
+        }
+
+        private string FormatNumberpadEntryValue(double value)
+        {
+            if (Math.Abs(value) < 0.0001)
+                return "0";
+
+            double rounded = Math.Round(value, 2, MidpointRounding.AwayFromZero);
+            if (Math.Abs(rounded - Math.Round(rounded)) < 0.0001)
+                return Math.Round(rounded).ToString(CultureInfo.InvariantCulture);
+
+            return rounded.ToString("0.##", CultureInfo.InvariantCulture);
+        }
+
         private string FormatNumberpadSliderValue(double value, bool allowFractions)
         {
             double snapped = SnapNumberpadSliderValue(value, allowFractions);
             if (!allowFractions)
                 return Math.Round(snapped).ToString(CultureInfo.InvariantCulture);
 
-            int whole = (int)Math.Floor(snapped);
-            int quarters = (int)Math.Round((snapped - whole) / 0.25);
-            if (quarters >= 4)
-            {
-                whole++;
-                quarters = 0;
-            }
-
-            return quarters switch
-            {
-                1 => $"{whole} 1/4",
-                2 => $"{whole} 1/2",
-                3 => $"{whole} 3/4",
-                _ => whole.ToString(CultureInfo.InvariantCulture)
-            };
+            return FormatNumberpadEntryValue(snapped);
         }
 
         private double SnapNumberpadSliderValue(double value, bool allowFractions)

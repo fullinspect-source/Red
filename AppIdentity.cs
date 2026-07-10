@@ -9,7 +9,7 @@ namespace InspectionEditor
     {
         public static string Version => GetAppVersion();
         public static string VersionDisplay => $"v{Version}";
-        public static DateTime PublishedDate => new DateTime(2026, 7, 8);
+        public static DateTime PublishedDate => new DateTime(2026, 7, 10);
         public static string PublishedDateText => PublishedDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
         public static string VersionWithPublishedDate => $"{VersionDisplay} - Published {PublishedDateText}";
         public static bool IsDevBuild => Assembly.GetExecutingAssembly().GetName().Name?.Contains("Dev", StringComparison.OrdinalIgnoreCase) == true;

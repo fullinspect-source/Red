@@ -231,7 +231,7 @@ namespace InspectionEditor.Services
             yield return Row("SLAB", "CPP", "", "front to back quantity OR side to side quantity", "CableCountTotal", "Plan total", "CableSum", 20);
             yield return Row("SLAB", "CPP", "", "beam width", "BeamWidthInches", "Beam W", "BeamWidth", 20);
             yield return Row("SLAB", "CPP", "", "bottom of beam OR beam depth OR top of form to bottom of beam", "BeamDepthInches", "TOF-BOB", "BeamDepth", 20);
-            yield return Row("SLAB", "CPP", "", "slab thickness OR proper thickness", "SlabThicknessInches", "Slab", "AtLeast");
+            yield return Row("SLAB", "CPP", "", "slab thickness OR slab depth OR proper thickness", "SlabThicknessInches", "Slab D", "AtLeast");
             yield return Row("SLAB", "CPP", "", "hold-down OR hold down OR holddown", "HolddownCount", "Holddowns", "ExactOrClose");
         }
 

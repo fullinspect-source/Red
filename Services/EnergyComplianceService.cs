@@ -550,7 +550,7 @@ namespace InspectionEditor.Services
             {
                 "FOUNDATIONTYPE" => slab.CableCount.HasValue ? (slab.CableCount.Value > 0 ? "Post Tensioned" : "Conventionally Reinforced") : null,
                 "CABLECOUNTTOTAL" or "CABLECOUNT" or "STRANDS" => slab.CableCount?.ToString(),
-                "SLABTHICKNESSINCHES" or "SLABTHICKNESS" => slab.SlabThicknessInches?.ToString(),
+                "SLABTHICKNESSINCHES" or "SLABTHICKNESS" or "SLABDEPTH" or "SLABDEPTHINCHES" => slab.SlabThicknessInches?.ToString(),
                 "BEAMWIDTHINCHES" or "BEAMWIDTH" => slab.BeamWidthInches?.ToString(),
                 "BEAMDEPTHINCHES" or "BEAMDEPTH" or "TOFBOB" => slab.BeamDepthInches?.ToString(),
                 "HOLDDOWNCOUNT" or "HOLDDOWNS" => slab.HolddownCount?.ToString(),
@@ -565,7 +565,7 @@ namespace InspectionEditor.Services
             {
                 "FOUNDATIONTYPE" => "Foundation",
                 "CABLECOUNTTOTAL" or "CABLECOUNT" or "STRANDS" => "Plan total",
-                "SLABTHICKNESSINCHES" or "SLABTHICKNESS" => "Slab",
+                "SLABTHICKNESSINCHES" or "SLABTHICKNESS" or "SLABDEPTH" or "SLABDEPTHINCHES" => "Slab D",
                 "BEAMWIDTHINCHES" or "BEAMWIDTH" => "Beam W",
                 "BEAMDEPTHINCHES" or "BEAMDEPTH" or "TOFBOB" => "TOF-BOB",
                 "HOLDDOWNCOUNT" or "HOLDDOWNS" => "Holddowns",
