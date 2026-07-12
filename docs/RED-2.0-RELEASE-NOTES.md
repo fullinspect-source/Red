@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.0.10 — Image processing security maintenance
+
+- Upgrades SixLabors.ImageSharp from 3.1.5 to 3.1.12.
+- Resolves the known crafted-GIF crash and infinite-loop advisories reported against the older decoder.
+- Retains the existing RED photo import, resize, enhancement, rotation, markup, and JPEG re-encoding behavior.
+
 ## 2.0.9 — Numberpad defaults and quick row sliders
 
 - Adds archive-informed Numberpad ranges and increments for recurring numeric prompts across AFI, CPP, CPR, HEF, HER, HET, IEF, IER, and SRP reports.
