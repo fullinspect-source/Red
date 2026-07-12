@@ -4363,8 +4363,8 @@ namespace InspectionEditor
             var border = new Border
             {
                 Tag = section,
-                Background = new SolidColorBrush(Color.FromRgb(221, 228, 234)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(190, 201, 213)),
+                Background = GetInlineSectionHeaderBackground(section),
+                BorderBrush = GetInlineSectionBorderBrush(section),
                 BorderThickness = new Thickness(0, 0, 0, 1),
                 Padding = new Thickness(10, 7, 10, 7),
                 Margin = new Thickness(0, 8, 0, 4),
@@ -4435,6 +4435,7 @@ namespace InspectionEditor
         private Border CreateInlineItemRow(Section section, Item item)
         {
             bool isExpanded = IsInlineItemExpanded(item);
+            Color progressColor = GetInlineProgressColor(section, item, isExpanded ? 0.90 : 0.94);
             var panel = new StackPanel { Orientation = Orientation.Vertical };
             panel.Children.Add(CreateInlineItemHeader(section, item, isExpanded));
             if (isExpanded)
@@ -4443,8 +4444,8 @@ namespace InspectionEditor
             var row = new Border
             {
                 Tag = item,
-                Background = isExpanded ? new SolidColorBrush(Color.FromRgb(247, 250, 252)) : Brushes.White,
-                BorderBrush = isExpanded ? new SolidColorBrush(Color.FromRgb(120, 174, 205)) : new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                Background = new SolidColorBrush(progressColor),
+                BorderBrush = isExpanded ? new SolidColorBrush(Color.FromRgb(120, 174, 205)) : new SolidColorBrush(DarkenColor(progressColor, 0.10)),
                 BorderThickness = isExpanded ? new Thickness(2) : new Thickness(0, 0, 0, 1),
                 Margin = new Thickness(0, 0, 0, 4),
                 Child = panel,
@@ -4453,6 +4454,149 @@ namespace InspectionEditor
             row.MouseLeftButtonUp += InlineItemRow_MouseLeftButtonUp;
             StretchInlineWidth(row);
             return row;
+        }
+
+        private Brush GetInlineSectionHeaderBackground(Section section)
+        {
+            if (IsCppMeasurementSection(section))
+                return new SolidColorBrush(Color.FromRgb(221, 228, 234));
+
+            return new SolidColorBrush(GetInlineProgressColor(section, null, 0.88));
+        }
+
+        private Brush GetInlineSectionBorderBrush(Section section)
+        {
+            if (IsCppMeasurementSection(section))
+                return new SolidColorBrush(Color.FromRgb(190, 201, 213));
+
+            return new SolidColorBrush(DarkenColor(GetInlineProgressColor(section, null, 0.88), 0.16));
+        }
+
+        private Color GetInlineProgressColor(Section section, Item? item, double lightness)
+        {
+            if (IsCppMeasurementSection(section) && item != null)
+                return GetCppMeasurementProgressColor(item, lightness);
+
+            var reportSections = GetReportProgressSections();
+            int count = Math.Max(1, reportSections.Count);
+            int index = Math.Max(0, reportSections.FindIndex(candidate => ReferenceEquals(candidate, section)));
+            return GetPastelSpectrumColor(index, count, lightness);
+        }
+
+        private List<Section> GetReportProgressSections()
+        {
+            if (_currentInspection?.Sections == null)
+                return new List<Section>();
+
+            return _currentInspection.Sections
+                .Where(section => !IsCppMeasurementSection(section))
+                .ToList();
+        }
+
+        private bool IsCppMeasurementSection(Section section)
+        {
+            if (!string.Equals(_currentInspectionCode ?? _currentInspection?.InspectionCode, "CPP", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string sectionName = section.Name ?? "";
+            if (sectionName.Contains("measure", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return section.Items?.Any(item =>
+                (item.Name ?? "").Contains("TOF to", StringComparison.OrdinalIgnoreCase) ||
+                (item.Name ?? "").Contains("Interior Measurements", StringComparison.OrdinalIgnoreCase)) == true;
+        }
+
+        private Color GetCppMeasurementProgressColor(Item item, double lightness)
+        {
+            int itemIndex = GetCppMeasurementItemIndex(item);
+            int divisionIndex = itemIndex >= 0 ? Math.Min(7, itemIndex / 3) : 0;
+
+            Color[] measurementColors =
+            {
+                Color.FromRgb(248, 215, 218), // soft rose
+                Color.FromRgb(252, 225, 194), // soft peach
+                Color.FromRgb(255, 243, 191), // soft yellow
+                Color.FromRgb(228, 247, 194), // soft yellow-green
+                Color.FromRgb(211, 243, 216), // soft green
+                Color.FromRgb(210, 241, 240), // soft mint-blue
+                Color.FromRgb(216, 232, 255), // soft blue
+                Color.FromRgb(231, 221, 248), // soft lavender
+            };
+
+            Color baseColor = measurementColors[divisionIndex];
+            return BlendWithWhite(baseColor, Math.Clamp((lightness - 0.90) * 5.0, 0.0, 0.25));
+        }
+
+        private int GetCppMeasurementItemIndex(Item item)
+        {
+            string number = item.Number ?? "";
+            var match = Regex.Match(number, @"^\d+\.(\d+)");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int suffix))
+                return Math.Max(0, suffix - 1);
+
+            if (_currentInspection?.Sections == null)
+                return -1;
+
+            foreach (var section in _currentInspection.Sections.Where(IsCppMeasurementSection))
+            {
+                int index = section.Items?.FindIndex(candidate => ReferenceEquals(candidate, item)) ?? -1;
+                if (index >= 0)
+                    return index;
+            }
+
+            return -1;
+        }
+
+        private static Color GetPastelSpectrumColor(int index, int count, double lightness)
+        {
+            count = Math.Max(1, count);
+            index = Math.Clamp(index, 0, count - 1);
+
+            double hue = ((index + 0.5) / count) * 285.0;
+            return HslToRgb(hue, 0.48, Math.Clamp(lightness, 0.0, 1.0));
+        }
+
+        private static Color HslToRgb(double hue, double saturation, double lightness)
+        {
+            hue = ((hue % 360.0) + 360.0) % 360.0;
+            saturation = Math.Clamp(saturation, 0.0, 1.0);
+            lightness = Math.Clamp(lightness, 0.0, 1.0);
+
+            double c = (1.0 - Math.Abs(2.0 * lightness - 1.0)) * saturation;
+            double x = c * (1.0 - Math.Abs((hue / 60.0) % 2.0 - 1.0));
+            double m = lightness - c / 2.0;
+
+            double r1, g1, b1;
+            if (hue < 60)       { r1 = c; g1 = x; b1 = 0; }
+            else if (hue < 120) { r1 = x; g1 = c; b1 = 0; }
+            else if (hue < 180) { r1 = 0; g1 = c; b1 = x; }
+            else if (hue < 240) { r1 = 0; g1 = x; b1 = c; }
+            else if (hue < 300) { r1 = x; g1 = 0; b1 = c; }
+            else                { r1 = c; g1 = 0; b1 = x; }
+
+            return Color.FromRgb(
+                (byte)Math.Round((r1 + m) * 255.0),
+                (byte)Math.Round((g1 + m) * 255.0),
+                (byte)Math.Round((b1 + m) * 255.0));
+        }
+
+        private static Color BlendWithWhite(Color color, double amount)
+        {
+            amount = Math.Clamp(amount, 0.0, 1.0);
+            return Color.FromRgb(
+                (byte)Math.Round(color.R + (255 - color.R) * amount),
+                (byte)Math.Round(color.G + (255 - color.G) * amount),
+                (byte)Math.Round(color.B + (255 - color.B) * amount));
+        }
+
+        private static Color DarkenColor(Color color, double amount)
+        {
+            amount = Math.Clamp(amount, 0.0, 1.0);
+            return Color.FromRgb(
+                (byte)Math.Round(color.R * (1.0 - amount)),
+                (byte)Math.Round(color.G * (1.0 - amount)),
+                (byte)Math.Round(color.B * (1.0 - amount)));
         }
 
         private bool IsInlineItemExpanded(Item item)

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 
 namespace InspectionEditor
@@ -9,8 +10,13 @@ namespace InspectionEditor
     {
         public static string Version => GetAppVersion();
         public static string VersionDisplay => $"v{Version}";
-        public static DateTime PublishedDate => new DateTime(2026, 7, 10);
-        public static string PublishedDateText => PublishedDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+        public static string ReleaseDate => GetAssemblyMetadata("ReleaseDate");
+        public static DateTime PublishedDate => DateTime.TryParse(ReleaseDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date
+            : DateTime.MinValue;
+        public static string PublishedDateText => PublishedDate == DateTime.MinValue
+            ? "date unknown"
+            : PublishedDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
         public static string VersionWithPublishedDate => $"{VersionDisplay} - Published {PublishedDateText}";
         public static bool IsDevBuild => Assembly.GetExecutingAssembly().GetName().Name?.Contains("Dev", StringComparison.OrdinalIgnoreCase) == true;
         public static string DisplayName => "RED";
@@ -39,6 +45,14 @@ namespace InspectionEditor
             }
 
             return (version ?? "0.0.0").Split('+')[0];
+        }
+
+        private static string GetAssemblyMetadata(string key)
+        {
+            return Assembly.GetExecutingAssembly()
+                .GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(attribute => string.Equals(attribute.Key, key, StringComparison.OrdinalIgnoreCase))
+                ?.Value ?? string.Empty;
         }
     }
 }

@@ -8,16 +8,21 @@
 set -e
 
 REPO="fullinspect-source/Red"
-PROJECT_DIR="/Users/trentfuller/Library/CloudStorage/Dropbox/P/PL"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_OUTPUT="$PROJECT_DIR/bin/Release/net8.0-windows10.0.19041.0"
 PUBLISH_OUTPUT="$PROJECT_DIR/bin/Publish"
 BAT_PATH="$PROJECT_DIR/scripts/update_red.bat"
 
 # Get version from the project metadata used by the compiled app.
 VERSION=$(grep -m1 '<Version>' "$PROJECT_DIR/InspectionEditor.csproj" | sed 's/.*<Version>\(.*\)<\/Version>.*/\1/')
+RELEASE_DATE=$(grep -m1 '<ReleaseDate>' "$PROJECT_DIR/InspectionEditor.csproj" | sed 's/.*<ReleaseDate>\(.*\)<\/ReleaseDate>.*/\1/')
 if [ -z "$VERSION" ]; then
     echo "❌ Could not detect version from InspectionEditor.csproj"
     exit 1
+fi
+if [ -z "$RELEASE_DATE" ]; then
+    RELEASE_DATE=$(date +%F)
 fi
 
 TAG="v$VERSION"
@@ -28,6 +33,7 @@ echo ""
 echo "🔴 RED Release Publisher"
 echo "========================"
 echo "  Version:  $VERSION"
+echo "  Date:     $RELEASE_DATE"
 echo "  Tag:      $TAG"
 echo "  Repo:     $REPO"
 echo ""
@@ -80,8 +86,8 @@ perl -pe 's/\r?\n/\r\n/' "$BAT_PATH" > "$CRLF_BAT"
 echo "🚀 Uploading to GitHub..."
 gh release create "$TAG" "$ZIP_PATH" "$CRLF_BAT" \
     --repo "$REPO" \
-    --title "Red $TAG" \
-    --notes "Red v$VERSION release" \
+    --title "RED $TAG" \
+    --notes "RED v$VERSION release — $RELEASE_DATE" \
     --latest
 
 echo ""

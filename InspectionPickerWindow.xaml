@@ -750,7 +750,7 @@
                                    Padding="20,10"
                                    MouseLeftButtonDown="AboutLogo_MouseLeftButtonDown"/>
                         <TextBlock x:Name="AboutCurrentVersionText"
-                                   Text="RED v2.0.7"
+                                   Text="RED"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="#8B0000"
