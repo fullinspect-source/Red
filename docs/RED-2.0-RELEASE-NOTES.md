@@ -1,5 +1,16 @@
 # RED 2.0 Release Notes
 
+## 2.0.9 — Numberpad defaults and quick row sliders
+
+- Adds archive-informed Numberpad ranges and increments for recurring numeric prompts across AFI, CPP, CPR, HEF, HER, HET, IEF, IER, and SRP reports.
+- Applies the new N and N+Camera tool defaults once for all users, then remembers later user customization normally.
+- Hides Comments on default numeric workflows and opens Photos alongside Numberpad where the normal workflow requires evidence.
+- Adds a compact Numberpad slider to the checklist row when no comment preview is present.
+- Keeps compact and full Numberpad sliders synchronized while either is being moved.
+- Leaves an empty row unmodified until the user intentionally touches its parked slider handle.
+- Adds explicit whole-number, quarter-step, and larger prompt-specific slider increments.
+- Repairs the My List refresh handler and About-version binding so clean builds succeed.
+
 RED 2.0 is the next major RED update for field inspectors. It is focused on faster tablet work, cleaner navigation, and fewer taps while keeping the classic RED workflow available during the transition.
 
 ## Highlights

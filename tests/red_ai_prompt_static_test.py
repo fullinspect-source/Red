@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GROK = (ROOT / "Services" / "GrokApiClient.cs").read_text()
-MAIN = (ROOT / "MainWindow.xaml.cs").read_text()
+GROK = (ROOT / "Services" / "GrokApiClient.cs").read_text(encoding="utf-8")
+MAIN = (ROOT / "MainWindow.xaml.cs").read_text(encoding="utf-8")
 
 
 class RedAiPromptStaticTests(unittest.TestCase):

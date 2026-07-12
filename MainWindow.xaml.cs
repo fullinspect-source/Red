@@ -98,6 +98,7 @@ namespace InspectionEditor
         private bool _inlineVerticalIsScrolling = false;
         private bool _inlineVerticalScrollStarted = false;
         private bool _inlineNumberpadSliderDragActive = false;
+        private readonly Dictionary<Item, List<InlineNumberpadSliderAction>> _inlineNumberpadSliders = new();
         private System.Windows.Threading.DispatcherTimer? _inlineChipLongPressTimer;
         private InlinePrefixSuffixAction? _inlineChipLongPressAction;
         private bool _inlineChipLongPressFired = false;
@@ -389,12 +390,52 @@ namespace InspectionEditor
                     _inlineDrawerPreferences.ValueUsageCounts ??= new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
                     _inlineDrawerPreferences.NumberpadRanges ??= new Dictionary<string, InlineNumberpadRange>(StringComparer.OrdinalIgnoreCase);
                     _inlineDrawerPreferences.CustomNumberpadRanges ??= new Dictionary<string, InlineNumberpadRange>(StringComparer.OrdinalIgnoreCase);
+                    _inlineDrawerPreferences.ItemClosedSpecialDrawers ??= new Dictionary<string, List<string>>();
                 }
+
+                if (ApplyNumberpadDefaultMigration())
+                    SaveInlineDrawerPreferences();
             }
             catch
             {
                 _inlineDrawerPreferences = new InlineDrawerPreferences();
             }
+        }
+
+        private bool ApplyNumberpadDefaultMigration()
+        {
+            if (_inlineDrawerPreferences.NumberpadDefaultsMigrationVersion >= NumberpadDefaultService.MigrationVersion)
+                return false;
+
+            // Force the new product defaults once for matching prompts. After this marker is
+            // saved, later user range/tool changes are ordinary remembered preferences.
+            foreach (string key in _inlineDrawerPreferences.CustomNumberpadRanges.Keys.ToList())
+                if (NumberpadDefaultService.GetFromPreferenceKey(key) != null)
+                    _inlineDrawerPreferences.CustomNumberpadRanges.Remove(key);
+
+            foreach (string key in _inlineDrawerPreferences.NumberpadRanges.Keys.ToList())
+                if (NumberpadDefaultService.GetFromPreferenceKey(key) != null)
+                    _inlineDrawerPreferences.NumberpadRanges.Remove(key);
+
+            foreach (string key in _inlineDrawerPreferences.ItemOpenedSpecialDrawers.Keys.ToList())
+            {
+                if (NumberpadDefaultService.GetFromPreferenceKey(key) == null) continue;
+                var drawers = _inlineDrawerPreferences.ItemOpenedSpecialDrawers[key];
+                if (!drawers.Contains(InlineNumberpadDrawer)) drawers.Add(InlineNumberpadDrawer);
+            }
+
+            foreach (string key in _inlineDrawerPreferences.ItemClosedSpecialDrawers.Keys.ToList())
+                if (NumberpadDefaultService.GetFromPreferenceKey(key) != null)
+                    _inlineDrawerPreferences.ItemClosedSpecialDrawers.Remove(key);
+
+            foreach (string key in _inlineDrawerPreferences.ItemClosedDrawers.Keys.ToList())
+                if (NumberpadDefaultService.GetFromPreferenceKey(key) != null)
+                    _inlineDrawerPreferences.ItemClosedDrawers.Remove(key);
+
+            _inlineDrawerPreferences.ItemStandardToolOverrides.RemoveAll(
+                key => NumberpadDefaultService.GetFromPreferenceKey(key) != null);
+            _inlineDrawerPreferences.NumberpadDefaultsMigrationVersion = NumberpadDefaultService.MigrationVersion;
+            return true;
         }
 
         private void SaveInlineDrawerPreferences()
@@ -4215,6 +4256,7 @@ namespace InspectionEditor
         private void PopulateInlineChecklist(string? filter = null)
         {
             InlineChecklistPanel.Children.Clear();
+            _inlineNumberpadSliders.Clear();
             if (!_inlineEditorMode || _currentInspection?.Sections == null)
                 return;
 
@@ -4644,6 +4686,10 @@ namespace InspectionEditor
             Grid.SetColumn(numberBadge, 2);
             grid.Children.Add(numberBadge);
 
+            var center = new Grid { VerticalAlignment = VerticalAlignment.Center };
+            center.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
+            center.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star), MinWidth = 180, MaxWidth = 520 });
+
             var prompt = new TextBlock
             {
                 Text = ExpandAbbreviations(item.Name ?? ""),
@@ -4654,8 +4700,37 @@ namespace InspectionEditor
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 8, 12, 8)
             };
-            Grid.SetColumn(prompt, 3);
-            grid.Children.Add(prompt);
+            Grid.SetColumn(prompt, 0);
+            center.Children.Add(prompt);
+
+            UIElement? middleContent = null;
+            if (!string.IsNullOrWhiteSpace(item.Comments))
+            {
+                middleContent = new TextBlock
+                {
+                    Text = item.Comments.Trim(),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextWrapping = TextWrapping.NoWrap,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
+                    FontSize = Math.Max(11, _checklistFontSize - 1),
+                    Margin = new Thickness(4, 8, 12, 8),
+                    ToolTip = item.Comments.Trim()
+                };
+            }
+            else if (IsSpecialInlineDrawerRemembered(item, InlineNumberpadDrawer))
+            {
+                middleContent = CreateCollapsedInlineNumberpadSlider(item);
+            }
+
+            if (middleContent != null)
+            {
+                Grid.SetColumn(middleContent, 1);
+                center.Children.Add(middleContent);
+            }
+
+            Grid.SetColumn(center, 3);
+            grid.Children.Add(center);
 
             var chips = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 10, 6) };
             string value = item.Value?.ToString() ?? "";
@@ -6198,7 +6273,8 @@ namespace InspectionEditor
                 Margin = new Thickness(8, 0, 0, 0)
             };
 
-            bool showFractions = !ShouldSuppressNumberpadFractions(item);
+            double increment = GetNumberpadIncrement(item);
+            bool showFractions = increment < 1;
             int rowCount = showFractions ? 5 : 4;
 
             for (int row = 0; row < rowCount; row++)
@@ -6264,14 +6340,14 @@ namespace InspectionEditor
         {
             string key = GetInlineItemKey(item);
             InlineNumberpadRange? customRange = GetCustomNumberpadRange(key);
-            bool allowFractions = !ShouldSuppressNumberpadFractions(item);
+            double increment = GetNumberpadIncrement(item);
             double? currentNumericValue = TryParseNumberpadObservedValue(item.Value?.ToString() ?? "", out double parsedCurrent)
-                ? SnapNumberpadSliderValue(parsedCurrent, allowFractions)
+                ? SnapNumberpadSliderValue(parsedCurrent, increment)
                 : null;
             InlineNumberpadRange? range = EnsureRangeIncludesCurrentValue(
-                customRange ?? GetObservedNumberpadRange(item),
+                customRange ?? GetDefaultNumberpadRange(item) ?? GetObservedNumberpadRange(item),
                 currentNumericValue,
-                allowFractions);
+                increment);
             bool isCustomRange = customRange != null;
 
             var panel = new StackPanel
@@ -6308,11 +6384,11 @@ namespace InspectionEditor
 
             double current = currentNumericValue ?? ParseDoubleValue(item.Value?.ToString(), range.Minimum);
             current = Math.Max(range.Minimum, Math.Min(range.Maximum, current));
-            current = SnapNumberpadSliderValue(current, allowFractions);
+            current = SnapNumberpadSliderValue(current, increment);
 
             var valueText = new TextBlock
             {
-                Text = FormatNumberpadSliderValue(current, allowFractions),
+                Text = FormatNumberpadSliderValue(current, increment),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 FontWeight = FontWeights.Bold,
                 FontSize = Math.Max(24, _checklistFontSize + 6),
@@ -6320,7 +6396,7 @@ namespace InspectionEditor
                 Margin = new Thickness(0, 8, 0, 0)
             };
 
-            var sliderLane = CreateInlineNumberpadTouchSlider(item, range, current, allowFractions, valueText);
+            var sliderLane = CreateInlineNumberpadTouchSlider(item, range, current, increment, valueText);
             panel.Children.Add(valueText);
             panel.Children.Add(sliderLane);
 
@@ -6331,14 +6407,15 @@ namespace InspectionEditor
             Item item,
             InlineNumberpadRange range,
             double current,
-            bool allowFractions,
-            TextBlock valueText)
+            double increment,
+            TextBlock valueText,
+            bool compact = false)
         {
-            const double thumbSize = 52;
+            double thumbSize = compact ? 34 : 52;
 
             var lane = new Grid
             {
-                MinHeight = 72,
+                MinHeight = compact ? 42 : 72,
                 Margin = new Thickness(0, 2, 0, 0),
                 Background = Brushes.Transparent,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -6349,21 +6426,21 @@ namespace InspectionEditor
 
             var track = new Border
             {
-                Height = 10,
+                Height = compact ? 7 : 10,
                 Margin = new Thickness(thumbSize / 2, 0, thumbSize / 2, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 Background = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
-                CornerRadius = new CornerRadius(5)
+                CornerRadius = new CornerRadius(compact ? 3.5 : 5)
             };
             lane.Children.Add(track);
 
             var fill = new Border
             {
-                Height = 10,
+                Height = compact ? 7 : 10,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
                 Background = new SolidColorBrush(Color.FromRgb(96, 165, 250)),
-                CornerRadius = new CornerRadius(5),
+                CornerRadius = new CornerRadius(compact ? 3.5 : 5),
                 Margin = new Thickness(thumbSize / 2, 0, 0, 0)
             };
             lane.Children.Add(fill);
@@ -6387,8 +6464,9 @@ namespace InspectionEditor
             };
             lane.Children.Add(thumb);
 
-            var action = new InlineNumberpadSliderAction(item, valueText, allowFractions, range, lane, thumb, fill);
+            var action = new InlineNumberpadSliderAction(item, valueText, increment, range, lane, thumb, fill);
             lane.Tag = action;
+            RegisterInlineNumberpadSlider(action);
             lane.SizeChanged += (_, _) => UpdateInlineNumberpadSliderVisual(action, current);
             lane.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(InlineNumberpadTouchSlider_MouseDown), true);
             lane.AddHandler(UIElement.PreviewMouseMoveEvent, new MouseEventHandler(InlineNumberpadTouchSlider_MouseMove), true);
@@ -6402,6 +6480,53 @@ namespace InspectionEditor
             lane.MouseLeave += InlineNumberpadTouchSlider_MouseLeave;
 
             return lane;
+        }
+
+        private UIElement? CreateCollapsedInlineNumberpadSlider(Item item)
+        {
+            double increment = GetNumberpadIncrement(item);
+            bool hasValue = TryParseNumberpadObservedValue(item.Value?.ToString() ?? "", out double parsedCurrent);
+            double? currentValue = hasValue ? SnapNumberpadSliderValue(parsedCurrent, increment) : null;
+            InlineNumberpadRange? range = EnsureRangeIncludesCurrentValue(
+                GetCustomNumberpadRange(GetInlineItemKey(item)) ??
+                GetDefaultNumberpadRange(item) ??
+                GetObservedNumberpadRange(item),
+                currentValue,
+                increment);
+            if (range == null) return null;
+
+            var panel = new Grid
+            {
+                MinWidth = 180,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 5, 12, 5),
+                Tag = "InlinePrefixSuffixSwipeZone"
+            };
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var valueText = new TextBlock
+            {
+                Text = hasValue ? FormatNumberpadSliderValue(currentValue!.Value, increment) : "",
+                MinWidth = 48,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Right,
+                FontWeight = FontWeights.Bold,
+                FontSize = Math.Max(13, _checklistFontSize),
+                Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+                Margin = new Thickness(7, 0, 0, 0)
+            };
+
+            // An empty item parks the handle at the left without assigning the range minimum.
+            double visualValue = currentValue ?? range.Minimum;
+            var lane = CreateInlineNumberpadTouchSlider(item, range, visualValue, increment, valueText, compact: true);
+            Grid.SetColumn(lane, 0);
+            Grid.SetColumn(valueText, 1);
+            panel.Children.Add(lane);
+            panel.Children.Add(valueText);
+            return panel;
         }
 
         private UIElement CreateInlinePhotosDrawer(Item item)
@@ -7564,7 +7689,7 @@ namespace InspectionEditor
 
             string key = GetInlineItemKey(item);
             InlineNumberpadRange? current = GetCustomNumberpadRange(key);
-            InlineNumberpadRange? observed = GetObservedNumberpadRange(item);
+            InlineNumberpadRange? observed = GetDefaultNumberpadRange(item) ?? GetObservedNumberpadRange(item);
             if (current != null)
             {
                 var menu = new ContextMenu();
@@ -7616,11 +7741,11 @@ namespace InspectionEditor
             }
             else if (TryParseNumberpadRange(response, out var range))
             {
-                bool allowFractions = !ShouldSuppressNumberpadFractions(item);
+                double increment = GetNumberpadIncrement(item);
                 if (TryParseNumberpadObservedValue(item.Value?.ToString() ?? "", out double currentValue))
                 {
-                    double snappedCurrent = SnapNumberpadSliderValue(currentValue, allowFractions);
-                    range = EnsureRangeIncludesCurrentValue(range, snappedCurrent, allowFractions) ?? range;
+                    double snappedCurrent = SnapNumberpadSliderValue(currentValue, increment);
+                    range = EnsureRangeIncludesCurrentValue(range, snappedCurrent, increment) ?? range;
                 }
 
                 _inlineDrawerPreferences.CustomNumberpadRanges[key] = range;
@@ -7749,9 +7874,8 @@ namespace InspectionEditor
         private void PreviewInlineNumberpadSliderValue(InlineNumberpadSliderAction action, double x)
         {
             double valueNumber = GetInlineNumberpadSliderValueAt(action, x);
-            string value = FormatNumberpadSliderValue(valueNumber, action.AllowFractions);
-            action.ValueText.Text = value;
-            UpdateInlineNumberpadSliderVisualAt(action, x);
+            string value = FormatNumberpadSliderValue(valueNumber, action.Increment);
+            SynchronizeInlineNumberpadSliders(action.Item, valueNumber, value);
             action.ValueText.UpdateLayout();
             action.Lane.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
         }
@@ -7759,14 +7883,13 @@ namespace InspectionEditor
         private void CommitInlineNumberpadSliderValue(InlineNumberpadSliderAction action, double x)
         {
             double valueNumber = GetInlineNumberpadSliderValueAt(action, x);
-            string value = FormatNumberpadSliderValue(valueNumber, action.AllowFractions);
+            string value = FormatNumberpadSliderValue(valueNumber, action.Increment);
             if (string.Equals(action.Item.Value?.ToString() ?? "", value, StringComparison.Ordinal))
                 return;
 
             action.Item.Value = value;
-            action.ValueText.Text = value;
+            SynchronizeInlineNumberpadSliders(action.Item, valueNumber, value);
             UpdateInlineValueDisplays(action.Item, value);
-            UpdateInlineNumberpadSliderVisual(action, valueNumber);
 
             LoadItemEditor(action.Item);
             RecordInlineValueUsage(action.Item, value);
@@ -7783,7 +7906,7 @@ namespace InspectionEditor
             double clampedX = Math.Max(thumbSize / 2, Math.Min(action.Lane.ActualWidth - thumbSize / 2, x));
             double ratio = (clampedX - thumbSize / 2) / usableWidth;
             double rawValue = action.Range.Minimum + ratio * (action.Range.Maximum - action.Range.Minimum);
-            return SnapNumberpadSliderValue(rawValue, action.AllowFractions);
+            return SnapNumberpadSliderValue(rawValue, action.Increment);
         }
 
         private void UpdateInlineNumberpadSliderVisual(InlineNumberpadSliderAction action, double value)
@@ -7806,6 +7929,26 @@ namespace InspectionEditor
 
             action.Thumb.RenderTransform = new TranslateTransform(left, 0);
             action.Fill.Width = Math.Max(0, clampedX);
+        }
+
+        private void RegisterInlineNumberpadSlider(InlineNumberpadSliderAction action)
+        {
+            if (!_inlineNumberpadSliders.TryGetValue(action.Item, out var sliders))
+            {
+                sliders = new List<InlineNumberpadSliderAction>();
+                _inlineNumberpadSliders[action.Item] = sliders;
+            }
+            sliders.Add(action);
+        }
+
+        private void SynchronizeInlineNumberpadSliders(Item item, double valueNumber, string value)
+        {
+            if (!_inlineNumberpadSliders.TryGetValue(item, out var sliders)) return;
+            foreach (var slider in sliders)
+            {
+                slider.ValueText.Text = value;
+                UpdateInlineNumberpadSliderVisual(slider, valueNumber);
+            }
         }
 
         private void UpdateInlineValueDisplays(Item item, string value)
@@ -7846,6 +7989,21 @@ namespace InspectionEditor
             return text.Contains("quantity");
         }
 
+        private double GetNumberpadIncrement(Item item)
+        {
+            var profile = GetNumberpadDefault(item);
+            if (profile != null) return Math.Max(0.01, profile.Increment);
+            return ShouldSuppressNumberpadFractions(item) ? 1 : 0.25;
+        }
+
+        private InlineNumberpadRange? GetDefaultNumberpadRange(Item item)
+        {
+            var profile = GetNumberpadDefault(item);
+            return profile == null
+                ? null
+                : new InlineNumberpadRange { Minimum = profile.Minimum, Maximum = profile.Maximum };
+        }
+
         private bool TryParseNumberpadRange(string text, out InlineNumberpadRange range)
         {
             range = new InlineNumberpadRange();
@@ -7872,12 +8030,12 @@ namespace InspectionEditor
         private InlineNumberpadRange? EnsureRangeIncludesCurrentValue(
             InlineNumberpadRange? range,
             double? currentValue,
-            bool allowFractions)
+            double increment)
         {
             if (range == null || !currentValue.HasValue)
                 return range;
 
-            double current = SnapNumberpadSliderValue(currentValue.Value, allowFractions);
+            double current = SnapNumberpadSliderValue(currentValue.Value, increment);
             double min = range.Minimum;
             double max = range.Maximum;
             bool changed = false;
@@ -7947,8 +8105,8 @@ namespace InspectionEditor
 
             if (TryParseNumberpadObservedValue(item.Value?.ToString() ?? "", out double currentValue))
             {
-                bool allowFractions = !ShouldSuppressNumberpadFractions(item);
-                range = EnsureRangeIncludesCurrentValue(range, currentValue, allowFractions) ?? range;
+                double increment = GetNumberpadIncrement(item);
+                range = EnsureRangeIncludesCurrentValue(range, currentValue, increment) ?? range;
             }
 
             return range;
@@ -8043,24 +8201,24 @@ namespace InspectionEditor
             return rounded.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
-        private string FormatNumberpadSliderValue(double value, bool allowFractions)
+        private string FormatNumberpadSliderValue(double value, double increment)
         {
-            double snapped = SnapNumberpadSliderValue(value, allowFractions);
-            if (!allowFractions)
+            double snapped = SnapNumberpadSliderValue(value, increment);
+            if (increment >= 1)
                 return Math.Round(snapped).ToString(CultureInfo.InvariantCulture);
 
             return FormatNumberpadEntryValue(snapped);
         }
 
-        private double SnapNumberpadSliderValue(double value, bool allowFractions)
+        private double SnapNumberpadSliderValue(double value, double increment)
         {
-            double increment = allowFractions ? 0.25 : 1;
+            increment = Math.Max(0.01, increment);
             return Math.Round(value / increment) * increment;
         }
 
-        private double GetNumberpadSliderTickFrequency(bool allowFractions)
+        private double GetNumberpadSliderTickFrequency(double increment)
         {
-            return allowFractions ? 0.25 : 1;
+            return Math.Max(0.01, increment);
         }
 
         private void InlineStandardToolsButton_Click(object sender, RoutedEventArgs e)
@@ -8452,9 +8610,13 @@ namespace InspectionEditor
 
         private static string NormalizeInlinePrompt(string prompt)
         {
-            string normalized = Regex.Replace(prompt.ToLowerInvariant(), @"\s+", " ").Trim();
-            return Regex.Replace(normalized, @"[^\p{L}\p{Nd}\s?]", "");
+            return NumberpadDefaultService.NormalizePrompt(prompt);
         }
+
+        private NumberpadDefaultProfile? GetNumberpadDefault(Item item) =>
+            NumberpadDefaultService.Get(
+                _currentInspectionCode ?? _currentInspection?.InspectionCode,
+                item.Name);
 
         private bool IsInlineDrawerOpen(Item item, string drawerName)
         {
@@ -8466,6 +8628,17 @@ namespace InspectionEditor
                 return IsSpecialInlineDrawerRemembered(item, drawerName);
 
             string key = GetInlineItemKey(item);
+            if (_inlineDrawerPreferences.ItemClosedDrawers.TryGetValue(key, out var explicitlyClosed) &&
+                explicitlyClosed.Contains(drawerName))
+                return false;
+
+            var numberpadDefault = GetNumberpadDefault(item);
+            if (numberpadDefault != null && !HasStandardToolsOverride(item))
+            {
+                if (drawerName == "Comments") return false;
+                if (drawerName == "Photos") return numberpadDefault.CameraByDefault;
+            }
+
             if (_inlineDrawerPreferences.ItemClosedDrawers.TryGetValue(key, out var closedForItem))
                 return !closedForItem.Contains(drawerName);
 
@@ -8511,6 +8684,16 @@ namespace InspectionEditor
                     openedSpecial.Add(drawerName);
                 else if (!open)
                     openedSpecial.Remove(drawerName);
+
+                if (!_inlineDrawerPreferences.ItemClosedSpecialDrawers.TryGetValue(key, out var closedSpecial))
+                {
+                    closedSpecial = new List<string>();
+                    _inlineDrawerPreferences.ItemClosedSpecialDrawers[key] = closedSpecial;
+                }
+                if (open)
+                    closedSpecial.Remove(drawerName);
+                else if (!closedSpecial.Contains(drawerName))
+                    closedSpecial.Add(drawerName);
                 return;
             }
 
@@ -8529,8 +8712,15 @@ namespace InspectionEditor
         private bool IsSpecialInlineDrawerRemembered(Item item, string drawerName)
         {
             string key = GetInlineItemKey(item);
-            return _inlineDrawerPreferences.ItemOpenedSpecialDrawers.TryGetValue(key, out var opened) &&
-                   opened.Contains(drawerName);
+            if (_inlineDrawerPreferences.ItemClosedSpecialDrawers.TryGetValue(key, out var closed) &&
+                closed.Contains(drawerName))
+                return false;
+
+            if (_inlineDrawerPreferences.ItemOpenedSpecialDrawers.TryGetValue(key, out var opened) &&
+                opened.Contains(drawerName))
+                return true;
+
+            return drawerName == InlineNumberpadDrawer && GetNumberpadDefault(item) != null;
         }
 
         private bool HasStandardToolsOverride(Item item)
@@ -8568,9 +8758,11 @@ namespace InspectionEditor
 
         private sealed class InlineDrawerPreferences
         {
+            public int NumberpadDefaultsMigrationVersion { get; set; }
             public List<string> DefaultClosedDrawers { get; set; } = new List<string>();
             public Dictionary<string, List<string>> ItemClosedDrawers { get; set; } = new Dictionary<string, List<string>>();
             public Dictionary<string, List<string>> ItemOpenedSpecialDrawers { get; set; } = new Dictionary<string, List<string>>();
+            public Dictionary<string, List<string>> ItemClosedSpecialDrawers { get; set; } = new Dictionary<string, List<string>>();
             public List<string> ItemStandardToolOverrides { get; set; } = new List<string>();
             public Dictionary<string, Dictionary<string, int>> ValueUsageCounts { get; set; } = new Dictionary<string, Dictionary<string, int>>();
             public Dictionary<string, InlineNumberpadRange> NumberpadRanges { get; set; } = new Dictionary<string, InlineNumberpadRange>();
@@ -8595,7 +8787,7 @@ namespace InspectionEditor
         private sealed record InlineNumberpadSliderAction(
             Item Item,
             TextBlock ValueText,
-            bool AllowFractions,
+            double Increment,
             InlineNumberpadRange Range,
             FrameworkElement Lane,
             Border Thumb,
