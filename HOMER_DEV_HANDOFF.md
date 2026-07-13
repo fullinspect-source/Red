@@ -7,7 +7,7 @@ This file is the concise cross-session source of development context for work pe
 ### 2026-07-12 — Local RED Codex workstream (uncommitted; based on RED 2.0.7)
 
 - **Computer/workstream:** This Windows Codex computer; dirty checkout at `C:\Users\grace\Documents\RedGit`.
-- **Commit:** None. These changes are uncommitted and are not present on GitHub. The checkout's `main` is at `e4f13cf` and is five commits behind `origin/main` (`d862d32`), so the work must be reconciled with the released 2.0.8–2.0.11 changes before it can be committed.
+- **Commit:** None. These changes are uncommitted and are not present on GitHub. The checkout was based on commit `e4f13cf` while `origin/main` was `d862d32` at reconciliation time, so the work must be reconciled with the released 2.0.8–2.0.11 changes before it can be committed.
 - **Files changed:** `InspectionEditor.csproj`, `InspectionPickerWindow.xaml`, `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, `Services/SlabEngineeringService.cs`, `Services/UserDataService.cs`, and `scripts/update_red.bat`.
 - **Exact behavior represented by the local diff:**
   - `MainWindow.xaml.cs` shows an item's existing comment inline after the collapsed checklist prompt instead of displaying a generic `Comment` badge; turns `Photo Required` into a button that expands the item and opens the camera; keeps numeric/measurement rows editable when their only listed status choices are NI/N/A; adds NI to required lookup/value lists; prevents row-expansion drag handling from consuming clicks on buttons, text boxes, combo boxes, and sliders; gives the no-photo placeholder and File/Camera controls matching 96-pixel heights; focuses the inline comment editor after a trade prefix is chosen; and excludes Yes/No and Pass/Fail rows from plan-value design-assist targets even when their prompt contains measurement words.
@@ -51,6 +51,17 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 - `MainWindow.xaml.cs`, quick/saved-comment button construction: local removal of comment tooltips may reduce accessibility. **Classification:** unsafe/unclear. **Recommendation:** discard.
 - `MainWindow.xaml.cs`, older collapsed-row comment rendering: current main already renders comments as dedicated `middleContent` and integrates the compact Numberpad slider. **Classification:** superseded. **Recommendation:** keep current main; evaluate removal of the remaining generic Comment badge separately if desired.
 
+### 2026-07-12 — Codex 1 shared handoff baseline — `d862d324c5a494b135296dc63a3f53dd86fc3c79`
+
+- **Files changed:** New `HOMER_DEV_HANDOFF.md` only.
+- **Prior behavior:** RED had no maintained cross-assistant development handoff. Current production state, recent Codex 1 releases, source-of-truth files, security rules, verification commands, and known debt were distributed across code, stale documentation, Git history, and GitHub Releases.
+- **Resulting behavior:** Added the shared handoff covering RED 2.0.8–2.0.11, version/release sources, updater architecture, Numberpad defaults and collapsed sliders, build/release commands, security-sensitive packaging rules, warnings, technical debt, and assumptions older RED documentation must not reintroduce.
+- **Verification performed:** Verified all cited implementation/test files and commit hashes; checked the document with `git diff --check`; scanned it for common API-key, GitHub-token, xAI-key, and private-key patterns; confirmed the live v2.0.11 GitHub release and asset; confirmed the pushed `main` branch at this commit.
+- **Committed:** Yes.
+- **Pushed:** Yes, to `main`.
+- **Included in a GitHub release:** No. Documentation-only commit after the v2.0.11 release.
+- **Unresolved risks/follow-up:** The handoff must be updated with every meaningful RED change. Several older repository documents remain stale and should not override current code or this handoff.
+
 ### 2026-07-12 — RED 2.0.11 — `8fcd0b024edfb1cbb9bfb7fd31cafb92ea31cdec`
 
 - **Files changed:** `App.xaml.cs`, `InspectionEditor.csproj`, `InspectionPickerWindow.xaml.cs`, `MainWindow.xaml.cs`, and new `Services/AppUpdateService.cs`.
@@ -70,7 +81,7 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, new `Services/NumberpadDefaultService.cs`, `docs/RED-2.0-RELEASE-NOTES.md`, `docs/RedHelp.html`, new `tests/numberpad_defaults_static_test.py`, and `tests/red_ai_prompt_static_test.py`.
 - **What changed:** Added archive-informed Numberpad defaults for recurring numeric prompts in AFI, CPP, CPR, HEF, HER, HET, IEF, IER, and SRP. Defaults include minimum, maximum, increment, and whether Camera accompanies Numberpad. CPP/SRP corner and interior beam measurements use quarter-inch increments; prepour beam-width defaults are 0–15. Added a compact collapsed-row slider when Numberpad is active and no comment preview exists. Compact and expanded sliders stay synchronized. A parked slider does not write a value until the user interacts with it. Default numeric workflows omit Comments; applicable evidence workflows use Numberpad plus Camera. `ApplyNumberpadDefaultMigration()` forces migration version 1 once, after which user customization is remembered normally.
-- **Verification:** Release build and the static Numberpad/AI tests passed.
+- **Verification:** Before implementation, Codex 1 exhaustively scanned the available Dropbox inspection archive/review INS corpus across all discovered report types, grouped numeric-only prompt patterns, and reviewed observed ranges plus camera/comment usage. Release build and the static Numberpad/AI tests passed. The generated audit CSV/JSON files were local analysis artifacts and were not committed because they were derived from private inspection data.
 - **Deployed to GitHub:** Yes. https://github.com/fullinspect-source/Red/releases/tag/v2.0.9
 
 ### 2026-07-12 — RED 2.0.8 — `7161e0bbc36d9334bc87927c2fb7132a458a1c9c`
@@ -144,7 +155,7 @@ Use code and live GitHub state before older prose documentation:
 
 ## Known Warnings, Debt, and Incomplete Work
 
-- A separate checkout on this computer (`C:\Users\grace\Documents\RedGit`) contains the seven uncommitted files described in the newest **Latest Changes** entry. It is based on 2.0.7 and five commits behind current `origin/main`; do not commit or publish it as-is, and do not treat its 2.0.8 version strings as authoritative.
+- A separate checkout on this computer (`C:\Users\grace\Documents\RedGit`) contains the seven uncommitted files described in the newest **Latest Changes** entry. The dirty checkout remains based on `e4f13cf` and must be compared against current `origin/main` before any future rescue work; do not commit or publish it as-is, and do not treat its 2.0.8 version strings as authoritative.
 
 - Release build currently succeeds with **16 compiler warnings and 0 errors**. Warnings are existing nullability/event-signature/unused-field issues, including `MainWindow.xaml.cs`, `InspectionPickerWindow.xaml.cs`, and `Services/GrokApiClient.cs`; do not report the build as warning-free.
 - Automated coverage is only two Python static test files: `tests/numberpad_defaults_static_test.py` (6 tests) and `tests/red_ai_prompt_static_test.py` (5 tests). There is no automated WPF interaction suite or true updater integration test.
