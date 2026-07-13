@@ -4,6 +4,53 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-07-12 — Local RED Codex workstream (uncommitted; based on RED 2.0.7)
+
+- **Computer/workstream:** This Windows Codex computer; dirty checkout at `C:\Users\grace\Documents\RedGit`.
+- **Commit:** None. These changes are uncommitted and are not present on GitHub. The checkout's `main` is at `e4f13cf` and is five commits behind `origin/main` (`d862d32`), so the work must be reconciled with the released 2.0.8–2.0.11 changes before it can be committed.
+- **Files changed:** `InspectionEditor.csproj`, `InspectionPickerWindow.xaml`, `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, `Services/SlabEngineeringService.cs`, `Services/UserDataService.cs`, and `scripts/update_red.bat`.
+- **Exact behavior represented by the local diff:**
+  - `MainWindow.xaml.cs` shows an item's existing comment inline after the collapsed checklist prompt instead of displaying a generic `Comment` badge; turns `Photo Required` into a button that expands the item and opens the camera; keeps numeric/measurement rows editable when their only listed status choices are NI/N/A; adds NI to required lookup/value lists; prevents row-expansion drag handling from consuming clicks on buttons, text boxes, combo boxes, and sliders; gives the no-photo placeholder and File/Camera controls matching 96-pixel heights; focuses the inline comment editor after a trade prefix is chosen; and excludes Yes/No and Pass/Fail rows from plan-value design-assist targets even when their prompt contains measurement words.
+  - `Services/EnergyComplianceService.cs` maps interior items 8.13, 8.16, 8.19, and 8.22 to slab thickness/depth, labels them `Slab D`, and evaluates actual slab depth as passing when it meets or exceeds the extracted design minimum. It also recognizes `SLABDEPTH`/`SLABDEPTHINCHES` field keys.
+  - `Services/SlabEngineeringService.cs` adds a focused OCR crop anchored on the embedded-hardware table heading, uses the focused result to extract hold-down quantities, tightens strand-count patterns so a four-digit year cannot be truncated into a false count, and requires a quantity after a complete hardware model token so the `14` in `STHD-14`/`STAD-14` is not treated as the quantity.
+  - `Services/UserDataService.cs` formats trade-prefixed comments as `[trade] - comment`, strips a legacy leading dash while parsing the core comment, and preserves a trailing space after a prefix-only selection so typing can continue immediately.
+  - `InspectionEditor.csproj`, `InspectionPickerWindow.xaml`, and `scripts/update_red.bat` contain local 2.0.8 version-label changes made before the later 2.0.8–2.0.11 production commits. These version hunks are stale and must not replace current 2.0.11 metadata or updater behavior.
+- **Verification performed:** The diff and repository state were inspected against fetched `origin/main`. A Release build was attempted once but did not start because the documented SDK path `C:\Users\grace\Documents\Codex\dotnet-sdk\dotnet.exe` no longer exists. `tests\red_ai_prompt_static_test.py` was attempted once with the bundled Python runtime but exited before assertions because `pathlib.read_text()` used Windows cp1252 and could not decode byte `0x8f` in `Services\GrokApiClient.cs`. No retry or source repair was performed during this handoff-only pass.
+- **Pushed to GitHub:** No.
+- **Included in a GitHub release:** No.
+- **Follow-up:** Reconcile the functional hunks against `origin/main` in a clean branch or worktree; discard the stale local version-label hunks; resolve overlaps in `InspectionEditor.csproj`, `InspectionPickerWindow.xaml`, `MainWindow.xaml.cs`, and `scripts/update_red.bat`; then run a current .NET 8 build and the static tests with explicit UTF-8 handling before considering a commit or release.
+
+#### Reconciliation against RED 2.0.11 `origin/main`
+
+The dirty checkout was compared read-only with `d862d32`. Preserve it until the following candidates are reviewed and selectively ported; do not merge the checkout wholesale.
+
+**High-confidence preservation candidates**
+
+- `MainWindow.xaml.cs`, `InlinePhotoRequiredButton_Click()` and collapsed-header construction: replace the passive **Photo Required** badge with a button that expands the item and opens Camera. **Classification:** missing from current main. **Recommendation:** preserve.
+- `MainWindow.xaml.cs`, `InlineItemRow_MouseLeftButtonUp()`: ignore row-toggle handling when the original click is inside a `ButtonBase`, `TextBoxBase`, `ComboBox`, or `Slider`. **Classification:** missing. **Recommendation:** preserve so child controls do not expand/collapse the row.
+- `MainWindow.xaml.cs`, `GetInlineDesignAssist()`/`IsInlineStatusOnlyDesignTarget()`: exclude Yes/No and Pass/Fail controls from plan-value application. **Classification:** missing. **Recommendation:** preserve.
+- `MainWindow.xaml.cs`, `GetInlineDesignAssist()`: build extraction prompt text from every nonblank, distinct `DisplayLabel` and `Name`; current main's `DisplayLabel ?? Name` fails when `DisplayLabel` is an empty string. **Classification:** missing. **Recommendation:** preserve.
+- `MainWindow.xaml.cs`, `InlinePrefixSuffixButton_Click()`: after selecting a trade prefix and rebuilding the inline UI, focus the multiline comment box and move its caret to the end. **Classification:** missing. **Recommendation:** preserve.
+- `Services/EnergyComplianceService.cs`, `GetSlabFieldBannerState()`: handle `SLABDEPTH` and `SLABDEPTHINCHES` with the same actual-at-least-design comparison already used for `SLABTHICKNESS`. **Classification:** field lookup/label aliases exist, but comparison aliases are missing. **Recommendation:** preserve the consistency fix.
+- `Services/SlabEngineeringService.cs`, `ExtractViaOcr()` and local `OcrHolddownTable()`: add a focused OCR pass anchored to the embedded-hardware table so model and quantity remain on one row. **Classification:** missing. **Recommendation:** preserve for a dedicated source review.
+- `Services/SlabEngineeringService.cs`, `ExtractStrandCountFromCrop()`: support OCR order `TOTAL NUMBER <count> ... OF STRANDS` and use complete-number boundaries so a year such as 2024 cannot be truncated into a false count. **Classification:** partly missing. **Recommendation:** preserve.
+- `Services/SlabEngineeringService.cs`, `ExtractHolddownCount()`: require a complete hardware model followed by a separate quantity and remove the fallback that treats the final number on a hardware line as quantity; this prevents the `14` in `STHD-14`/`STAD-14` from becoming Qty 14. **Classification:** missing. **Recommendation:** preserve.
+- `Services/UserDataService.cs`, `SaveComment()`/`BuildComment()`: route saved prefixed-comment construction through `BuildComment()` instead of duplicating formatting, and preserve the trailing space after a prefix-only selection so the inspector can continue typing. **Classification:** missing. **Recommendation:** preserve the shared formatter and ready-to-type spacing, while deciding persisted punctuation separately.
+
+**Manual review before preservation**
+
+- `MainWindow.xaml.cs`, `CreateInlineStatusHeaderControl()` plus local `HasOnlyInlineNiOptions()`/`IsInlineMeasurementOrQuantityItem()`: allow free entry for measurement/quantity rows whose supplied choices are only NI/N/A. **Classification:** missing but heuristic-sensitive and potentially overlapping newer Numberpad defaults. **Recommendation:** manual template/UI review.
+- `Services/EnergyComplianceService.cs`, `SlabItemMappings`, `SlabLabels`, and `GetSlabItemBannerState()`: interpret CPP items 8.13/8.16/8.19/8.22 as slab depth. **Classification:** unclear; current main explicitly treats them as non-derivable TOF-to-TOG. **Recommendation:** confirm against the live CPP template before porting.
+- `Services/UserDataService.cs`, `BuildComment()`/`StripPrefixAndSuffix()`: persist comments as `[trade] - comment` and strip the separator during parsing. **Classification:** missing but changes stored display format. **Recommendation:** compatibility/product review.
+- `MainWindow.xaml.cs`, `CreateInlinePhotosDrawer()`: make the empty-photo placeholder and File/Camera controls 96 pixels tall. **Classification:** missing, cosmetic. **Recommendation:** manual layout review.
+
+**Discard or keep the newer main implementation**
+
+- `InspectionEditor.csproj`, `InspectionPickerWindow.xaml`, and `scripts/update_red.bat`: local 2.0.8 labels are obsolete because production is 2.0.11. **Classification:** stale version-only changes. **Recommendation:** discard these hunks.
+- `MainWindow.xaml.cs`, local `AddRequiredNiOption()` and classic required-lookup NI injection: automatically adding NI to every required value list is broader than current control semantics. **Classification:** unsafe/unclear. **Recommendation:** discard the broad rule; design a narrower policy if needed.
+- `MainWindow.xaml.cs`, quick/saved-comment button construction: local removal of comment tooltips may reduce accessibility. **Classification:** unsafe/unclear. **Recommendation:** discard.
+- `MainWindow.xaml.cs`, older collapsed-row comment rendering: current main already renders comments as dedicated `middleContent` and integrates the compact Numberpad slider. **Classification:** superseded. **Recommendation:** keep current main; evaluate removal of the remaining generic Comment badge separately if desired.
+
 ### 2026-07-12 — RED 2.0.11 — `8fcd0b024edfb1cbb9bfb7fd31cafb92ea31cdec`
 
 - **Files changed:** `App.xaml.cs`, `InspectionEditor.csproj`, `InspectionPickerWindow.xaml.cs`, `MainWindow.xaml.cs`, and new `Services/AppUpdateService.cs`.
@@ -96,6 +143,8 @@ Use code and live GitHub state before older prose documentation:
 - `scripts/update_red.bat` creates backups under `%LOCALAPPDATA%\RED_Backups`, preserves selected local license/preferences/userdata, and deliberately refuses to restore an old `settings.txt` beginning with `xai-`.
 
 ## Known Warnings, Debt, and Incomplete Work
+
+- A separate checkout on this computer (`C:\Users\grace\Documents\RedGit`) contains the seven uncommitted files described in the newest **Latest Changes** entry. It is based on 2.0.7 and five commits behind current `origin/main`; do not commit or publish it as-is, and do not treat its 2.0.8 version strings as authoritative.
 
 - Release build currently succeeds with **16 compiler warnings and 0 errors**. Warnings are existing nullability/event-signature/unused-field issues, including `MainWindow.xaml.cs`, `InspectionPickerWindow.xaml.cs`, and `Services/GrokApiClient.cs`; do not report the build as warning-free.
 - Automated coverage is only two Python static test files: `tests/numberpad_defaults_static_test.py` (6 tests) and `tests/red_ai_prompt_static_test.py` (5 tests). There is no automated WPF interaction suite or true updater integration test.
