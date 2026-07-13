@@ -30,7 +30,7 @@ namespace InspectionEditor
     public partial class MainWindow : Window
     {
         private static readonly string AppVersion = AppIdentity.Version;
-        private static readonly TimeSpan AppUpdateCheckInterval = TimeSpan.FromHours(12);
+        private static readonly TimeSpan AppUpdateCheckInterval = TimeSpan.FromHours(24);
         private static readonly string LastAppUpdateCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
         
         private InspectionFile? _currentInspection;
@@ -937,7 +937,7 @@ namespace InspectionEditor
             // Animate "Click Open INS" hint sliding in from the left
             StartWelcomeHintAnimation();
 
-            // Quiet startup app update check. v2.0.0 did not run this path reliably; v2.0.1+ checks at most every 12 hours.
+            // Secondary safety check for editor-only launches; normal RED startup uses the same 24-hour marker.
             if (ShouldRunStartupAppUpdateCheck())
             {
                 Dispatcher.BeginInvoke(new Action(() => CheckForUpdatesAsync(silent: true)),

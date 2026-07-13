@@ -12,6 +12,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using InspectionEditor.Services;
 using Microsoft.Win32;
 
 namespace InspectionEditor
@@ -696,25 +697,14 @@ namespace InspectionEditor
                 ? "RED 2.0 Dev skips app self-updates; refreshing datasets only..."
                 : "Checking for updates...";
 
+            AppUpdateResult? appUpdateResult = null;
             InspectionEditor.Services.StatsUpdateResult? statsResult = null;
             InspectionEditor.Services.StatsUpdateResult? teamStatsResult = null;
-            string remoteRedVersion = AppIdentity.Version;
-            string? redCheckError = null;
             try
             {
-                using var http = new System.Net.Http.HttpClient();
-                http.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionPicker");
-                http.Timeout = TimeSpan.FromSeconds(15);
-
-                var redTask = http.GetStringAsync("https://api.github.com/repos/fullinspect-source/Red/releases/latest");
-                var statsTask = InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
-                await Task.WhenAll(redTask, statsTask);
-
-                statsResult = statsTask.Result;
-                var tagMatch = System.Text.RegularExpressions.Regex.Match(redTask.Result, "\"tag_name\":\\s*\"v?([^\"]+)\"");
-                if (tagMatch.Success)
-                    remoteRedVersion = tagMatch.Groups[1].Value;
-
+                // Triple-click is deliberately unthrottled and installs immediately when a newer release exists.
+                appUpdateResult = await AppUpdateService.CheckAndInstallIfAvailableAsync(force: true);
+                statsResult = await InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
                 teamStatsResult = new InspectionEditor.Services.StatsUpdateResult
                 {
                     CurrentDate = statsResult.CurrentDate,
@@ -725,7 +715,6 @@ namespace InspectionEditor
             }
             catch (Exception ex)
             {
-                redCheckError = ex.Message;
                 statsResult = new InspectionEditor.Services.StatsUpdateResult
                 {
                     CurrentDate = InspectionEditor.Services.DataUpdateService.GetLocalStatsDate(),
@@ -742,22 +731,25 @@ namespace InspectionEditor
             AboutUpdateResultsGrid.Visibility = Visibility.Visible;
 
             AboutRedHadText.Text = $"v{AppIdentity.Version}";
-            AboutRedNowText.Text = string.IsNullOrWhiteSpace(remoteRedVersion) ? "-" : $"v{remoteRedVersion}";
-            if (redCheckError != null)
+            AboutRedNowText.Text = string.IsNullOrWhiteSpace(appUpdateResult?.LatestVersion)
+                ? $"v{AppIdentity.Version}"
+                : $"v{appUpdateResult.LatestVersion}";
+            if (appUpdateResult?.InstallerStarted == true)
             {
-                AboutRedStatusText.Text = $"App check issue: {redCheckError}";
-                AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(180, 0, 0));
+                AboutRedStatusText.Text = "Restarting to install update";
+                AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(21, 101, 192));
+                await Task.Delay(1500);
+                Application.Current.Shutdown();
+                return;
             }
-            else if (remoteRedVersion != AppIdentity.Version)
+            else if (appUpdateResult?.Error != null)
             {
-                AboutRedStatusText.Text = "New RED version available. Use update_red.bat or restart after update prompt.";
+                AboutRedStatusText.Text = appUpdateResult.Error;
                 AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(180, 0, 0));
             }
             else
             {
-                AboutRedStatusText.Text = AppIdentity.IsDevBuild
-                    ? "Dev build: app self-update skipped"
-                    : "Up to date";
+                AboutRedStatusText.Text = "Up to date";
                 AboutRedStatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 125, 50));
             }
 

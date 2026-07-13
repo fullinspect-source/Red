@@ -78,13 +78,31 @@ namespace InspectionEditor
             var splash = new SplashWindow();
             splash.Show();
 
-            // Check for data file updates
+            // Check for RED app + data updates. The app check is throttled to once every 24 hours.
             splash.SetStatus("Checking for updates...");
             try
             {
-                var updateTask = DataUpdateService.CheckForUpdatesAsync();
-                var completed = await Task.WhenAny(updateTask, Task.Delay(TimeSpan.FromSeconds(20)));
-                if (completed != updateTask)
+                var appUpdateTask = AppUpdateService.CheckAndInstallIfAvailableAsync();
+                var appUpdateCompleted = await Task.WhenAny(appUpdateTask, Task.Delay(TimeSpan.FromSeconds(12)));
+                if (appUpdateCompleted == appUpdateTask)
+                {
+                    var appUpdate = await appUpdateTask;
+                    if (appUpdate.InstallerStarted)
+                    {
+                        splash.SetStatus($"Installing RED v{appUpdate.LatestVersion}...");
+                        await Task.Delay(1500);
+                        Shutdown();
+                        return;
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("App update check timed out, continuing startup...");
+                }
+
+                var dataUpdateTask = DataUpdateService.CheckForUpdatesAsync();
+                var dataUpdateCompleted = await Task.WhenAny(dataUpdateTask, Task.Delay(TimeSpan.FromSeconds(8)));
+                if (dataUpdateCompleted != dataUpdateTask)
                     System.Diagnostics.Debug.WriteLine("Data update still running, continuing startup...");
             }
             catch
