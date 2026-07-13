@@ -4,6 +4,14 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-07-12 — RED 2.0.12 — field workflow and foundation-plan rescue
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, `Services/SlabEngineeringService.cs`, `Services/UserDataService.cs`, `tests/codex2_rescue_static_test.py`, and `docs/RED-2.0-RELEASE-NOTES.md`.
+- **What changed:** Completed the verified remainder of the Codex 2 rescue on top of the high-confidence work already merged in `7bde489`. CPP interior SD items 8.13/8.16/8.19/8.22 now use extracted slab thickness as a minimum-depth design check; the mapping was confirmed against hundreds of active CPP records where those item numbers are NumberPad prompts named `Interior Measurements (Location N): SD`. The embedded hold-down table now receives its own heading-anchored OCR crop before full-page fallback. Prefixed comments display as `[trade] - comment`, and the photo placeholder/File/Camera controls share a 96-pixel height.
+- **Already completed before this release pass:** Actionable **Photo Required**, child-control row-toggle protection, status-only design-assist filtering, dual-label design matching, prefix-focus restoration, slab-depth field aliases, bounded/reordered strand-count patterns, and removal of the unsafe hardware-line final-number fallback were already merged to `main` through PR #1; they are included in this release without being duplicated.
+- **Deliberately not added:** Broad automatic NI injection and the older NI-only measurement heuristic were not ported because current CPP measurement rows are already NumberPad controls and the broad rule could assign NI where the report does not permit it. Tooltip removal was also rejected as an accessibility regression.
+- **Verification/deployment:** Release build and self-contained win-x64 publish succeeded with 0 errors and the same 16 existing compiler warnings; all 18 static tests passed; `git diff --check` and changed-file secret scans passed. GitHub deployment was still pending at the time of this source commit.
+
 ### 2026-07-12 — Codex 2 high-confidence rescue (candidate for next RED release)
 
 - **Computer/workstream:** Homer rescue branch `rescue/codex2-high-confidence`, merged into `main` after RED 2.0.11.

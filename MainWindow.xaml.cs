@@ -6646,13 +6646,20 @@ namespace InspectionEditor
             }
             else
             {
-                photoTop.Children.Add(CreateInlineInfoText("No photos"));
+                var emptyPhoto = CreateInlineInfoText("No photos");
+                emptyPhoto.Width = 136;
+                emptyPhoto.Height = 96;
+                emptyPhoto.Margin = new Thickness(0, 0, 8, 0);
+                emptyPhoto.TextAlignment = TextAlignment.Center;
+                emptyPhoto.VerticalAlignment = VerticalAlignment.Center;
+                photoTop.Children.Add(emptyPhoto);
             }
 
             var addPhoto = new Button
             {
                 Content = "File",
                 Tag = item,
+                Height = 96,
                 Padding = new Thickness(9, 5, 9, 5),
                 Margin = new Thickness(0, 0, 6, 0),
                 Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
@@ -6667,6 +6674,7 @@ namespace InspectionEditor
             {
                 Content = "Camera",
                 Tag = item,
+                Height = 96,
                 Padding = new Thickness(9, 5, 9, 5),
                 Margin = new Thickness(0),
                 Background = new SolidColorBrush(Color.FromRgb(22, 163, 74)),

@@ -1,5 +1,17 @@
 # RED 2.0 Release Notes
 
+## 2.0.12 — Field workflow and foundation-plan rescue
+
+- Makes **Photo Required** actionable: selecting it opens Camera for that checklist item.
+- Prevents embedded buttons, text boxes, combo boxes, and sliders from accidentally toggling checklist-row expansion.
+- Excludes Yes/No and Pass/Fail controls from plan-value design assist and uses both prompt labels when matching extracted design values.
+- Restores comment-box focus after selecting a trade prefix and standardizes displayed prefixed comments as `[trade] - comment`.
+- Gives the empty-photo area and File/Camera controls matching 96-pixel heights.
+- Maps CPP interior `SD` items 8.13, 8.16, 8.19, and 8.22 to extracted slab thickness and evaluates them as minimum-depth checks. This mapping was verified against the active CPP inspection corpus.
+- Adds focused OCR around the embedded hold-down table and prevents hardware model numbers such as the `14` in `STHD-14` from being interpreted as quantities.
+- Improves reordered strand-count OCR and prevents four-digit years from being truncated into false counts.
+- Retains the existing Numberpad behavior for current CPP measurement prompts; the active templates already expose those rows as NumberPad controls, so no broad NI injection was added.
+
 ## 2.0.10 — Image processing security maintenance
 
 - Upgrades SixLabors.ImageSharp from 3.1.5 to 3.1.12.

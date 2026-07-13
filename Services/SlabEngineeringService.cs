@@ -176,6 +176,7 @@ namespace InspectionEditor.Services
 
                 var allText = new System.Text.StringBuilder();
                 var cropText = new System.Text.StringBuilder();
+                var holddownCropText = new System.Text.StringBuilder();
 
                 for (int i = 0; i < pageCount; i++)
                 {
@@ -197,14 +198,31 @@ namespace InspectionEditor.Services
                         cropHeight: (int)(h * 0.55));
                     cropText.AppendLine(pageCrop);
                     cropText.AppendLine("---CROP_BREAK---");
+
+                    // Anchor a second crop on the embedded-holddown table heading. This
+                    // keeps hardware model and quantity on the same OCR row and avoids
+                    // unrelated STHD references elsewhere on the plan.
+                    string holddownCrop = OcrHolddownTable(rawBytes, w, h, engine);
+                    if (!string.IsNullOrWhiteSpace(holddownCrop))
+                    {
+                        holddownCropText.AppendLine(holddownCrop);
+                        holddownCropText.AppendLine("---HOLDDOWN_CROP_BREAK---");
+                    }
                 }
 
                 string fullText = allText.ToString();
                 string strandCropText = cropText.ToString();
+                string focusedHolddownText = holddownCropText.ToString();
 
                 // The focused elongation-chart crop is much less likely to contain
                 // unrelated drawing/detail numbers, so let it win when it can.
                 data.CableCount = ExtractStrandCountFromCrop(strandCropText);
+
+                if (!string.IsNullOrWhiteSpace(focusedHolddownText))
+                {
+                    data.HolddownCount = ExtractHolddownCount(focusedHolddownText, out string? focusedBreakdown);
+                    data.HolddownBreakdown = focusedBreakdown;
+                }
 
                 ParseFoundationData(fullText, data);
 
@@ -216,7 +234,8 @@ namespace InspectionEditor.Services
                 string debugFile = Path.Combine(Path.GetTempPath(), "red_ocr_debug.txt");
                 File.WriteAllText(debugFile,
                     "=== FULL PAGE OCR ===\n" + fullText +
-                    "\n\n=== LOWER-LEFT CROP OCR (strand search) ===\n" + strandCropText);
+                    "\n\n=== LOWER-LEFT CROP OCR (strand search) ===\n" + strandCropText +
+                    "\n\n=== EMBEDDED HOLDDOWN TABLE OCR ===\n" + focusedHolddownText);
 
                 data.DebugText = $"OCR pages={pageCount}, chars={fullText.Length} | full text → {debugFile}";
             }
@@ -286,6 +305,72 @@ namespace InspectionEditor.Services
                 Debug.WriteLine($"OCR crop error: {ex.Message}");
                 return "";
             }
+        }
+
+        private static string OcrHolddownTable(byte[] bgraBytes, int width, int height, TesseractEngine engine)
+        {
+            try
+            {
+                Tesseract.Rect? headingBounds = null;
+                using (var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+                {
+                    var bmpData = bmp.LockBits(
+                        new Rectangle(0, 0, width, height),
+                        ImageLockMode.WriteOnly,
+                        PixelFormat.Format32bppArgb);
+                    Marshal.Copy(bgraBytes, 0, bmpData.Scan0, bgraBytes.Length);
+                    bmp.UnlockBits(bmpData);
+
+                    using var ms = new MemoryStream();
+                    bmp.Save(ms, DrawingImageFormat.Png);
+                    using var pix = Pix.LoadFromMemory(ms.ToArray());
+                    using var page = engine.Process(pix);
+                    using var iterator = page.GetIterator();
+
+                    iterator.Begin();
+                    do
+                    {
+                        string line = iterator.GetText(PageIteratorLevel.TextLine) ?? "";
+                        bool hasEmbedded = line.IndexOf("EMBED", StringComparison.OrdinalIgnoreCase) >= 0;
+                        bool hasHolddown = Regex.IsMatch(line, @"(?:HOLD|H0LD|HOL).{0,10}DOWN", RegexOptions.IgnoreCase);
+                        if (hasEmbedded && hasHolddown &&
+                            iterator.TryGetBoundingBox(PageIteratorLevel.TextLine, out var bounds))
+                        {
+                            headingBounds = bounds;
+                            break;
+                        }
+                    }
+                    while (iterator.Next(PageIteratorLevel.TextLine));
+                }
+
+                // Dispose the full-page OCR result before asking the same engine to
+                // process the focused crop.
+                if (!headingBounds.HasValue)
+                    return "";
+
+                var heading = headingBounds.Value;
+                int cropLeft = Math.Max(0, heading.X1 - (int)(width * 0.03));
+                int cropTop = Math.Max(0, heading.Y1 - (int)(height * 0.02));
+                int cropRight = Math.Min(width,
+                    Math.Max(heading.X2 + (int)(width * 0.40), cropLeft + (int)(width * 0.45)));
+                int cropBottom = Math.Min(height, cropTop + (int)(height * 0.28));
+
+                return OcrCroppedRegion(
+                    bgraBytes,
+                    width,
+                    height,
+                    engine,
+                    cropLeft,
+                    cropTop,
+                    cropRight - cropLeft,
+                    cropBottom - cropTop);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Holddown table OCR error: {ex.Message}");
+            }
+
+            return "";
         }
 
         private static int? ExtractStrandCountFromCrop(string cropText)
@@ -486,8 +571,12 @@ namespace InspectionEditor.Services
             }
 
             // ── 4. Holddown count ────────────────────────────────────────
-            data.HolddownCount = ExtractHolddownCount(text, out string? holddownBreakdown);
-            data.HolddownBreakdown = holddownBreakdown;
+            // Preserve the focused table result when available; full-page OCR is fallback.
+            if (!data.HolddownCount.HasValue)
+            {
+                data.HolddownCount = ExtractHolddownCount(text, out string? holddownBreakdown);
+                data.HolddownBreakdown = holddownBreakdown;
+            }
         }
 
         internal static string FormatHolddownDisplay(SlabEngineeringInfo info)
