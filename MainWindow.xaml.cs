@@ -4741,7 +4741,23 @@ namespace InspectionEditor
             if (item.Required && string.IsNullOrWhiteSpace(value))
                 chips.Children.Add(CreateInlineBadge("Value Required", new SolidColorBrush(Color.FromRgb(139, 0, 0)), Brushes.White, FontWeights.SemiBold));
             if (item.IsPictureRequired && item.Pictures.Count == 0)
-                chips.Children.Add(CreateInlineBadge("Photo Required", new SolidColorBrush(Color.FromRgb(180, 83, 9)), Brushes.White, FontWeights.SemiBold));
+            {
+                var photoRequiredButton = new Button
+                {
+                    Content = "Photo Required",
+                    Tag = item,
+                    Padding = new Thickness(7, 2, 7, 2),
+                    Margin = new Thickness(0, 0, 5, 4),
+                    Background = new SolidColorBrush(Color.FromRgb(180, 83, 9)),
+                    Foreground = Brushes.White,
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(146, 64, 14)),
+                    FontSize = Math.Max(10, _checklistFontSize - 1),
+                    FontWeight = FontWeights.SemiBold,
+                    ToolTip = "Open the camera to add the required photo"
+                };
+                photoRequiredButton.Click += InlinePhotoRequiredButton_Click;
+                chips.Children.Add(photoRequiredButton);
+            }
             var designChip = CreateInlineDesignAssistChip(section, item);
             if (designChip != null)
                 chips.Children.Add(designChip);
@@ -5056,8 +5072,13 @@ namespace InspectionEditor
 
         private InlineDesignAssist? GetInlineDesignAssist(Section section, Item item)
         {
+            if (IsInlineStatusOnlyDesignTarget(item))
+                return null;
+
             string? actualValue = item.Value?.ToString()?.Trim();
-            string? promptText = item.DisplayLabel ?? item.Name;
+            string promptText = string.Join(" ", new[] { item.DisplayLabel, item.Name }
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
 
             if (_currentSlabInfo != null)
             {
@@ -5189,6 +5210,12 @@ namespace InspectionEditor
             }
 
             return null;
+        }
+
+        private static bool IsInlineStatusOnlyDesignTarget(Item item)
+        {
+            string controlName = item.ControlName?.Trim().ToLowerInvariant() ?? "";
+            return controlName is "yesno" or "yesnonani" or "passfail" or "passfailnani";
         }
 
         private bool ShouldShowInlineEcAssist(Item item, string ecValue)
@@ -6986,9 +7013,30 @@ namespace InspectionEditor
             element.SetBinding(FrameworkElement.WidthProperty, widthBinding);
         }
 
+        private void InlinePhotoRequiredButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: Item item })
+                return;
+
+            SetInlineItemExpanded(item, true);
+            LoadItemEditor(item);
+            CameraButton_Click(sender, e);
+            e.Handled = true;
+        }
+
         private void InlineItemRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_scrollStarted) return;
+
+            var source = e.OriginalSource as DependencyObject;
+            if (FindAncestor<ButtonBase>(source) != null ||
+                FindAncestor<TextBoxBase>(source) != null ||
+                FindAncestor<ComboBox>(source) != null ||
+                FindAncestor<Slider>(source) != null)
+            {
+                return;
+            }
+
             if (sender is not FrameworkElement element || element.Tag is not Item item) return;
 
             AutoApplyCurrentItem();
@@ -7520,10 +7568,12 @@ namespace InspectionEditor
             var suffixes = UserDataService.ExtractSuffixes(existing);
             string core = UserDataService.StripPrefixAndSuffix(existing);
 
+            bool focusCommentEditor = false;
             if (action.IsPrefix)
             {
                 bool removing = action.Value.Equals(prefix, StringComparison.OrdinalIgnoreCase);
                 prefix = removing ? "" : action.Value;
+                focusCommentEditor = !removing;
                 if (!removing)
                     RecordInlineUsage(action.Item, action.Value, "prefix");
             }
@@ -7543,7 +7593,24 @@ namespace InspectionEditor
             MarkUnsaved();
             LoadItemEditor(action.Item);
             PopulateTreeView(SearchFilterBox.Text);
+            if (focusCommentEditor)
+                FocusInlineCommentEditor(action.Item);
             e.Handled = true;
+        }
+
+        private void FocusInlineCommentEditor(Item item)
+        {
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+            {
+                var commentBox = FindVisualChildren<TextBox>(InlineChecklistPanel)
+                    .FirstOrDefault(box => ReferenceEquals(box.Tag, item) && box.AcceptsReturn);
+                if (commentBox == null)
+                    return;
+
+                commentBox.Focus();
+                commentBox.CaretIndex = commentBox.Text.Length;
+                Keyboard.Focus(commentBox);
+            }));
         }
 
         private void InlineDateSuffixButton_Click(object sender, RoutedEventArgs e)

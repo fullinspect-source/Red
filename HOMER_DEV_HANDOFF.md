@@ -4,6 +4,16 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-07-12 — Codex 2 high-confidence rescue (candidate for next RED release)
+
+- **Computer/workstream:** Homer rescue branch `rescue/codex2-high-confidence`, based on current `origin/main` after RED 2.0.11.
+- **Files changed:** `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, `Services/SlabEngineeringService.cs`, `Services/UserDataService.cs`, and `tests/codex2_rescue_static_test.py`.
+- **Resulting behavior:** The inline **Photo Required** control now opens Camera for that item; clicks on embedded buttons, text boxes, combo boxes, and sliders no longer toggle the checklist row; Yes/No and Pass/Fail controls are excluded from plan-value design assist; extraction matching uses both nonblank `DisplayLabel` and `Name`; selecting a trade prefix restores focus to the multiline comment editor; slab-depth aliases use the same actual-at-least-design comparison as slab thickness; reordered strand-count OCR and complete-number boundaries are supported; and the unsafe fallback that could treat the `14` in `STHD-14` as quantity 14 was removed. Saved comments now use the shared formatter, prefix-only selection retains a ready-to-type trailing space, and legacy `[trade] - comment` text can be parsed without changing the persisted punctuation policy.
+- **Verification:** `dotnet build -c Release -r win-x64` succeeded with 0 errors and 16 existing warnings. All 17 static tests passed, including 6 new rescue regression checks. `git diff --check` passed.
+- **Pushed to GitHub:** Not yet at the time of this entry.
+- **Included in a GitHub release:** No. Production remains RED 2.0.11.
+- **Deferred intentionally:** The focused hold-down OCR crop was not transplanted without its original source patch; CPP 8.13/8.16/8.19/8.22 slab-depth mapping, NI-only measurement heuristics, broad required-field NI injection, `[trade] - comment` persistence changes, 96-pixel photo layout, and tooltip removal remain excluded pending separate review.
+
 ### 2026-07-12 — Local RED Codex workstream (uncommitted; based on RED 2.0.7)
 
 - **Computer/workstream:** This Windows Codex computer; dirty checkout at `C:\Users\grace\Documents\RedGit`.

@@ -238,10 +238,9 @@ namespace InspectionEditor.Services
             if (string.IsNullOrWhiteSpace(coreComment))
                 return;
             
-            // Save with prefix if it had one
-            string commentToSave = string.IsNullOrEmpty(prefix) 
-                ? coreComment 
-                : $"{prefix} {coreComment}";
+            // Route saved-comment formatting through the same helper used by the editor.
+            // Passing no suffixes preserves the current persisted format while avoiding drift.
+            string commentToSave = BuildComment(prefix, coreComment, new List<string>());
 
             if (!allComments.ContainsKey(itemNumber))
             {
@@ -346,6 +345,8 @@ namespace InspectionEditor.Services
             if (result.StartsWith("[") && bracketEnd > 0)
             {
                 result = result.Substring(bracketEnd + 1).TrimStart();
+                if (result.StartsWith("-"))
+                    result = result.Substring(1).TrimStart();
             }
 
             // Strip ALL known suffixes (case-insensitive)
@@ -392,14 +393,19 @@ namespace InspectionEditor.Services
                 result = prefix.ToLower() + " ";
             }
 
-            result += coreText.Trim();
+            result += (coreText ?? "").Trim();
 
             if (suffixes != null && suffixes.Count > 0)
             {
                 result += " " + string.Join(" ", suffixes);
             }
 
-            return result.Trim();
+            bool prefixOnly =
+                !string.IsNullOrWhiteSpace(prefix) &&
+                string.IsNullOrWhiteSpace(coreText) &&
+                (suffixes == null || suffixes.Count == 0);
+
+            return prefixOnly ? result : result.Trim();
         }
 
         #endregion
