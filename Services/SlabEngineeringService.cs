@@ -295,13 +295,15 @@ namespace InspectionEditor.Services
             // (e.g. 12 for S-52) instead of the TOTAL NUMBER OF STRANDS summary.
             var patterns = new[]
             {
+                // OCR column order can place the count between TOTAL NUMBER and OF STRANDS.
+                (@"TOTAL[\s_]+NUMBER[\s_]+\b(\d{1,3})\b[\s\S]{0,80}?OF[\s_]+STRANDS", RegexOptions.IgnoreCase),
                 // Most specific: "TOTAL NUMBER OF STRANDS" summary row
                 (@"TOTAL\s+NUMBER\s+OF\s+STRANDS[\s\S]{0,300}?\b(\d{1,3})\b", RegexOptions.IgnoreCase),
                 // OCR-garbling: total row can become "TON SAEs 25" just before
                 // "TOTAL LINEAR / FEET OF STRANDS". Capture that first number.
                 (@"\b(?:TOTAL|TON|T0N)\b[^\n]{0,60}?\b(?:SAE\w*|STRANDS?)\b[^\n]{0,60}?\b(\d{2,3})\b[\s\S]{0,100}?TOTAL\s+LINEAR[\s\S]{0,100}?FEET\s+OF\s+STRANDS", RegexOptions.IgnoreCase),
                 // Tight: number within 30 chars of "OF STRANDS", not followed by foot/fraction marks
-                (@"OF\s+STRANDS[\s\S]{0,30}?(\d{1,3})(?!\s*['/\""\d])", RegexOptions.IgnoreCase),
+                (@"OF\s+STRANDS[\s\S]{0,30}?\b(\d{1,3})\b(?!\s*['/\""\d])", RegexOptions.IgnoreCase),
                 // Medium: number anywhere between "TOTAL NUMBER" and "TOTAL LINEAR"
                 (@"TOTAL\s+NUMBER[\s\S]{0,200}?(\d{1,3})[\s\S]{0,300}?TOTAL\s+LINEAR", RegexOptions.IgnoreCase),
                 // Loose: any reasonable strand count label
@@ -337,6 +339,15 @@ namespace InspectionEditor.Services
             // CRITICAL: try the most-specific pattern first. The column header
             // "OF STRANDS" appears before per-route counts (e.g. 12 for S-52),
             // so tight/medium patterns tried first would grab 12 instead of 53.
+            if (data.CableCount == null)
+            {
+                // OCR may reorder the total row as "TOTAL NUMBER 40 ... OF STRANDS".
+                var m = Regex.Match(text,
+                    @"TOTAL[\s_]+NUMBER[\s_]+\b(\d{1,3})\b[\s\S]{0,80}?OF[\s_]+STRANDS",
+                    RegexOptions.IgnoreCase);
+                if (m.Success && int.TryParse(m.Groups[1].Value, out int c) && c >= 10 && c <= 400)
+                    data.CableCount = c;
+            }
             if (data.CableCount == null)
             {
                 // Most specific: "TOTAL NUMBER OF STRANDS" summary row.
@@ -563,20 +574,6 @@ namespace InspectionEditor.Services
                     }
                 }
 
-                if (total == 0)
-                {
-                    foreach (var line in searchArea.Split('\n'))
-                    {
-                        if (!Regex.IsMatch(line, @"STHD|STAD|HDU|HTT|MST|STRAP|HOLD\s*DOWN", RegexOptions.IgnoreCase))
-                            continue;
-                        var eolNum = Regex.Match(line.TrimEnd(), @"(\d{1,3})\s*$");
-                        if (eolNum.Success && int.TryParse(eolNum.Groups[1].Value, out int qty) && qty >= 1 && qty <= 100)
-                        {
-                            total += qty;
-                            quantities.Add(qty);
-                        }
-                    }
-                }
             }
 
             if (total > 0)

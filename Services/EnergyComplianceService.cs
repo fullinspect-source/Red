@@ -889,7 +889,8 @@ namespace InspectionEditor.Services
                 return (actualParsed.Value >= designParsed.Value && actualParsed.Value <= 18.0) ? BannerState.Green : BannerState.Red;
             if (key == "BEAMDEPTHINCHES" || key == "BEAMDEPTH" || key == "TOFBOB")
                 return (actualParsed.Value >= designParsed.Value && actualParsed.Value <= designParsed.Value + 12.0) ? BannerState.Green : BannerState.Red;
-            if (key == "SLABTHICKNESSINCHES" || key == "SLABTHICKNESS")
+            if (key == "SLABTHICKNESSINCHES" || key == "SLABTHICKNESS" ||
+                key == "SLABDEPTHINCHES" || key == "SLABDEPTH")
                 return actualParsed.Value >= designParsed.Value ? BannerState.Green : BannerState.Red;
 
             return NumericOrTextClose(actualValue, designValue);
