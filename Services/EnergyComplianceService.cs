@@ -517,8 +517,15 @@ namespace InspectionEditor.Services
             { "8.21", s => s.BeamDepthInches?.ToString() },
             { "8.24", s => s.BeamDepthInches?.ToString() },
 
-            // NOTE: TOF-to-TOG items (8.1, 8.4, 8.7, 8.10, 8.13, 8.16, 8.19, 8.22) are intentionally
-            // omitted — that measurement is not derivable from plan data.
+            // Interior SD prompts are slab-depth checks. The active CPP corpus identifies
+            // these as NumberPad items named "Interior Measurements (Location N): SD".
+            { "8.13", s => s.SlabThicknessInches?.ToString() },
+            { "8.16", s => s.SlabThicknessInches?.ToString() },
+            { "8.19", s => s.SlabThicknessInches?.ToString() },
+            { "8.22", s => s.SlabThicknessInches?.ToString() },
+
+            // Corner TOF-to-TOG items (8.1, 8.4, 8.7, 8.10) remain omitted because
+            // that field measurement is not derivable from plan data.
         };
 
         private static readonly Dictionary<string, string> SlabLabels = new()
@@ -529,6 +536,7 @@ namespace InspectionEditor.Services
             { "8.12", "Beam W" },  { "8.14", "Beam W" },  { "8.17", "Beam W" },
             { "8.20", "Beam W" },  { "8.23", "Beam W" },
             { "8.15", "Beam D" },  { "8.18", "Beam D" },  { "8.21", "Beam D" },  { "8.24", "Beam D" },
+            { "8.13", "Slab D" },  { "8.16", "Slab D" },  { "8.19", "Slab D" },  { "8.22", "Slab D" },
         };
 
         internal static string? GetSlabValueForItem(SlabEngineeringInfo slab, string? itemNum)
@@ -655,6 +663,8 @@ namespace InspectionEditor.Services
             { "8.3","8.6","8.9","8.12","8.14","8.17","8.20","8.23" };
         private static readonly HashSet<string> BdItems = new()
             { "8.2","8.5","8.8","8.11","8.15","8.18","8.21","8.24" };
+        private static readonly HashSet<string> SdItems = new()
+            { "8.13","8.16","8.19","8.22" };
 
         /// <summary>
         /// Extract a leading number from strings like "R6", "R13", "15.2 SEER2", "2,199 sq ft".
@@ -845,7 +855,7 @@ namespace InspectionEditor.Services
                 return actualValue.Trim().Equals(designValue.Trim(), StringComparison.OrdinalIgnoreCase)
                     ? BannerState.Green : BannerState.Red;
 
-            if (!BwItems.Contains(itemNum) && !BdItems.Contains(itemNum))
+            if (!BwItems.Contains(itemNum) && !BdItems.Contains(itemNum) && !SdItems.Contains(itemNum))
                 return BannerState.Gray;
 
             double? actualParsed = ParseNumericValue(actualValue);
@@ -857,9 +867,12 @@ namespace InspectionEditor.Services
             if (BwItems.Contains(itemNum))
                 // Beam width: [min, 18"] — wider than 18" is suspicious, narrower than min fails
                 return (actual >= design && actual <= 18.0) ? BannerState.Green : BannerState.Red;
-            else
+            if (BdItems.Contains(itemNum))
                 // Beam depth: [min, min+12"] — more than 12" over min suggests dig error
                 return (actual >= design && actual <= design + 12.0) ? BannerState.Green : BannerState.Red;
+
+            // Slab depth is a minimum; extra thickness is acceptable.
+            return actual >= design ? BannerState.Green : BannerState.Red;
         }
 
         internal static BannerState GetSlabFieldBannerState(SlabEngineeringInfo slab, string? fieldKey, string? actualValue, int? cableF2B = null, int? cableR2L = null)

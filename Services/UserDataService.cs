@@ -390,7 +390,7 @@ namespace InspectionEditor.Services
             
             if (!string.IsNullOrEmpty(prefix))
             {
-                result = prefix.ToLower() + " ";
+                result = prefix.ToLower() + " - ";
             }
 
             result += (coreText ?? "").Trim();
