@@ -4138,8 +4138,16 @@ namespace InspectionEditor
                 return 0;
 
             string name = Path.GetFileNameWithoutExtension(path);
-            var match = Regex.Match(name, @"(?:^|[^A-Za-z])R(?:EV(?:ISION)?)?\s*[-_. ]?(\d+)\b", RegexOptions.IgnoreCase);
+
+            // Compact STRAND filenames append the document type directly after the revision,
+            // e.g. 2528605R3EC, 2528605R3FFP, or "Address (2528605R3EL)". A word-boundary
+            // check after the revision digit misses these and incorrectly displays R0.
+            var match = Regex.Match(name, @"\d{5,}R(\d+)(?=[A-Za-z])", RegexOptions.IgnoreCase);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int revision))
+                return Math.Max(0, revision);
+
+            match = Regex.Match(name, @"(?:^|[^A-Za-z])R(?:EV(?:ISION)?)?\s*[-_. ]?(\d+)\b", RegexOptions.IgnoreCase);
+            if (match.Success && int.TryParse(match.Groups[1].Value, out revision))
                 return Math.Max(0, revision);
 
             match = Regex.Match(name, @"\bREV(?:ISION)?\s*[-_. ]?(\d+)\b", RegexOptions.IgnoreCase);
