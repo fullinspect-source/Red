@@ -6,9 +6,9 @@ This file is the concise cross-session source of development context for work pe
 
 ### 2026-07-15 — RED 2.0.13 — correct compact revision labels
 
-- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/revision_filename_static_test.py`, and `docs/RED-2.0-RELEASE-NOTES.md`.
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/revision_filename_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and `HOMER_DEV_HANDOFF.md`.
 - **What changed:** `GetRevisionFromDesignPath()` now recognizes compact STRAND filenames where the document suffix immediately follows the revision, including `2528605R3EC`, `2528605R3FFP`, and address-named files containing `2528605R3EL`. Previously the EC chooser correctly selected the highest revision but the separate badge parser missed the filename and displayed R0.
-- **Verification/deployment:** Release build and self-contained win-x64 publish succeeded with 0 errors and the same 16 existing compiler warnings. All 21 static tests passed, including compact EC/FFP/EL filename regression cases; `git diff --check` and changed-file secret scans passed. Commit, package inspection, and GitHub release were pending at the time of this entry.
+- **Verification/deployment:** Source merged through PR #3 as `db406d8c0cf40776a46ad9cee2c409b7040f4338`. Release build and self-contained win-x64 publish succeeded with 0 errors and the same 16 existing compiler warnings. All 21 static tests passed, including compact EC/FFP/EL filename regression cases; `git diff --check`, changed-file secret scans, and package-content checks passed. GitHub release v2.0.13 is live at https://github.com/fullinspect-source/Red/releases/tag/v2.0.13. The 90,878,633-byte ZIP SHA-256 is `a76f8d553a8046febb954e1a75b549ac03602a3d463bcb0f4c58634b8cd5b9f9`; the 8,437-byte CRLF updater SHA-256 is `94724c7c5dea2777e27f856e6697818f04d74fe11e265ed3e65ac95c7578f49d`. GitHub latest-release API, tag target, asset digests, and both stable latest-download URLs were verified.
 
 ### 2026-07-12 — RED 2.0.12 — field workflow and foundation-plan rescue
 
