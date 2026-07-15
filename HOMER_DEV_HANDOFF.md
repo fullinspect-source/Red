@@ -4,6 +4,12 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-07-15 — RED 2.0.13 — correct compact revision labels
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/revision_filename_static_test.py`, and `docs/RED-2.0-RELEASE-NOTES.md`.
+- **What changed:** `GetRevisionFromDesignPath()` now recognizes compact STRAND filenames where the document suffix immediately follows the revision, including `2528605R3EC`, `2528605R3FFP`, and address-named files containing `2528605R3EL`. Previously the EC chooser correctly selected the highest revision but the separate badge parser missed the filename and displayed R0.
+- **Verification/deployment:** Release build and self-contained win-x64 publish succeeded with 0 errors and the same 16 existing compiler warnings. All 21 static tests passed, including compact EC/FFP/EL filename regression cases; `git diff --check` and changed-file secret scans passed. Commit, package inspection, and GitHub release were pending at the time of this entry.
+
 ### 2026-07-12 — RED 2.0.12 — field workflow and foundation-plan rescue
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, `Services/SlabEngineeringService.cs`, `Services/UserDataService.cs`, `tests/codex2_rescue_static_test.py`, and `docs/RED-2.0-RELEASE-NOTES.md`.

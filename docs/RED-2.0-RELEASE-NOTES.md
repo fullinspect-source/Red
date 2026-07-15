@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.0.13 — Correct design-extraction revision labels
+
+- Correctly recognizes compact STRAND revision filenames such as `2528605R3EC.pdf`, `2528605R3FFP.pdf`, and address-named files containing `2528605R3EL`.
+- Shows the actual selected design revision in the **Design Extraction** badge instead of falling back to R0 when the revision number is immediately followed by a document-type suffix.
+- Leaves source selection unchanged: EC extraction continues choosing the highest available EC revision.
+
 ## 2.0.12 — Field workflow and foundation-plan rescue
 
 - Makes **Photo Required** actionable: selecting it opens Camera for that checklist item.
