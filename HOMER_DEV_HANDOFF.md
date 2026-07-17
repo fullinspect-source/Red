@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-07-17 — RED 2.0.14 — restore Transcribe/Get 3 release packaging
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/ai_release_packaging_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and `HOMER_DEV_HANDOFF.md`. The private `EmbeddedApiKeyProvider.Generated.cs` is required during Release builds but remains gitignored and is never committed or packaged as source.
+- **Root cause:** RED 2.0.13 was published from a clean checkout without the gitignored generated AI-key provider. `_grokClient` therefore remained null, and the inline UI disabled Transcribe/Get 3; the disabled WPF styling made their text appear blank across checklist items.
+- **What changed:** Release builds now fail immediately when the generated provider is absent. Inline and classic AI controls remain visible whenever a photo is present, and a missing client produces an explicit updater message instead of a silent return. The production package is built with the current private generated provider present.
+- **Verification/deployment:** Pending final publish/package verification, merge, release, stable-link verification, and Dropbox sync. The missing-provider negative test failed with the expected MSBuild error; the generated provider's Gemini credential returned HTTP 200 and exposed `gemini-2.5-flash`; the Release build succeeded with 0 errors and 16 existing warnings; all 25 static tests passed; and decompilation of the non-single-file build confirmed nonempty generated payload and mask without printing key material.
+
 ### 2026-07-15 — RED 2.0.13 — correct compact revision labels
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/revision_filename_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and `HOMER_DEV_HANDOFF.md`.

@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.0.14 — Restore Transcribe and Get 3
+
+- Restores the embedded Gemini client in the production package so **Transcribe** and **Get 3** work again.
+- Keeps AI buttons visible and readable if a future installation is missing AI configuration, and gives a direct update message instead of silently showing blank controls.
+- Adds a Release-build guard that refuses to build when the gitignored generated key provider is absent, preventing another AI-disabled package.
+
 ## 2.0.13 — Correct design-extraction revision labels
 
 - Correctly recognizes compact STRAND revision filenames such as `2528605R3EC.pdf`, `2528605R3FFP.pdf`, and address-named files containing `2528605R3EL`.

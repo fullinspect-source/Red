@@ -2128,8 +2128,8 @@ namespace InspectionEditor
                 
                 DisplayImage(photoData);
                 _currentPhotoData = photoData;
-                GetSuggestionsButton.IsEnabled = _grokClient != null;
-                TranscribeButton.IsEnabled = _grokClient != null;
+                GetSuggestionsButton.IsEnabled = true;
+                TranscribeButton.IsEnabled = true;
                 
                 // Update photo navigation to show new photo
                 _currentPhotoIndex = _editorLoadedItem.Pictures.Count - 1;
@@ -6576,7 +6576,9 @@ namespace InspectionEditor
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 220 });
 
             bool hasPhoto = item.Pictures.Count > 0;
-            bool canUseAi = _grokClient != null && hasPhoto;
+            // Keep AI controls visible/readable when the release key is unavailable.
+            // The click path gives an explicit diagnostic instead of silently rendering blank controls.
+            bool canUseAi = hasPhoto;
 
             var transcribePanel = CreateInlineMediaToolPanel();
             transcribePanel.Children.Add(CreateInlineMediaAiButton(
@@ -8502,7 +8504,10 @@ namespace InspectionEditor
         private async Task RunInlineAiToolAsync(Item item, InlineAiMode mode)
         {
             if (_grokClient == null)
+            {
+                ShowAiUnavailableMessage();
                 return;
+            }
 
             byte[]? photoData = GetInlinePhotoBytes(item);
             if (photoData == null)
@@ -11739,8 +11744,8 @@ namespace InspectionEditor
                     
                     DisplayImage(imageData);
                     _currentPhotoData = imageData;
-                    GetSuggestionsButton.IsEnabled = _grokClient != null;
-                    TranscribeButton.IsEnabled = _grokClient != null;
+                    GetSuggestionsButton.IsEnabled = true;
+                    TranscribeButton.IsEnabled = true;
                     
                     // Update photo navigation to show new photo
                     _currentPhotoIndex = _editorLoadedItem.Pictures.Count - 1;
@@ -11807,8 +11812,8 @@ namespace InspectionEditor
                     byte[] imageData = Convert.FromBase64String(picture.Data);
                     DisplayImage(imageData);
                     _currentPhotoData = imageData;
-                    GetSuggestionsButton.IsEnabled = _grokClient != null;
-                    TranscribeButton.IsEnabled = _grokClient != null;
+                    GetSuggestionsButton.IsEnabled = true;
+                    TranscribeButton.IsEnabled = true;
                 }
                 catch
                 {
@@ -11920,7 +11925,13 @@ namespace InspectionEditor
         
         private async Task GetAISuggestionsAsync(bool transcribeMode = false)
         {
-            if (_grokClient == null || _currentPhotoData == null || _currentItem == null)
+            if (_grokClient == null)
+            {
+                ShowAiUnavailableMessage();
+                return;
+            }
+
+            if (_currentPhotoData == null || _currentItem == null)
                 return;
 
             SuggestionsStack.Children.Clear();
@@ -11984,6 +11995,15 @@ namespace InspectionEditor
                 GetSuggestionsButton.IsEnabled = true;
                 TranscribeButton.IsEnabled = true;
             }
+        }
+
+        private void ShowAiUnavailableMessage()
+        {
+            MessageBox.Show(
+                "RED's AI tools are unavailable in this installation. Run the latest RED updater, then reopen RED.",
+                "RED AI Tools Unavailable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
 
         private string GetCurrentCommentForAi(Item? item = null)
