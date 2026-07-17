@@ -12,8 +12,8 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.0.13</Version>
-    <ReleaseDate>2026-07-15</ReleaseDate>
+    <Version>2.0.14</Version>
+    <ReleaseDate>2026-07-17</ReleaseDate>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
     <Product>RED $(Version)</Product>
@@ -36,7 +36,7 @@
     <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
-  <!-- Do not package API keys. Users can add a local settings.txt manually if AI features are needed. -->
+  <!-- Never package settings.txt. Release builds use the gitignored generated key provider. -->
   <ItemGroup>
     <None Update="settings.txt">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
@@ -88,5 +88,11 @@
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
   </ItemGroup>
+
+  <!-- A release without the private generated provider silently disables Transcribe/Get 3. -->
+  <Target Name="RequireEmbeddedAiKeyForRelease" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\EmbeddedApiKeyProvider.Generated.cs')"
+           Text="Release builds require the gitignored EmbeddedApiKeyProvider.Generated.cs so RED AI tools remain available." />
+  </Target>
 
 </Project>
