@@ -3310,8 +3310,8 @@ namespace InspectionEditor
                 "AFI" or "COH" or "FS" or "FSF" or "ME" or "MP" or "SWI" or "TPC" or "TFF" or "TRDI" or "TRSI" =>
                     FindBestPdf(pdfs, n =>
                         n.Contains("WITH DETAIL") ? 100 :
-                        n.Contains("DETAIL") ? 80 :
-                        System.Text.RegularExpressions.Regex.IsMatch(n, @"^\d+$") ? 50 : 0),
+                        System.Text.RegularExpressions.Regex.IsMatch(n, @"^\d+(?:R\d+)?$") ? 50 : 0,
+                        preferScore: true),
 
                 // Plain engineering (prefer bare job-number file; reject known-suffix files)
                 "SCI" =>
@@ -3334,18 +3334,22 @@ namespace InspectionEditor
             };
         }
 
-        private static string? FindBestPdf(string[] pdfs, Func<string, int> scorer)
+        private static string? FindBestPdf(string[] pdfs, Func<string, int> scorer, bool preferScore = false)
         {
-            return pdfs
+            var candidates = pdfs
                 .Select(pdf => new
                 {
                     Path = pdf,
                     Score = scorer(Path.GetFileNameWithoutExtension(pdf).ToUpperInvariant()),
                     Revision = GetRevisionFromDesignPath(pdf)
                 })
-                .Where(x => x.Score > 0)
-                .OrderByDescending(x => x.Revision)
-                .ThenByDescending(x => x.Score)
+                .Where(x => x.Score > 0);
+
+            var ordered = preferScore
+                ? candidates.OrderByDescending(x => x.Score).ThenByDescending(x => x.Revision)
+                : candidates.OrderByDescending(x => x.Revision).ThenByDescending(x => x.Score);
+
+            return ordered
                 .ThenBy(x => x.Path)
                 .Select(x => x.Path)
                 .FirstOrDefault();

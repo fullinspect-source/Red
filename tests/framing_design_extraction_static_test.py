@@ -21,6 +21,8 @@ class FramingDesignExtractionRegressionTests(unittest.TestCase):
     def test_all_framing_reports_prefer_detail_sheet_plan_sets(self):
         self.assertIn('"TPC" or "TFF" or "TRDI" or "TRSI" =>', MAIN)
         self.assertIn('n.Contains("WITH DETAIL") ? 100', MAIN)
+        self.assertIn("preferScore: true", MAIN)
+        self.assertNotIn('n.Contains("DETAIL") ? 80', MAIN)
 
     def test_ocr_is_targeted_cached_and_has_wind_crop_retry(self):
         self.assertIn("FramingDesignParser.IsCandidateSheetText", SERVICE)

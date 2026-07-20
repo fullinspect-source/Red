@@ -366,7 +366,7 @@ namespace InspectionEditor.Services
 
             return Regex.IsMatch(page.Text, @"\bFJ[1-9]\d*(?:\.\d+)?\b", RegexOptions.IgnoreCase) ||
                    Regex.IsMatch(page.Text,
-                       @"(?:(?:second|2nd|upper)\s+(?:floor|level).{0,80}?(?:shear\s+wall|framing|joists?|layout)|floor\s+joist\s+layout|floor\s+framing\s+plan)",
+                       @"(?:(?:second|2nd|upper)\s+(?:floor|level)\b|floor\s+joist\s+layout|floor\s+framing\s+plan)",
                        RegexOptions.IgnoreCase);
         }
 
@@ -384,9 +384,10 @@ namespace InspectionEditor.Services
 
             if (Regex.IsMatch(floorText, openWebPattern, RegexOptions.IgnoreCase))
             {
-                AddPreferred(info, "FloorType", "Open Web", source, "Open-web floor-system callout.", "High", priority);
+                AddPreferred(info, "FloorType", "Open Web", source, "Open-web floor-system callout.", "High", priority,
+                    appendValue: false);
                 var selectedOpenWebProduct = Regex.Match(floorText,
-                    $@"{openWebPattern}[^.\r\n]{{0,140}}?(?:by|manufacturer|product|series|model|size|grade|species)\s*[:=]?\s*(?<product>[A-Za-z0-9][A-Za-z0-9 .#/-]{{1,60}})",
+                    $@"{openWebPattern}[^.\r\n]{{0,140}}?(?:manufacturer|product|series|model)\s*[:=]\s*(?<product>[A-Za-z0-9][A-Za-z0-9 .#/-]{{1,60}}?)(?=[.;\r\n]|$)",
                     RegexOptions.IgnoreCase);
                 if (selectedOpenWebProduct.Success)
                     AddPreferred(info, "FloorProduct", CleanEvidence(selectedOpenWebProduct.Groups["product"].Value, 80), source,
@@ -400,7 +401,8 @@ namespace InspectionEditor.Services
 
             if (Regex.IsMatch(floorText, @"I\s*[- ]?Joists?\s+per\s+plan", RegexOptions.IgnoreCase))
             {
-                AddPreferred(info, "FloorType", "I-Joist", source, "I-Joist per plan.", "High", priority);
+                AddPreferred(info, "FloorType", "I-Joist", source, "I-Joist per plan.", "High", priority,
+                    appendValue: false);
 
                 var selected = Regex.Match(floorText,
                     @"(?:floor\s+system|floor\s+joists?)\s*(?:shall\s+be|:|=)\s*(?<product>(?:TJI|BCI|LPI)\s*[A-Z0-9.-]+)",
@@ -418,7 +420,8 @@ namespace InspectionEditor.Services
                 RegexOptions.IgnoreCase);
             if (dimensional.Success)
             {
-                AddPreferred(info, "FloorType", "Dimensional Lumber", source, CleanEvidence(dimensional.Value, 180), "High", priority);
+                AddPreferred(info, "FloorType", "Dimensional Lumber", source, CleanEvidence(dimensional.Value, 180), "High", priority,
+                    appendValue: false);
                 AddPreferred(info, "FloorLumberSchedule", CleanEvidence(dimensional.Groups["value"].Value, 140), source,
                     CleanEvidence(dimensional.Value, 180), "High", priority);
                 return;
