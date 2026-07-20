@@ -424,7 +424,7 @@ namespace InspectionEditor.Services
                 return;
             }
 
-            if (extractionComplete && info.Values.Count > 0 && !info.HasSecondFloorDesign)
+            if (extractionComplete && info.HasFramingPlanEvidence && info.Values.Count > 0 && !info.HasSecondFloorDesign)
             {
                 AddPreferred(info, "FloorTypeNotApplicable", "NI", pages.FirstOrDefault(),
                     "No second-floor shear-wall or floor-system plan was detected.", "Medium", priority, appendValue: false);
