@@ -56,8 +56,10 @@ namespace InspectionEditor
         private string _currentClientName = "";
         private SlabEngineeringInfo? _currentSlabInfo;
         private EnergyComplianceInfo? _currentEcInfo;
+        private FramingDesignInfo? _currentFramingInfo;
         private string? _planPdfPath; // For non-CPP plan types (EC, FFP, Arch, Eng, etc.)
         private bool _designExtractionLoading;
+        private long _framingExtractionRequestId;
         
         // Stats mode: which tier of averages to use for section counters
         private enum StatsMode { Global, Builder, Project }
@@ -3104,6 +3106,8 @@ namespace InspectionEditor
 
             _currentSlabInfo = null;
             _currentEcInfo = null;
+            _currentFramingInfo = null;
+            _framingExtractionRequestId++;
             _planPdfPath = null;
             _designExtractionLoading = false;
             SlabEngButton.IsEnabled = false;
@@ -3211,6 +3215,32 @@ namespace InspectionEditor
                     SlabEngButton.IsEnabled = true;
                     SlabEngButton.Visibility = Visibility.Visible;
                     UpdateDesignExtractionButton();
+
+                    if (FramingDesignService.SupportsInspectionCode(inspType))
+                    {
+                        string capturedFilePath = filePath;
+                        string capturedPlanPdf = planPdf;
+                        long capturedRequestId = ++_framingExtractionRequestId;
+                        _designExtractionLoading = true;
+                        UpdateDesignExtractionButton();
+                        Task.Run(() => FramingDesignService.GetInfoForInspection(capturedFilePath, capturedPlanPdf))
+                            .ContinueWith(t =>
+                            {
+                                Dispatcher.Invoke(() =>
+                                {
+                                    if (_currentFilePath != capturedFilePath ||
+                                        capturedRequestId != _framingExtractionRequestId ||
+                                        !string.Equals(_planPdfPath, capturedPlanPdf, StringComparison.OrdinalIgnoreCase))
+                                        return;
+
+                                    _designExtractionLoading = false;
+                                    if (!t.IsFaulted)
+                                        _currentFramingInfo = t.Result;
+                                    UpdateDesignExtractionButton();
+                                    RefreshInlineChecklistForBackgroundData();
+                                });
+                            });
+                    }
                 }
             }
         }
@@ -3277,14 +3307,14 @@ namespace InspectionEditor
                 "PPE" => FindBestPdf(pdfs, n => n.Contains("FFP") ? 100 : 0),
 
                 // Engineering with detail sheets (prefer detail-sheet PDF; fall back to plain job-number PDF)
-                "AFI" or "COH" or "FS" or "FSF" or "ME" or "MP" or "SWI" or "TPC" =>
+                "AFI" or "COH" or "FS" or "FSF" or "ME" or "MP" or "SWI" or "TPC" or "TFF" or "TRDI" or "TRSI" =>
                     FindBestPdf(pdfs, n =>
                         n.Contains("WITH DETAIL") ? 100 :
                         n.Contains("DETAIL") ? 80 :
                         System.Text.RegularExpressions.Regex.IsMatch(n, @"^\d+$") ? 50 : 0),
 
                 // Plain engineering (prefer bare job-number file; reject known-suffix files)
-                "SCI" or "TFF" or "TRDI" or "TRSI" =>
+                "SCI" =>
                     FindBestPdf(pdfs, n =>
                         System.Text.RegularExpressions.Regex.IsMatch(n, @"^\d+$") ? 100 :
                         !n.Contains("FD") && !n.Contains("EC") && !n.Contains("FFP") && !n.Contains("ARCH") ? 20 : 0),
@@ -3328,8 +3358,8 @@ namespace InspectionEditor
                 "CPR" or "STR"                                                    => "FD Plan",
                 "HEF" or "HER" or "HET" or "IAP" or "IEF" or "IER" or "PLY" or "QIER" => "EC Plan",
                 "PPE"                                                             => "FFP Plan",
-                "AFI" or "COH" or "FS" or "FSF" or "ME" or "MP" or "SWI" or "TPC" => "Eng Plan",
-                "SCI" or "TFF" or "TRDI" or "TRSI"                               => "Eng Plan",
+                "AFI" or "COH" or "FS" or "FSF" or "ME" or "MP" or "SWI" or "TPC" or "TFF" or "TRDI" or "TRSI" => "Eng Plan",
+                "SCI"                                                             => "Eng Plan",
                 "BC" or "BF" or "BWT" or "FWI"                                   => "Arch Plan",
                 "SRP"                                                             => "Repair Design",
                 _                                                                 => "Plan"
@@ -4095,9 +4125,11 @@ namespace InspectionEditor
                 ? (_currentSlabInfo.DisplayName ?? "slab engineering")
                 : _currentEcInfo != null
                     ? (_currentEcInfo.DisplayName ?? "energy compliance")
-                    : !string.IsNullOrWhiteSpace(_planPdfPath)
-                        ? Path.GetFileName(_planPdfPath)
-                        : "waiting for design extraction";
+                    : _currentFramingInfo != null
+                        ? (_currentFramingInfo.DisplayName ?? "framing engineering")
+                        : !string.IsNullOrWhiteSpace(_planPdfPath)
+                            ? Path.GetFileName(_planPdfPath)
+                            : "waiting for design extraction";
             DesignExtractionButton.ToolTip = $"Show extracted design data from {source}";
         }
 
@@ -4172,7 +4204,29 @@ namespace InspectionEditor
                 return;
             }
 
+            if (_currentFramingInfo != null)
+            {
+                ShowFramingExtractionPopup();
+                return;
+            }
+
             ShowDesignExtractionFallbackPopup();
+        }
+
+        private void ShowFramingExtractionPopup()
+        {
+            var info = _currentFramingInfo;
+            if (info == null)
+                return;
+
+            string values = string.Join("\n", info.GetSummaryLines());
+            if (string.IsNullOrWhiteSpace(values))
+                values = "No focused framing values were confidently extracted.";
+
+            string message = $"{info.StatusText}\n\n{values}\n\n" +
+                             "Tap a teal value badge on the related checklist row to append it to the report.";
+            MessageBox.Show(message, "Framing Design Extraction",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ShowDesignExtractionFallbackPopup()
@@ -4766,6 +4820,8 @@ namespace InspectionEditor
                 photoRequiredButton.Click += InlinePhotoRequiredButton_Click;
                 chips.Children.Add(photoRequiredButton);
             }
+            foreach (var framingChip in CreateInlineFramingDesignAssistChips(item))
+                chips.Children.Add(framingChip);
             var designChip = CreateInlineDesignAssistChip(section, item);
             if (designChip != null)
                 chips.Children.Add(designChip);
@@ -4902,6 +4958,7 @@ namespace InspectionEditor
                 valueCombo.LostFocus += InlineValueCombo_LostFocus;
                 valueCombo.PreviewKeyDown += InlineValueCombo_PreviewKeyDown;
                 panel.Children.Add(valueCombo);
+                AddInlineNiValueButtonIfNeeded(panel, item);
                 AddInlineClearValueButton(panel, item);
             }
             else if (options != null)
@@ -4926,6 +4983,8 @@ namespace InspectionEditor
                     btn.Click += InlineStatusButton_Click;
                     panel.Children.Add(btn);
                 }
+                if (!options.Any(option => option.Equals("NI", StringComparison.OrdinalIgnoreCase)))
+                    AddInlineNiValueButtonIfNeeded(panel, item);
             }
 
             if (options == null)
@@ -5009,6 +5068,10 @@ namespace InspectionEditor
 
         private bool ShouldOfferInlineNiValueButton(Item item)
         {
+            string controlName = item.ControlName?.Trim().ToLowerInvariant() ?? "";
+            if (controlName.Contains("nani") && !IsInlineStatusOnlyDesignTarget(item))
+                return true;
+
             if (!item.Required)
                 return false;
 
@@ -5039,6 +5102,58 @@ namespace InspectionEditor
             };
             clearButton.Click += InlineClearValueButton_Click;
             panel.Children.Add(clearButton);
+        }
+
+        private IEnumerable<UIElement> CreateInlineFramingDesignAssistChips(Item item)
+        {
+            var info = _currentFramingInfo;
+            if (info == null || !info.IsLoaded || IsInlineStatusOnlyDesignTarget(item))
+                yield break;
+
+            string promptText = string.Join(" ", new[] { item.DisplayLabel, item.Name }
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+            string currentValue = item.Value?.ToString() ?? "";
+
+            foreach (var suggestion in info.GetSuggestionsForPrompt(promptText))
+            {
+                if (FramingDesignParser.ValueAlreadyContains(currentValue, suggestion.Value))
+                    continue;
+                if (!suggestion.AppendValue &&
+                    suggestion.Value.Equals("NI", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(currentValue))
+                    continue;
+
+                string tooltip = $"Framing plan value — {suggestion.SourceSheet} — {suggestion.Confidence} confidence";
+                if (!string.IsNullOrWhiteSpace(suggestion.Evidence))
+                    tooltip += $"\n{suggestion.Evidence}";
+
+                var assist = new InlineDesignAssist(
+                    item,
+                    suggestion.Value,
+                    suggestion.Value,
+                    EnergyComplianceService.BannerState.Gray,
+                    CanApply: true,
+                    Source: "framing",
+                    ToolTip: tooltip,
+                    AppendValue: suggestion.AppendValue);
+
+                var button = new Button
+                {
+                    Content = suggestion.Value,
+                    Tag = assist,
+                    Padding = new Thickness(7, 2, 7, 2),
+                    Margin = new Thickness(3, 0, 0, 3),
+                    Background = new SolidColorBrush(Color.FromRgb(204, 251, 241)),
+                    Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(45, 212, 191)),
+                    FontSize = Math.Max(10, _checklistFontSize - 2),
+                    FontWeight = FontWeights.SemiBold,
+                    ToolTip = tooltip
+                };
+                button.Click += InlineDesignAssistButton_Click;
+                yield return button;
+            }
         }
 
         private UIElement? CreateInlineDesignAssistChip(Section section, Item item)
@@ -7173,7 +7288,9 @@ namespace InspectionEditor
             if (sender is Button { Tag: InlineDesignAssist assist } && assist.CanApply)
             {
                 LoadItemEditor(assist.Item);
-                assist.Item.Value = assist.Value;
+                assist.Item.Value = assist.AppendValue
+                    ? FramingDesignParser.AppendValue(assist.Item.Value?.ToString(), assist.Value)
+                    : assist.Value;
                 RecordInlineValueUsage(assist.Item, assist.Value);
                 MarkUnsaved();
                 LoadItemEditor(assist.Item);
@@ -8865,7 +8982,7 @@ namespace InspectionEditor
 
         private sealed record InlineDrawerAction(Item Item, string DrawerName, bool Open);
         private sealed record InlineValueAction(Item Item, string Value);
-        private sealed record InlineDesignAssist(Item Item, string Value, string Text, EnergyComplianceService.BannerState State, bool CanApply, string Source, string ToolTip);
+        private sealed record InlineDesignAssist(Item Item, string Value, string Text, EnergyComplianceService.BannerState State, bool CanApply, string Source, string ToolTip, bool AppendValue = false);
         private sealed record InlineQuickCommentAction(Item Item, string Comment);
         private sealed record InlineCommentFlagAction(Item Item);
         private sealed record InlinePrefixSuffixAction(Item Item, string Value, bool IsPrefix);

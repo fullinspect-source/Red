@@ -1,5 +1,14 @@
 # RED 2.0 Release Notes
 
+## 2.0.15 — Framing-plan design extraction
+
+- Extracts focused project values from the selected framing engineering PDF for SWI, TFF, TPC, TRDI, TRSI, COH, FS, FSF, ME, and MP reports.
+- Uses native PDF text, targeted SW/FR/FJ OCR, a focused wind-design crop retry, sanity checks, source-sheet provenance, and a persistent source-revision cache.
+- Presents extracted wind, wall, plate/sill, rafter, ceiling-joist, floor-system, roof/floor sheathing, and structural-sheathing values as optional teal checklist badges. RED never changes Pass/Fail from the extraction.
+- Supports multiple values per report field: tapping a badge appends it, and values already present in a loaded report no longer appear as unused badges.
+- Keeps NI directly available on collapsed NaNi value rows. One-story plan sets can suggest NI for floor type/product only after the complete plan set lacks second-floor/FJ evidence; I-joist and open-web species/grade remain NI when unstated.
+- Applies the confirmed T-Ply classifications: structural `3" edge / 6" middle`, exterior non-structural air-barrier `6" / 6"`, and interior non-structural outside the thermal boundary `6" / 12"`. Ambiguous T-Ply use produces no badge.
+
 ## 2.0.14 — Restore Transcribe and Get 3
 
 - Restores the embedded Gemini client in the production package so **Transcribe** and **Get 3** work again.

@@ -12,8 +12,8 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.0.14</Version>
-    <ReleaseDate>2026-07-17</ReleaseDate>
+    <Version>2.0.15</Version>
+    <ReleaseDate>2026-07-19</ReleaseDate>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
     <Product>RED $(Version)</Product>
@@ -34,6 +34,10 @@
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="Docnet.Core" Version="2.6.0" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\FramingDesignParserHarness\**\*.cs" />
   </ItemGroup>
 
   <!-- Never package settings.txt. Release builds use the gitignored generated key provider. -->

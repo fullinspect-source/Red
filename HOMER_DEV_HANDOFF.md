@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-07-19 — RED 2.0.15 — framing-plan design extraction
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, new `Services/FramingDesignParser.cs`, new `Services/FramingDesignService.cs`, new `tests/FramingDesignParserHarness/`, new `tests/framing_design_extraction_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
+- **What changed:** RED now loads the same revision-selected engineering PDF shown by the UI for SWI/TFF/TPC/TRDI/TRSI/COH/FS/FSF/ME/MP reports, classifies SW/FR/FJ pages, runs native extraction plus targeted Tesseract OCR and a wind-box crop retry, caches by file identity/parser version, and exposes source-backed framing values as optional teal appendable badges. Existing values suppress matching complete-token badges. NI is directly available on collapsed NaNi value rows; floor type NI and floor product/species NI are separate and gated on complete absence of second-floor/FJ evidence. Pass/Fail and Yes/No controls never receive framing values.
+- **T-Ply rules:** Structural T-Ply is `3" edge / 6" middle` regardless of location; exterior non-structural T-Ply acting as the thermal-boundary air barrier is `6" / 6"`; interior non-structural T-Ply outside the thermal boundary is `6" / 12"`. Non-structural classification requires the usage terms in the same focused source clause, and ambiguous T-Ply is suppressed.
+- **Verification/deployment:** Pure parser harness passes #2/#3 lumber, wind, unrelated-MPH suppression, one/two-story and FJ2 floor gating, incomplete-extraction NI suppression, I-joist/open-web product handling, all three T-Ply classes, unrelated-term suppression, append behavior, and used-badge suppression. Representative OCR text produced verified values across digital and scanned plan sets, while the two-page detail-only sample produced no value/NI badges. All 37 Python static tests pass and Debug/Release win-x64 builds succeed with 0 errors and 16 existing warnings. Release build, PR, GitHub release, updater verification, and Dropbox sync are pending in this entry and must be replaced with final deployment proof.
+
 ### 2026-07-17 — RED 2.0.14 — restore Transcribe/Get 3 release packaging
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/ai_release_packaging_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and `HOMER_DEV_HANDOFF.md`. The private `EmbeddedApiKeyProvider.Generated.cs` is required during Release builds but remains gitignored and is never committed or packaged as source.
