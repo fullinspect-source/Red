@@ -130,14 +130,33 @@ Assert(!incomplete.Values.Any(v => v.FieldKey is "FloorTypeNotApplicable" or "Fl
 
 var openWebSpecified = FramingDesignParser.Parse("open-web.pdf", new[]
 {
-    new FramingPageText { PageNumber = 7, SheetName = "FJ2", Text = "OPEN WEB FLOOR TRUSSES by MiTek Series 4x2" }
+    new FramingPageText { PageNumber = 7, SheetName = "FJ2", Text = "OPEN WEB FLOOR TRUSSES manufacturer: MiTek Series 4x2." }
 }, extractionComplete: true);
 Assert(openWebSpecified.Values.Any(v => v.FieldKey == "FloorType" && v.Value == "Open Web"),
     "plural open-web floor truss type missing");
+Assert(openWebSpecified.Values.Single(v => v.FieldKey == "FloorType").AppendValue == false,
+    "categorical floor type should replace rather than append");
 Assert(openWebSpecified.Values.Any(v => v.FieldKey == "FloorProduct" && v.Value.Contains("MiTek")),
     "specified open-web product missing");
 Assert(!openWebSpecified.Values.Any(v => v.FieldKey == "FloorProductNotApplicable"),
     "specified open-web product incorrectly marked NI");
+
+var openWebProse = FramingDesignParser.Parse("open-web-prose.pdf", new[]
+{
+    new FramingPageText { PageNumber = 7, SheetName = "FJ2", Text = "OPEN WEB FLOOR TRUSSES size and spacing per plan." }
+}, extractionComplete: true);
+Assert(!openWebProse.Values.Any(v => v.FieldKey == "FloorProduct"),
+    "ordinary open-web prose was fabricated into a product");
+Assert(openWebProse.Values.Any(v => v.FieldKey == "FloorProductNotApplicable"),
+    "unstated open-web product should yield NI");
+
+var plainSecondFloor = FramingDesignParser.Parse("second-floor.pdf", oneStoryPages.Concat(new[]
+{
+    new FramingPageText { PageNumber = 9, SheetName = "FR2", Text = "FR2 SECOND FLOOR PLAN. See keyed notes and details." }
+}), extractionComplete: true);
+Assert(plainSecondFloor.HasSecondFloorDesign, "plain SECOND FLOOR PLAN evidence missing");
+Assert(!plainSecondFloor.Values.Any(v => v.FieldKey is "FloorTypeNotApplicable" or "FloorProductNotApplicable"),
+    "plain SECOND FLOOR PLAN incorrectly produced NI");
 
 var unrelatedWind = FramingDesignParser.Parse("wind-guard.pdf", new[]
 {
