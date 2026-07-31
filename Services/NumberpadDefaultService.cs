@@ -24,6 +24,11 @@ namespace InspectionEditor.Services
             string code = (inspectionCode ?? "").Trim().ToUpperInvariant();
             string text = NormalizePrompt(prompt ?? "");
 
+            // Room-pressure sliders use whole-Pa steps while the normal value text box
+            // remains free-form so inspectors can type the exact decimal measurement.
+            if (code is "HET" or "IEF" && RoomPressureBalanceService.IsPressureBalancePrompt(prompt))
+                return Whole(-10, 10);
+
             if (code is "CPP" or "SRP")
                 return GetPrePourProfile(text);
 

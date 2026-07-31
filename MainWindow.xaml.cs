@@ -100,6 +100,12 @@ namespace InspectionEditor
         private bool _inlineVerticalIsScrolling = false;
         private bool _inlineVerticalScrollStarted = false;
         private bool _inlineNumberpadSliderDragActive = false;
+        private InlineNumberpadSliderAction? _inlineNumberpadSliderActiveAction;
+        private double _inlineNumberpadSliderPressStartX;
+        private bool _inlineNumberpadSliderMoved;
+        private bool _inlineNumberpadSliderPressWasLocked;
+        private readonly HashSet<Item> _inlineUnlockedNumberpadSliderItems = new();
+        private readonly HashSet<Item> _inlineDrawerClosingItems = new();
         private readonly Dictionary<Item, List<InlineNumberpadSliderAction>> _inlineNumberpadSliders = new();
         private System.Windows.Threading.DispatcherTimer? _inlineChipLongPressTimer;
         private InlinePrefixSuffixAction? _inlineChipLongPressAction;
@@ -2499,6 +2505,8 @@ namespace InspectionEditor
             // --- End multi-instance locking ---
             
             _currentInspection = await Task.Run(() => _saveService.Load(filePath));
+            _inlineUnlockedNumberpadSliderItems.Clear();
+            _inlineDrawerClosingItems.Clear();
             _currentFilePath = filePath;
             _currentInspectionCode = _currentInspection.InspectionCode;
             _rulesAcknowledged = false;
@@ -4824,6 +4832,9 @@ namespace InspectionEditor
                 photoRequiredButton.Click += InlinePhotoRequiredButton_Click;
                 chips.Children.Add(photoRequiredButton);
             }
+            var pressureBalanceChip = CreateInlineRoomPressureBalanceChip(item);
+            if (pressureBalanceChip != null)
+                chips.Children.Add(pressureBalanceChip);
             foreach (var framingChip in CreateInlineFramingDesignAssistChips(item))
                 chips.Children.Add(framingChip);
             var designChip = CreateInlineDesignAssistChip(section, item);
@@ -4837,6 +4848,70 @@ namespace InspectionEditor
             grid.Children.Add(statusControl);
 
             return grid;
+        }
+
+        private Border? CreateInlineRoomPressureBalanceChip(Item item)
+        {
+            RoomPressureBalanceResult result = RoomPressureBalanceService.Evaluate(
+                item.Name,
+                item.Value?.ToString());
+            if (result.State == RoomPressureBalanceState.NotApplicable)
+                return null;
+
+            string text;
+            string tooltip;
+            Color background;
+            Color foreground;
+            Color borderColor;
+
+            if (result.State == RoomPressureBalanceState.Pending)
+            {
+                text = "±3 PASS · ±5 MAX";
+                tooltip = "Enter a numeric room-pressure value. RED rounds it to the nearest whole Pa: -3 through +3 passes, ±4 or ±5 requires an airflow judgment, and beyond ±5 is a hard fail. This badge does not change the inspection Pass/Fail field.";
+                background = Color.FromRgb(241, 245, 249);
+                foreground = Color.FromRgb(51, 65, 85);
+                borderColor = Color.FromRgb(148, 163, 184);
+            }
+            else
+            {
+                int roundedPa = result.RoundedPa!.Value;
+                string displayedPa = roundedPa > 0 ? $"+{roundedPa}" : roundedPa.ToString(CultureInfo.InvariantCulture);
+                string stateText = result.State switch
+                {
+                    RoomPressureBalanceState.Pass => "PASS",
+                    RoomPressureBalanceState.Caution => "CAUTION",
+                    _ => "FAIL"
+                };
+                text = $"{stateText} · {displayedPa} Pa";
+                tooltip = $"Entered {result.RawPa:0.##} Pa; rounded to {displayedPa} Pa. " +
+                          (result.State switch
+                          {
+                              RoomPressureBalanceState.Pass => "Passes because the rounded value is within -3 through +3 Pa. ",
+                              RoomPressureBalanceState.Caution => "Caution: rounded ±4 or ±5 Pa may be acceptable when the room receives enough AC airflow. ",
+                              _ => "Hard fail because the rounded value is beyond ±5 Pa. "
+                          }) +
+                          "Feedback only; RED does not change the inspection Pass/Fail field.";
+
+                (background, foreground, borderColor) = result.State switch
+                {
+                    RoomPressureBalanceState.Pass =>
+                        (Color.FromRgb(220, 252, 231), Color.FromRgb(22, 101, 52), Color.FromRgb(74, 222, 128)),
+                    RoomPressureBalanceState.Caution =>
+                        (Color.FromRgb(254, 243, 199), Color.FromRgb(146, 64, 14), Color.FromRgb(251, 191, 36)),
+                    _ =>
+                        (Color.FromRgb(254, 226, 226), Color.FromRgb(153, 27, 27), Color.FromRgb(248, 113, 113))
+                };
+            }
+
+            var chip = CreateInlineBadge(
+                text,
+                new SolidColorBrush(background),
+                new SolidColorBrush(foreground),
+                FontWeights.Bold);
+            chip.BorderBrush = new SolidColorBrush(borderColor);
+            chip.BorderThickness = new Thickness(1);
+            chip.ToolTip = tooltip;
+            return chip;
         }
 
         private Border CreateInlineStatHudIcon(Item item)
@@ -5419,10 +5494,12 @@ namespace InspectionEditor
 
             return new Border
             {
+                Tag = new InlineDrawerHostTag(item),
                 Background = new SolidColorBrush(Color.FromRgb(245, 248, 250)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(207, 216, 226)),
                 BorderThickness = new Thickness(1, 0, 1, 1),
                 Padding = new Thickness(0, 8, 0, 0),
+                ClipToBounds = true,
                 Child = host
             };
         }
@@ -6616,10 +6693,26 @@ namespace InspectionEditor
                     Opacity = 0.25
                 }
             };
+
+            TextBlock? lockIcon = null;
+            if (compact)
+            {
+                lockIcon = new TextBlock
+                {
+                    FontFamily = new FontFamily("Segoe UI Emoji"),
+                    FontSize = 15,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center,
+                    IsHitTestVisible = false
+                };
+                thumb.Child = lockIcon;
+            }
             lane.Children.Add(thumb);
 
-            var action = new InlineNumberpadSliderAction(item, valueText, increment, range, lane, thumb, fill);
+            var action = new InlineNumberpadSliderAction(item, valueText, increment, range, lane, thumb, fill, compact, lockIcon);
             lane.Tag = action;
+            UpdateInlineNumberpadSliderLockVisual(action);
             RegisterInlineNumberpadSlider(action);
             lane.SizeChanged += (_, _) => UpdateInlineNumberpadSliderVisual(action, current);
             lane.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(InlineNumberpadTouchSlider_MouseDown), true);
@@ -7186,10 +7279,16 @@ namespace InspectionEditor
             SetInlineItemExpanded(item, !IsInlineItemExpanded(item));
         }
 
-        private void SetInlineItemExpanded(Item item, bool expand)
+        private void SetInlineItemExpanded(Item item, bool expand, bool animate = true)
         {
             if (!_inlineEditorMode)
                 return;
+
+            if (!expand && animate && IsInlineItemExpanded(item) &&
+                TryAnimateInlineDrawerClose(item, () => SetInlineItemExpanded(item, false, animate: false)))
+            {
+                return;
+            }
 
             if (expand)
             {
@@ -7209,7 +7308,87 @@ namespace InspectionEditor
 
             PopulateInlineChecklist(SearchFilterBox.Text);
             if (expand)
+            {
                 KeepInlineItemHeaderVisible(item);
+                if (animate)
+                    AnimateInlineDrawerOpen(item);
+            }
+        }
+
+        private Border? FindInlineDrawerHost(Item item)
+        {
+            return FindVisualChildren<Border>(InlineChecklistPanel)
+                .FirstOrDefault(border => border.Tag is InlineDrawerHostTag tag && ReferenceEquals(tag.Item, item));
+        }
+
+        private void AnimateInlineDrawerOpen(Item item)
+        {
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                var host = FindInlineDrawerHost(item);
+                if (host == null)
+                    return;
+
+                var translate = new TranslateTransform(0, -8);
+                host.RenderTransform = translate;
+                host.RenderTransformOrigin = new Point(0.5, 0);
+                host.Opacity = 0;
+
+                var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+                host.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation
+                {
+                    From = 0,
+                    To = 1,
+                    Duration = TimeSpan.FromMilliseconds(90),
+                    EasingFunction = ease
+                });
+                translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation
+                {
+                    From = -8,
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(90),
+                    EasingFunction = ease
+                });
+            }));
+        }
+
+        private bool TryAnimateInlineDrawerClose(Item item, Action completed)
+        {
+            if (_inlineDrawerClosingItems.Contains(item))
+                return true;
+
+            var host = FindInlineDrawerHost(item);
+            if (host == null)
+                return false;
+
+            _inlineDrawerClosingItems.Add(item);
+            host.IsHitTestVisible = false;
+            var translate = host.RenderTransform as TranslateTransform ?? new TranslateTransform();
+            host.RenderTransform = translate;
+            host.RenderTransformOrigin = new Point(0.5, 0);
+
+            var fade = new DoubleAnimation
+            {
+                From = host.Opacity,
+                To = 0,
+                Duration = TimeSpan.FromMilliseconds(60),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            fade.Completed += (_, _) =>
+            {
+                _inlineDrawerClosingItems.Remove(item);
+                completed();
+            };
+
+            host.BeginAnimation(UIElement.OpacityProperty, fade);
+            translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation
+            {
+                From = 0,
+                To = -6,
+                Duration = TimeSpan.FromMilliseconds(60),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            });
+            return true;
         }
 
         private void KeepInlineItemHeaderVisible(Item item)
@@ -7977,9 +8156,8 @@ namespace InspectionEditor
             if (sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            _inlineNumberpadSliderDragActive = true;
+            BeginInlineNumberpadSliderInteraction(action, e.GetPosition(lane).X);
             Mouse.Capture(lane);
-            PreviewInlineNumberpadSliderValue(action, e.GetPosition(lane).X);
             e.Handled = true;
         }
 
@@ -7989,7 +8167,7 @@ namespace InspectionEditor
                 sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            PreviewInlineNumberpadSliderValue(action, e.GetPosition(lane).X);
+            MoveInlineNumberpadSliderInteraction(action, e.GetPosition(lane).X);
             e.Handled = true;
         }
 
@@ -7998,9 +8176,9 @@ namespace InspectionEditor
             if (sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            CommitInlineNumberpadSliderValue(action, e.GetPosition(lane).X);
-            _inlineNumberpadSliderDragActive = false;
+            double x = e.GetPosition(lane).X;
             Mouse.Capture(null);
+            EndInlineNumberpadSliderInteraction(action, x);
             e.Handled = true;
         }
 
@@ -8009,8 +8187,8 @@ namespace InspectionEditor
             if (!_inlineNumberpadSliderDragActive || Mouse.LeftButton == MouseButtonState.Pressed)
                 return;
 
-            _inlineNumberpadSliderDragActive = false;
             Mouse.Capture(null);
+            ResetInlineNumberpadSliderInteraction();
         }
 
         private void InlineNumberpadTouchSlider_TouchDown(object sender, TouchEventArgs e)
@@ -8018,9 +8196,8 @@ namespace InspectionEditor
             if (sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            _inlineNumberpadSliderDragActive = true;
+            BeginInlineNumberpadSliderInteraction(action, e.GetTouchPoint(lane).Position.X);
             lane.CaptureTouch(e.TouchDevice);
-            PreviewInlineNumberpadSliderValue(action, e.GetTouchPoint(lane).Position.X);
             e.Handled = true;
         }
 
@@ -8030,7 +8207,7 @@ namespace InspectionEditor
                 sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            PreviewInlineNumberpadSliderValue(action, e.GetTouchPoint(lane).Position.X);
+            MoveInlineNumberpadSliderInteraction(action, e.GetTouchPoint(lane).Position.X);
             e.Handled = true;
         }
 
@@ -8039,9 +8216,9 @@ namespace InspectionEditor
             if (sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            CommitInlineNumberpadSliderValue(action, e.GetTouchPoint(lane).Position.X);
-            _inlineNumberpadSliderDragActive = false;
+            double x = e.GetTouchPoint(lane).Position.X;
             lane.ReleaseTouchCapture(e.TouchDevice);
+            EndInlineNumberpadSliderInteraction(action, x);
             e.Handled = true;
         }
 
@@ -8050,9 +8227,8 @@ namespace InspectionEditor
             if (sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            _inlineNumberpadSliderDragActive = true;
+            BeginInlineNumberpadSliderInteraction(action, e.GetPosition(lane).X);
             Stylus.Capture(lane);
-            PreviewInlineNumberpadSliderValue(action, e.GetPosition(lane).X);
             e.Handled = true;
         }
 
@@ -8062,7 +8238,7 @@ namespace InspectionEditor
                 sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            PreviewInlineNumberpadSliderValue(action, e.GetPosition(lane).X);
+            MoveInlineNumberpadSliderInteraction(action, e.GetPosition(lane).X);
             e.Handled = true;
         }
 
@@ -8071,10 +8247,116 @@ namespace InspectionEditor
             if (sender is not FrameworkElement { Tag: InlineNumberpadSliderAction action } lane)
                 return;
 
-            CommitInlineNumberpadSliderValue(action, e.GetPosition(lane).X);
-            _inlineNumberpadSliderDragActive = false;
+            double x = e.GetPosition(lane).X;
             Stylus.Capture(null);
+            EndInlineNumberpadSliderInteraction(action, x);
             e.Handled = true;
+        }
+
+        private void BeginInlineNumberpadSliderInteraction(InlineNumberpadSliderAction action, double x)
+        {
+            _inlineNumberpadSliderDragActive = true;
+            _inlineNumberpadSliderActiveAction = action;
+            _inlineNumberpadSliderPressStartX = x;
+            _inlineNumberpadSliderMoved = false;
+            _inlineNumberpadSliderPressWasLocked = action.IsLockable && !IsInlineNumberpadSliderUnlocked(action);
+
+            // Full-drawer sliders keep their original tap-to-position behavior. Compact
+            // sliders wait for a deliberate drag so a tap can only toggle the lock.
+            if (!action.IsLockable)
+                PreviewInlineNumberpadSliderValue(action, x);
+        }
+
+        private void MoveInlineNumberpadSliderInteraction(InlineNumberpadSliderAction action, double x)
+        {
+            if (!ReferenceEquals(_inlineNumberpadSliderActiveAction, action) ||
+                _inlineNumberpadSliderPressWasLocked)
+            {
+                return;
+            }
+
+            if (action.IsLockable && !_inlineNumberpadSliderMoved)
+            {
+                if (Math.Abs(x - _inlineNumberpadSliderPressStartX) < 15)
+                    return;
+                _inlineNumberpadSliderMoved = true;
+            }
+
+            PreviewInlineNumberpadSliderValue(action, x);
+        }
+
+        private void EndInlineNumberpadSliderInteraction(InlineNumberpadSliderAction action, double x)
+        {
+            if (!ReferenceEquals(_inlineNumberpadSliderActiveAction, action))
+            {
+                ResetInlineNumberpadSliderInteraction();
+                return;
+            }
+
+            bool pressWasLocked = _inlineNumberpadSliderPressWasLocked;
+            bool moved = _inlineNumberpadSliderMoved;
+            ResetInlineNumberpadSliderInteraction();
+
+            if (action.IsLockable)
+            {
+                if (pressWasLocked)
+                {
+                    SetInlineNumberpadSliderUnlocked(action, true);
+                    return;
+                }
+
+                if (!moved)
+                {
+                    SetInlineNumberpadSliderUnlocked(action, false);
+                    return;
+                }
+            }
+
+            CommitInlineNumberpadSliderValue(action, x);
+        }
+
+        private void ResetInlineNumberpadSliderInteraction()
+        {
+            _inlineNumberpadSliderDragActive = false;
+            _inlineNumberpadSliderActiveAction = null;
+            _inlineNumberpadSliderPressStartX = 0;
+            _inlineNumberpadSliderMoved = false;
+            _inlineNumberpadSliderPressWasLocked = false;
+        }
+
+        private bool IsInlineNumberpadSliderUnlocked(InlineNumberpadSliderAction action)
+        {
+            return !action.IsLockable || _inlineUnlockedNumberpadSliderItems.Contains(action.Item);
+        }
+
+        private void SetInlineNumberpadSliderUnlocked(InlineNumberpadSliderAction action, bool unlocked)
+        {
+            if (!action.IsLockable)
+                return;
+
+            if (unlocked)
+                _inlineUnlockedNumberpadSliderItems.Add(action.Item);
+            else
+                _inlineUnlockedNumberpadSliderItems.Remove(action.Item);
+
+            UpdateInlineNumberpadSliderLockVisual(action);
+        }
+
+        private void UpdateInlineNumberpadSliderLockVisual(InlineNumberpadSliderAction action)
+        {
+            if (!action.IsLockable || action.LockIcon == null)
+                return;
+
+            bool unlocked = IsInlineNumberpadSliderUnlocked(action);
+            action.LockIcon.Text = unlocked ? "🔓" : "🔒";
+            action.Thumb.Background = new SolidColorBrush(unlocked
+                ? Color.FromRgb(37, 99, 235)
+                : Color.FromRgb(71, 85, 105));
+            action.Fill.Opacity = unlocked ? 1.0 : 0.45;
+            action.Lane.Cursor = unlocked ? Cursors.SizeWE : Cursors.Hand;
+            action.Lane.ToolTip = unlocked
+                ? "Unlocked — slide to change the value, or tap to lock"
+                : "Locked — tap once to unlock";
         }
 
         private void PreviewInlineNumberpadSliderValue(InlineNumberpadSliderAction action, double x)
@@ -8985,6 +9267,7 @@ namespace InspectionEditor
         }
 
         private sealed record InlineDrawerAction(Item Item, string DrawerName, bool Open);
+        private sealed record InlineDrawerHostTag(Item Item);
         private sealed record InlineValueAction(Item Item, string Value);
         private sealed record InlineDesignAssist(Item Item, string Value, string Text, EnergyComplianceService.BannerState State, bool CanApply, string Source, string ToolTip, bool AppendValue = false);
         private sealed record InlineQuickCommentAction(Item Item, string Comment);
@@ -9000,7 +9283,9 @@ namespace InspectionEditor
             InlineNumberpadRange Range,
             FrameworkElement Lane,
             Border Thumb,
-            Border Fill);
+            Border Fill,
+            bool IsLockable,
+            TextBlock? LockIcon);
         private sealed record InlinePhotoAction(Item Item, int PhotoIndex);
         private enum InlineAiMode { GetThree, Transcribe }
         private sealed record InlineAiResult(InlineAiMode Mode, List<string> Suggestions, bool IsLoading = false);
