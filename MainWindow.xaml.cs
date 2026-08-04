@@ -130,7 +130,7 @@ namespace InspectionEditor
         // Read-only mode for unsupported inspection types (BWT, SCI)
         private bool _readOnlyMode = false;
 
-        private const string SpecialistFlagMarker = "\u25A9";
+        private const string SpecialistFlagMarker = SpecialistFlagService.Marker;
         private const int SpecialistFlagMinimumCommentLength = 10;
         private bool _isLoadingFile = false;
         
@@ -7547,13 +7547,12 @@ namespace InspectionEditor
 
         private static string CommentWithoutSpecialistFlag(string? comment)
         {
-            return (comment ?? "").Replace(SpecialistFlagMarker, "").Trim();
+            return SpecialistFlagService.RemoveMarker(comment);
         }
 
         private static bool HasSpecialistFlag(string? comment)
         {
-            return !string.IsNullOrEmpty(comment) &&
-                   comment.Contains(SpecialistFlagMarker, StringComparison.Ordinal);
+            return SpecialistFlagService.HasFlag(comment);
         }
 
         private static bool CanAddSpecialistFlag(string? comment)
@@ -7578,6 +7577,29 @@ namespace InspectionEditor
             if (button == null)
                 return;
 
+            bool isFlagged = HasSpecialistFlag(comment);
+            if (isFlagged)
+            {
+                var blinkingRed = new SolidColorBrush(Color.FromRgb(153, 27, 27));
+                button.Background = blinkingRed;
+                button.Foreground = Brushes.White;
+                button.BorderBrush = new SolidColorBrush(Color.FromRgb(127, 29, 29));
+                button.IsEnabled = false;
+                button.Opacity = 1.0;
+                blinkingRed.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
+                {
+                    From = Color.FromRgb(153, 27, 27),
+                    To = Color.FromRgb(220, 38, 38),
+                    Duration = TimeSpan.FromMilliseconds(900),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever
+                });
+                return;
+            }
+
+            button.Background = new SolidColorBrush(Color.FromRgb(255, 241, 242));
+            button.Foreground = new SolidColorBrush(Color.FromRgb(190, 18, 60));
+            button.BorderBrush = new SolidColorBrush(Color.FromRgb(251, 113, 133));
             bool canFlag = CanAddSpecialistFlag(comment);
             button.IsEnabled = canFlag;
             button.Opacity = canFlag ? 1.0 : 0.42;
@@ -13430,7 +13452,8 @@ namespace InspectionEditor
                 var itemEntries = new List<string>();
                 foreach (var item in trade.OrderBy(i => i.Number))
                 {
-                    string comment = UserDataService.StripPrefixAndSuffix(item.Comments);
+                    string comment = CommentWithoutSpecialistFlag(
+                        UserDataService.StripPrefixAndSuffix(item.Comments));
                     itemEntries.Add($"{item.Number} - {comment}");
                 }
                 
