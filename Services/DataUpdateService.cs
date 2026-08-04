@@ -206,7 +206,9 @@ namespace InspectionEditor.Services
             }
             catch (Exception ex)
             {
-                result.Error = ex.Message.Length > 50 ? ex.Message[..50] + "…" : ex.Message;
+                result.Error = ex is HttpRequestException or TaskCanceledException or TimeoutException
+                    ? AppUpdateService.InternetRequiredMessage
+                    : "RED couldn't refresh this data. Please try again.";
                 result.LatestDate = result.CurrentDate;
             }
             return result;

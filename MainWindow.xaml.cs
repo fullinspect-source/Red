@@ -6699,8 +6699,10 @@ namespace InspectionEditor
             {
                 lockIcon = new TextBlock
                 {
-                    FontFamily = new FontFamily("Segoe UI Emoji"),
-                    FontSize = 15,
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    FontSize = 16,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.White,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     TextAlignment = TextAlignment.Center,
@@ -7339,14 +7341,14 @@ namespace InspectionEditor
                 {
                     From = 0,
                     To = 1,
-                    Duration = TimeSpan.FromMilliseconds(90),
+                    Duration = TimeSpan.FromMilliseconds(120),
                     EasingFunction = ease
                 });
                 translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation
                 {
                     From = -8,
                     To = 0,
-                    Duration = TimeSpan.FromMilliseconds(90),
+                    Duration = TimeSpan.FromMilliseconds(120),
                     EasingFunction = ease
                 });
             }));
@@ -7371,7 +7373,7 @@ namespace InspectionEditor
             {
                 From = host.Opacity,
                 To = 0,
-                Duration = TimeSpan.FromMilliseconds(60),
+                Duration = TimeSpan.FromMilliseconds(90),
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             };
             fade.Completed += (_, _) =>
@@ -7385,7 +7387,7 @@ namespace InspectionEditor
             {
                 From = 0,
                 To = -6,
-                Duration = TimeSpan.FromMilliseconds(60),
+                Duration = TimeSpan.FromMilliseconds(90),
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             });
             return true;
@@ -8348,7 +8350,8 @@ namespace InspectionEditor
                 return;
 
             bool unlocked = IsInlineNumberpadSliderUnlocked(action);
-            action.LockIcon.Text = unlocked ? "🔓" : "🔒";
+            action.LockIcon.Text = unlocked ? "\uE785" : "\uE72E";
+            action.LockIcon.Foreground = Brushes.White;
             action.Thumb.Background = new SolidColorBrush(unlocked
                 ? Color.FromRgb(37, 99, 235)
                 : Color.FromRgb(71, 85, 105));

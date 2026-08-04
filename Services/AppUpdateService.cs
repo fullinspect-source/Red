@@ -16,11 +16,14 @@ namespace InspectionEditor.Services
         public bool SkippedByThrottle { get; init; }
         public bool UpdateAvailable { get; init; }
         public bool InstallerStarted { get; init; }
+        public bool InternetRequired { get; init; }
         public string? Error { get; init; }
     }
 
     internal static class AppUpdateService
     {
+        internal const string InternetRequiredMessage = "Connect to the internet and try again.";
+        private const string UpdateCheckFailedMessage = "RED couldn't check for updates. Please try again.";
         private const string LatestReleaseApi = "https://api.github.com/repos/fullinspect-source/Red/releases/latest";
         private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
         private static readonly string LastCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
@@ -81,11 +84,29 @@ namespace InspectionEditor.Services
             }
             catch (Exception ex)
             {
-                return new AppUpdateResult
-                {
-                    Error = ex.Message.Length > 120 ? ex.Message[..120] + "..." : ex.Message
-                };
+                return CreateFailureResult(ex);
             }
+        }
+
+        internal static AppUpdateResult CreateFailureResult(Exception exception)
+        {
+            bool internetRequired = IsConnectivityFailure(exception);
+            return new AppUpdateResult
+            {
+                InternetRequired = internetRequired,
+                Error = internetRequired ? InternetRequiredMessage : UpdateCheckFailedMessage
+            };
+        }
+
+        private static bool IsConnectivityFailure(Exception exception)
+        {
+            for (Exception? current = exception; current != null; current = current.InnerException)
+            {
+                if (current is HttpRequestException or TaskCanceledException or TimeoutException)
+                    return true;
+            }
+
+            return false;
         }
 
         private static async Task DownloadExtractAndStartInstallerAsync(string remoteVersion, string zipUrl)

@@ -80,6 +80,7 @@ namespace InspectionEditor
 
             // Check for RED app + data updates. The app check is throttled to once every 24 hours.
             splash.SetStatus("Checking for updates...");
+            bool startupInternetRequired = false;
             try
             {
                 var appUpdateTask = AppUpdateService.CheckAndInstallIfAvailableAsync();
@@ -94,6 +95,8 @@ namespace InspectionEditor
                         Shutdown();
                         return;
                     }
+
+                    startupInternetRequired = appUpdate.InternetRequired;
                 }
                 else
                 {
@@ -130,7 +133,16 @@ namespace InspectionEditor
             }
             splash.Close();
 
-            if (staleWarning != null)
+            if (startupInternetRequired)
+            {
+                MessageBox.Show(
+                    "RED couldn't check for updates because this device is offline.\n\n" +
+                    AppUpdateService.InternetRequiredMessage,
+                    "Internet Connection Needed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else if (staleWarning != null)
             {
                 MessageBox.Show(
                     staleWarning,
