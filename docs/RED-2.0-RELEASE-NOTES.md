@@ -1,5 +1,12 @@
 # RED 2.0 Release Notes
 
+## 2.0.19 — Continuous camera and crash diagnostics
+
+- Keeps Windows Camera open, visible, and focused after a successful capture so inspectors can take several photos without reopening Camera after each one.
+- Continues adding each captured photo to the active RED checklist item in the background.
+- Contains all Camera Roll watcher exceptions so a file-access or watcher failure cannot escape the background callback and terminate RED.
+- Writes durable, best-effort error diagnostics to `%LOCALAPPDATA%\RED\red_errors.log`, including WPF, background-task, AppDomain, and Camera Roll failures.
+
 ## 2.0.15 — Framing-plan design extraction
 
 - Extracts focused project values from the selected framing engineering PDF for SWI, TFF, TPC, TRDI, TRSI, COH, FS, FSF, ME, and MP reports.

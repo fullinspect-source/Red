@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-08-06 — RED 2.0.19 — continuous camera and crash diagnostics
+
+- **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/CameraService.cs`, new `Services/DiagnosticLogService.cs`, new `tests/camera_crash_safety_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
+- **What changed:** Windows Camera remains open and visible after each successful capture so inspectors can take multiple photos continuously. RED still adds every photo to the active checklist item on the UI thread but no longer minimizes Camera or pulls RED to the foreground after success. Camera Roll `Created`/`Renamed` callbacks now route through a full exception boundary, preventing non-I/O watcher failures from escaping `async void` and terminating the process. Durable diagnostics now write best-effort to `%LOCALAPPDATA%\RED\red_errors.log`; WPF dispatcher, unobserved task, AppDomain, and Camera watcher failures all use the same thread-safe logger.
+- **Incident context:** Juan Cantu reported RED 2.0.15 closed twice during or immediately after photo capture in a first-trip Energy Star Final, losing unsaved progress. The unguarded watcher path existed unchanged through 2.0.18. The exact exception was not recoverable from Juan's machine, but a minimal .NET reproduction confirmed this callback shape can terminate a process when a non-I/O exception escapes.
+- **Verification/deployment:** All 42 static regression tests passed. Release build and standalone self-contained win-x64 publish succeeded with 0 errors and 16 existing warnings. The compiled `Red.dll` contains the nonempty generated AI payload/mask, contains no plaintext key, and the decoded credential returned HTTP 200 from `gemini-2.5-flash`. GitHub deployment is pending.
+
 ### 2026-07-19 — RED 2.0.15 — framing-plan design extraction
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, new `Services/FramingDesignParser.cs`, new `Services/FramingDesignService.cs`, new `tests/FramingDesignParserHarness/`, new `tests/framing_design_extraction_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
