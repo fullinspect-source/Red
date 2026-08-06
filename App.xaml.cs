@@ -13,9 +13,14 @@ namespace InspectionEditor
         {
             base.OnStartup(e);
             DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            {
+                if (args.ExceptionObject is Exception exception)
+                    DiagnosticLogService.Log("AppDomain unhandled exception", exception);
+            };
             TaskScheduler.UnobservedTaskException += (_, args) =>
             {
-                LogUnhandledException(args.Exception);
+                DiagnosticLogService.Log("Unobserved task exception", args.Exception);
                 args.SetObserved();
             };
 
@@ -181,7 +186,7 @@ namespace InspectionEditor
 
         private static void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
-            LogUnhandledException(e.Exception);
+            DiagnosticLogService.Log("WPF dispatcher exception", e.Exception);
             MessageBox.Show(
                 $"RED caught an unexpected UI error and kept running.\n\n{e.Exception.Message}",
                 "RED Error",
@@ -190,18 +195,5 @@ namespace InspectionEditor
             e.Handled = true;
         }
 
-        private static void LogUnhandledException(Exception ex)
-        {
-            try
-            {
-                string logPath = Path.Combine(Path.GetTempPath(), "red_unhandled_error.log");
-                File.AppendAllText(logPath,
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{ex}\n\n");
-            }
-            catch
-            {
-                // Nothing useful to do if logging itself fails.
-            }
-        }
     }
 }

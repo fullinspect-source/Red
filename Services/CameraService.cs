@@ -84,7 +84,7 @@ namespace InspectionEditor.Services
         /// <summary>
         /// Opens the camera (or brings it to front if already open) and starts 
         /// watching for new photos. Each photo fires the PhotoCaptured event.
-        /// Call OpenOrFocusCamera() again to bring camera back to front for more photos.
+        /// Camera remains open and visible so additional photos can be taken continuously.
         /// Call StopSession() when done.
         /// </summary>
         public void OpenOrFocusCamera()
@@ -142,12 +142,24 @@ namespace InspectionEditor.Services
 
         private async void OnFileCreated(object sender, FileSystemEventArgs e)
         {
-            await ProcessNewPhoto(e.FullPath);
+            await ProcessNewPhotoSafely("created", e.FullPath);
         }
 
         private async void OnFileRenamed(object sender, RenamedEventArgs e)
         {
-            await ProcessNewPhoto(e.FullPath);
+            await ProcessNewPhotoSafely("renamed", e.FullPath);
+        }
+
+        private async Task ProcessNewPhotoSafely(string eventType, string filePath)
+        {
+            try
+            {
+                await ProcessNewPhoto(filePath);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogService.Log($"Camera Roll {eventType} event failed for '{filePath}'", ex);
+            }
         }
 
         private async Task ProcessNewPhoto(string filePath)
@@ -169,9 +181,6 @@ namespace InspectionEditor.Services
             }
             _lastProcessedFile = fileName;
             _lastProcessedTime = DateTime.Now;
-
-            // Minimize camera immediately — don't wait for file read
-            MinimizeCamera();
 
             // Wait for file to finish writing (500ms initial — camera apps need time to flush)
             await Task.Delay(500);
@@ -233,13 +242,12 @@ namespace InspectionEditor.Services
 
             if (photoData != null)
             {
-                // Fire event on UI thread and bring RED to front
+                // Add the photo on RED's UI thread, but leave Camera visible and active
+                // so the inspector can take another photo without reopening it.
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     PhotoCaptured?.Invoke(photoData);
                 });
-                
-                BringRedToFront();
             }
             else
             {
