@@ -5762,6 +5762,16 @@ namespace InspectionEditor
                     .ToArray()
             };
 
+            // Inspect stores LookupNaNi choices without including NI in ValueList.
+            // Keep NI in the actual choice collection so it remains selectable in
+            // both the collapsed row and the expanded value drawer.
+            if (options is { Length: > 0 } &&
+                controlName.Contains("nani") &&
+                !options.Any(value => value.Equals("NI", StringComparison.OrdinalIgnoreCase)))
+            {
+                options = options.Concat(new[] { "NI" }).ToArray();
+            }
+
             return options is { Length: > 0 } ? options : null;
         }
 
@@ -5807,6 +5817,15 @@ namespace InspectionEditor
                 .Where(v => !string.IsNullOrWhiteSpace(v))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            // Long LookupNaNi lists render as a ComboBox instead of individual
+            // buttons, so NI must also be part of the ComboBox data source.
+            string controlName = item.ControlName?.Trim().ToLowerInvariant() ?? "";
+            if (controlName.Contains("nani") &&
+                !options.Any(value => value.Equals("NI", StringComparison.OrdinalIgnoreCase)))
+            {
+                options.Add("NI");
+            }
 
             string key = GetInlineUsageKey(item, "value");
             _inlineDrawerPreferences.ValueUsageCounts.TryGetValue(key, out var counts);

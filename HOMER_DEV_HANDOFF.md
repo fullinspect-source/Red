@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-08-07 — RED 2.0.20 — restore NI for FSF lookup fields
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/framing_design_extraction_static_test.py`, `tests/camera_crash_safety_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
+- **Root cause:** FSF 3.1.b and 3.1.c are `LookupNaNi` controls, but Inspect stores only the normal lookup values in each item's `ValueList`. RED's collapsed row added NI as a separate button at the end of a horizontally clipped control strip, while the expanded inline drawer rendered only `ValueList` and therefore omitted NI entirely.
+- **What changed:** RED now injects NI into the real option collection for every NaNi lookup. Short lists expose NI as a normal option in collapsed and expanded views, and long lists include NI inside the ComboBox data source.
+- **Verification/deployment:** All 43 static regression tests passed. Release build and standalone self-contained win-x64 publish succeeded with 0 errors and 16 existing warnings. The private generated provider remained gitignored, its decoded credential returned HTTP 200 from `gemini-2.5-flash`, and package checks found neither `settings.txt` nor generated private source. GitHub deployment is pending.
+
 ### 2026-08-06 — RED 2.0.19 — continuous camera and crash diagnostics
 
 - **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/CameraService.cs`, new `Services/DiagnosticLogService.cs`, new `tests/camera_crash_safety_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.

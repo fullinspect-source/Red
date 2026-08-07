@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.0.20 — Restore NI for FSF lookup fields
+
+- Restores NI as a selectable value for `LookupNaNi` checklist items in both collapsed rows and expanded value drawers.
+- Fixes FSF 3.1.b **Floor Type** and 3.1.c **Manufacturer or Size/Grade/Species**, whose stored lookup lists omit NI even though the report fields explicitly permit it.
+- Keeps NI available inside long lookup dropdowns as well as short button lists so it cannot be hidden beyond a horizontal scroller.
+
 ## 2.0.19 — Continuous camera and crash diagnostics
 
 - Keeps Windows Camera open, visible, and focused after a successful capture so inspectors can take several photos without reopening Camera after each one.

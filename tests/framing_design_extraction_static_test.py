@@ -75,6 +75,20 @@ class FramingDesignExtractionRegressionTests(unittest.TestCase):
         self.assertIn('controlName.Contains("nani")', MAIN)
         self.assertIn("AddInlineNiValueButtonIfNeeded(panel, item);", MAIN)
         self.assertIn("!IsInlineStatusOnlyDesignTarget(item)", MAIN)
+        self.assertIn('options = options.Concat(new[] { "NI" }).ToArray();', MAIN)
+        self.assertIn('options.Add("NI");', MAIN)
+
+    def test_lookup_nani_ni_is_in_expanded_drawer_options(self):
+        drawer_start = MAIN.index("private UIElement CreateInlineStatusDrawer")
+        drawer_end = MAIN.index("private UIElement CreateInlineValueChoicesDrawer", drawer_start)
+        drawer = MAIN[drawer_start:drawer_end]
+        self.assertIn("GetInlineStatusOptions(item, controlName)", drawer)
+
+        options_start = MAIN.index("private string[]? GetInlineStatusOptions")
+        options_end = MAIN.index("private UIElement CreateInlineValueChoicesDrawer", options_start)
+        options_method = MAIN[options_start:options_end]
+        self.assertIn('controlName.Contains("nani")', options_method)
+        self.assertIn('options = options.Concat(new[] { "NI" }).ToArray();', options_method)
 
     def test_status_only_items_never_receive_framing_design_values(self):
         self.assertIn("IsInlineStatusOnlyDesignTarget(item)", MAIN)

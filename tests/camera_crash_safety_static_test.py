@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static regression checks for RED 2.0.19 camera crash hardening."""
+"""Static regression checks for RED camera crash hardening."""
 
 from pathlib import Path
 import re
@@ -55,8 +55,8 @@ class CameraCrashSafetyTests(unittest.TestCase):
         self.assertIn('DiagnosticLogService.Log("WPF dispatcher exception"', APP)
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.0.19</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-08-06</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.0.20</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-08-07</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":
