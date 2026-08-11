@@ -56,7 +56,7 @@ class CameraCrashSafetyTests(unittest.TestCase):
 
     def test_release_metadata(self):
         self.assertIn("<Version>2.0.20</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-08-07</ReleaseDate>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-08-11</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":
