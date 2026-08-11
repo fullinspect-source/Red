@@ -62,7 +62,18 @@ namespace InspectionEditor.Services
         // HVAC
         public string? HvacCoolingSeer  { get; set; }    // "15.2 SEER2"
         public string? HvacTonnage      { get; set; }    // "3"
-        public string? DesignAirflowCfm { get; set; }   // tonnage × 360
+        public string? DesignAirflowCfm { get; set; }   // unit 1; EC tonnage × 360 unless an equipment matchup overrides it
+        public string? DesignAirflowCfm2 { get; set; }
+        public string? DesignAirflowSource { get; set; }
+        public string? DesignAirflowSourceFile { get; set; }
+        public string? DesignAirflowOutdoorModel { get; set; }
+        public string? DesignAirflowIndoorModel { get; set; }
+        public string? DesignAirflowOutdoorModel2 { get; set; }
+        public string? DesignAirflowIndoorModel2 { get; set; }
+        internal string? DesignAirflowFallbackCfm { get; set; }
+        internal string? DesignAirflowFallbackCfm2 { get; set; }
+        internal string? DesignAirflowFallbackStatusText { get; set; }
+        internal string? DesignAirflowFallbackDisplayName { get; set; }
 
         // Ventilation
         public string? TargetFreshAirCfm { get; set; }
@@ -74,7 +85,8 @@ namespace InspectionEditor.Services
         public string? IECCVersion       { get; set; }  // "IECC 2015" / "IECC 2021"
 
         public bool IsLoaded =>
-            HersIndex != null || ConditionedFloorArea != null || BlowerDoorMaxCfm != null;
+            HersIndex != null || ConditionedFloorArea != null || BlowerDoorMaxCfm != null ||
+            DesignAirflowCfm != null || DesignAirflowCfm2 != null;
 
         // ── Derived targets (used when OCR can't find the value directly) ──
 
@@ -176,9 +188,9 @@ namespace InspectionEditor.Services
             { ("AFI", "1.4"),   i => i.NumberOfReturns },
             { ("AFI", "1.5"),   i => i.ConditionedFloorArea },
             { ("AFI", "2.1"),   i => i.DesignAirflowCfm },
-            { ("AFI", "2.5"),   i => i.DesignAirflowCfm },
+            { ("AFI", "2.5"),   i => i.DesignAirflowCfm2 ?? i.DesignAirflowCfm },
             { ("AFI", "3.1"),   i => i.DesignAirflowCfm },
-            { ("AFI", "3.9"),   i => i.DesignAirflowCfm },
+            { ("AFI", "3.9"),   i => i.DesignAirflowCfm2 ?? i.DesignAirflowCfm },
 
             // PLY (Polyseal / Energy Star air-barrier inspection) — 2.1 is Performance/Prescriptive path
             { ("PLY", "2.1"),   _ => "Performance IECC" },
@@ -243,6 +255,21 @@ namespace InspectionEditor.Services
             { ("PS",  "2.1"),   "Type" },
         };
 
+        // Energy Final equipment ID rows show the resolved airflow as a read-only
+        // suggestion. They are intentionally excluded from Mappings so Apply never
+        // writes a CFM value into a model or serial-number field.
+        private static readonly Dictionary<(string code, string num), Func<EnergyComplianceInfo, string?>> EquipmentAirflowDisplayMappings = new()
+        {
+            { ("IEF", "5.2"), i => i.DesignAirflowCfm },
+            { ("IEF", "5.3"), i => i.DesignAirflowCfm },
+            { ("IEF", "6.3"), i => i.DesignAirflowCfm },
+            { ("IEF", "6.4"), i => i.DesignAirflowCfm },
+            { ("IEF", "5.5"), i => i.DesignAirflowCfm2 },
+            { ("IEF", "5.6"), i => i.DesignAirflowCfm2 },
+            { ("IEF", "6.6"), i => i.DesignAirflowCfm2 },
+            { ("IEF", "6.7"), i => i.DesignAirflowCfm2 },
+        };
+
         internal static string NormalizeCode(string? code) => (code ?? "").ToUpperInvariant() switch
         {
             "HER"  => "IER",
@@ -256,8 +283,11 @@ namespace InspectionEditor.Services
         {
             if (info == null || string.IsNullOrWhiteSpace(itemNum)) return null;
             string normCode = NormalizeCode(inspCode);
-            if (!Mappings.TryGetValue((normCode, itemNum), out var getter)) return null;
-            return getter(info);
+            if (Mappings.TryGetValue((normCode, itemNum), out var getter))
+                return getter(info);
+            return EquipmentAirflowDisplayMappings.TryGetValue((normCode, itemNum), out var displayGetter)
+                ? displayGetter(info)
+                : null;
         }
 
         /// Returns a short display label for the EC field mapped to a specific item.
@@ -265,7 +295,14 @@ namespace InspectionEditor.Services
         {
             if (string.IsNullOrWhiteSpace(itemNum)) return null;
             string normCode = NormalizeCode(inspCode);
-            return Labels.TryGetValue((normCode, itemNum), out var label) ? label : null;
+            if (Labels.TryGetValue((normCode, itemNum), out var label)) return label;
+            return EquipmentAirflowDisplayMappings.ContainsKey((normCode, itemNum)) ? "STRADA airflow" : null;
+        }
+
+        public static bool CanApplyToItem(string? inspCode, string? itemNum)
+        {
+            if (string.IsNullOrWhiteSpace(itemNum)) return false;
+            return Mappings.ContainsKey((NormalizeCode(inspCode), itemNum));
         }
 
         public static string? GetValueForField(EnergyComplianceInfo info, string? fieldKey)
@@ -770,6 +807,7 @@ namespace InspectionEditor.Services
             if (info == null || !info.IsLoaded) return BannerState.Gray;
             string? designValue = GetValueForItem(info, inspCode, itemNum);
             if (string.IsNullOrWhiteSpace(designValue)) return BannerState.Gray;
+            if (!CanApplyToItem(inspCode, itemNum)) return BannerState.Gray;
             if (string.IsNullOrWhiteSpace(actualValue)) return BannerState.Red; // blank ≠ design value
 
             string normCode = NormalizeCode(inspCode);

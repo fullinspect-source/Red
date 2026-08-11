@@ -3185,7 +3185,12 @@ namespace InspectionEditor
                     string capturedFilePath = filePath;
                     _designExtractionLoading = true;
                     UpdateDesignExtractionButton();
-                    Task.Run(() => EnergyComplianceService.GetInfoForInspection(capturedFilePath))
+                    Task.Run(() =>
+                    {
+                        var info = EnergyComplianceService.GetInfoForInspection(capturedFilePath);
+                        EquipmentAirflowService.ApplyMatches(info, capturedFilePath, null);
+                        return info;
+                    })
                         .ContinueWith(t =>
                         {
                             if (t.IsFaulted)
@@ -3766,6 +3771,9 @@ namespace InspectionEditor
         private void RefreshEcDataPanel()
         {
             var info = _currentEcInfo;
+            string currentCode = _currentInspection?.InspectionCode?.ToUpperInvariant() ?? "";
+            if (info != null && (currentCode is "IEF" or "HEF"))
+                EquipmentAirflowService.ApplyMatches(info, _currentFilePath, _currentInspection);
 
             // Show banner whenever we have an EC info object — even if data extraction failed,
             // so the user can click it and see the status/error message.
@@ -3807,9 +3815,12 @@ namespace InspectionEditor
                     EcChip_Hers.Foreground = EcDataHeaderBorder.BorderBrush; // match banner border
                     Show(EcChip_Hers, chipText);
 
-                    // Apply button: always visible for mapped items; green+enabled when empty, gray+disabled when filled
-                    ApplyEcButton.Visibility = Visibility.Visible;
-                    SetApplyButtonState(ApplyEcButton, !hasCurrentValue);
+                    // Equipment model/serial rows display the target as guidance only.
+                    // Normal EC-mapped rows keep the one-tap Apply behavior.
+                    bool canApply = EnergyComplianceService.CanApplyToItem(inspCode, itemNum);
+                    ApplyEcButton.Visibility = canApply ? Visibility.Visible : Visibility.Collapsed;
+                    if (canApply)
+                        SetApplyButtonState(ApplyEcButton, !hasCurrentValue);
                 }
                 // No chip / no Apply button when the active item has no EC mapping
             }
@@ -3948,7 +3959,18 @@ namespace InspectionEditor
             sb.AppendLine();
             sb.AppendLine($"Cooling SEER:      {info.HvacCoolingSeer ?? "not found"}");
             sb.AppendLine($"Tonnage:           {info.HvacTonnage ?? "not found"} tons");
-            sb.AppendLine($"Design Airflow:    {info.DesignAirflowCfm ?? "not found"} CFM");
+            sb.AppendLine($"Design Airflow 1:  {info.DesignAirflowCfm ?? "not found"} CFM");
+            if (info.DesignAirflowCfm2 != null)
+                sb.AppendLine($"Design Airflow 2:  {info.DesignAirflowCfm2} CFM");
+            if (info.DesignAirflowSource != null)
+            {
+                sb.AppendLine($"Airflow Source:    {info.DesignAirflowSource}");
+                sb.AppendLine($"Unit 1 Matchup:    {info.DesignAirflowOutdoorModel ?? "?"} + {info.DesignAirflowIndoorModel ?? "?"}");
+                if (info.DesignAirflowCfm2 != null)
+                    sb.AppendLine($"Unit 2 Matchup:    {info.DesignAirflowOutdoorModel2 ?? "?"} + {info.DesignAirflowIndoorModel2 ?? "?"}");
+                if (info.DesignAirflowSourceFile != null)
+                    sb.AppendLine($"Equipment File:    {info.DesignAirflowSourceFile}");
+            }
             sb.AppendLine();
             sb.AppendLine($"Fresh Air:         {info.TargetFreshAirCfm ?? "not found"} CFM");
             sb.AppendLine($"Run Time:          {info.TargetRunTime ?? "not found"} hrs/day");

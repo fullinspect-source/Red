@@ -38,6 +38,7 @@
 
   <ItemGroup>
     <Compile Remove="tests\FramingDesignParserHarness\**\*.cs" />
+    <Compile Remove="tests\EquipmentAirflowHarness\**\*.cs" />
   </ItemGroup>
 
   <!-- Never package settings.txt. Release builds use the gitignored generated key provider. -->
