@@ -1,6 +1,10 @@
 # RED 2.0 Release Notes
 
-## 2.0.20 — Restore NI for FSF lookup fields
+## 2.0.20 — STRADA airflow targets and FSF NI restoration
+
+- Recognizes the approved STRADA condenser and air-handler model matchups entered in Energy Final reports and shows the exact HVAC design airflow as read-only guidance.
+- Uses the newest same-job Energy Final equipment matchup when an AFI/ACCA report is opened, while keeping unit 1 and unit 2 targets separate.
+- Keeps the normal EC/tonnage airflow as a fallback when no approved matchup exists, never mixes equipment across report attempts, and never changes Pass/Fail automatically.
 
 - Restores NI as a selectable value for `LookupNaNi` checklist items in both collapsed rows and expanded value drawers.
 - Fixes FSF 3.1.b **Floor Type** and 3.1.c **Manufacturer or Size/Grade/Species**, whose stored lookup lists omit NI even though the report fields explicitly permit it.

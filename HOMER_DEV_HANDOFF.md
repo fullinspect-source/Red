@@ -4,6 +4,12 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-08-11 — RED 2.0.20 — STRADA equipment-match airflow targets
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, new `Services/EquipmentAirflowService.cs`, new `tests/EquipmentAirflowHarness/`, new `tests/equipment_airflow_ui_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
+- **What changed:** RED recognizes five approved STRADA condenser + air-handler model pairs from Energy Final equipment fields, displays the exact airflow as read-only guidance while the equipment is entered, and supplies that target to the newest same-job AFI/ACCA report. Unit 1 and unit 2 remain separate, newest Energy Final attempts are authoritative, and the feature never changes Pass/Fail.
+- **Verification/deployment:** The behavior harness, 47 Python regression tests, Debug build, and standalone win-x64 candidate passed. GitHub release and Dropbox deployment are pending.
+
 ### 2026-08-07 — RED 2.0.20 — restore NI for FSF lookup fields
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/framing_design_extraction_static_test.py`, `tests/camera_crash_safety_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
