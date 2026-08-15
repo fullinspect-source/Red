@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.0.21 — Gemini 3.7 Flash upgrade
+
+- Upgrades **Get 3**, photo transcription, and fact-checking to Gemini 3.7 Flash after a 20-call paired RED benchmark showed better quality and faster average/P90 responses than Gemini 3.6 Flash.
+- Hard-codes low thinking for fast field requests and medium thinking with a larger output budget for careful requests so Gemini 3.7 does not waste the response budget or truncate useful output.
+- Keeps Gemini 2.5 Flash as the explicit fallback and omits 3.7-only thinking settings when fallback is used.
+
 ## 2.0.20 — STRADA airflow targets and FSF NI restoration
 
 - Recognizes the approved STRADA condenser and air-handler model matchups entered in Energy Final reports and shows the exact HVAC design airflow as read-only guidance.

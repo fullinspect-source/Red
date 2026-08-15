@@ -17,12 +17,17 @@ namespace InspectionEditor.Services
         private readonly HttpClient _httpClient;
         private const string API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{0}:generateContent";
         
-        // Gemini model choices. Fast favors touch-speed field use; careful favors richer reasoning.
-        private const string FAST_MODEL = "gemini-3.1-flash-lite";
+        // Gemini 3.7 Flash won RED's paired speed, cost, OCR, and instruction-following benchmark.
+        // It does not support minimal thinking, so fast field calls explicitly use low thinking.
+        private const string FAST_MODEL = "gemini-3.7-flash";
         private const string FAST_LEGACY_MODEL = "gemini-2.5-flash";
-        private const string CAREFUL_MODEL = "gemini-3.5-flash";
+        private const string CAREFUL_MODEL = "gemini-3.7-flash";
         private const string CAREFUL_LEGACY_MODEL = "gemini-2.5-flash";
-        private const string TRANSCRIBE_MODEL = "gemini-2.5-flash";
+        private const string TRANSCRIBE_MODEL = "gemini-3.7-flash";
+        private const string FAST_THINKING_LEVEL = "low";
+        private const string CAREFUL_THINKING_LEVEL = "medium";
+        private const int FAST_MAX_OUTPUT_TOKENS = 800;
+        private const int CAREFUL_MAX_OUTPUT_TOKENS = 1600;
         private const int PRIMARY_TIMEOUT_SECONDS = 20;
         
         // Default collection (legacy "Red" collection with all docs)
@@ -438,8 +443,8 @@ If using Need context:, include the likely conditional rule instead of only aski
                         retryPrompt,
                         CAREFUL_LEGACY_MODEL,
                         45,
-                        mediumReasoning: false,
-                        maxOutputTokens: 1600,
+                        thinkingLevel: null,
+                        maxOutputTokens: CAREFUL_MAX_OUTPUT_TOKENS,
                         imageDataUrl,
                         enableGoogleSearch: true);
                     aiResponse = NormalizeFactCheckResponse(ExtractFactCheckText(retryText, includeSources: true));
@@ -532,11 +537,24 @@ Only return the JSON array, nothing else.";
                 string responseText;
                 try
                 {
-                    responseText = await MakeApiRequestWithTimeout(prompt, imageDataUrl, TRANSCRIBE_MODEL, PRIMARY_TIMEOUT_SECONDS);
+                    responseText = await MakeApiRequestWithTimeout(
+                        prompt,
+                        imageDataUrl,
+                        TRANSCRIBE_MODEL,
+                        PRIMARY_TIMEOUT_SECONDS,
+                        FAST_THINKING_LEVEL,
+                        FAST_MAX_OUTPUT_TOKENS);
                 }
-                catch (GeminiApiException ex) when (IsTransientApiStatus(ex.StatusCode))
+                catch (GeminiApiException ex) when (IsTransientApiStatus(ex.StatusCode) || IsUnsupportedModelStatus(ex.StatusCode))
                 {
-                    responseText = await MakeApiRequestWithTimeout(prompt, imageDataUrl, FAST_LEGACY_MODEL, 45);
+                    OnModelFallback?.Invoke();
+                    responseText = await MakeApiRequestWithTimeout(
+                        prompt,
+                        imageDataUrl,
+                        FAST_LEGACY_MODEL,
+                        45,
+                        thinkingLevel: null,
+                        maxOutputTokens: FAST_MAX_OUTPUT_TOKENS);
                 }
                 
                 // Parse API response to extract AI content (same as GetInspectionSuggestions)
@@ -606,35 +624,86 @@ Only return the JSON array, nothing else.";
 
             try
             {
-                return await MakeApiRequestWithTimeout(prompt, imageDataUrl, primaryModel, timeout, style.Careful);
+                return await MakeApiRequestWithTimeout(
+                    prompt,
+                    imageDataUrl,
+                    primaryModel,
+                    timeout,
+                    style.Careful ? CAREFUL_THINKING_LEVEL : FAST_THINKING_LEVEL,
+                    style.Careful ? CAREFUL_MAX_OUTPUT_TOKENS : FAST_MAX_OUTPUT_TOKENS);
             }
             catch (OperationCanceledException) when (style.Careful)
             {
                 OnModelFallback?.Invoke();
-                return await MakeApiRequestWithTimeout(prompt, imageDataUrl, fallbackModel, 45);
+                return await MakeApiRequestWithTimeout(
+                    prompt,
+                    imageDataUrl,
+                    fallbackModel,
+                    45,
+                    thinkingLevel: null,
+                    maxOutputTokens: CAREFUL_MAX_OUTPUT_TOKENS);
             }
             catch (GeminiApiException ex) when (IsUnsupportedModelStatus(ex.StatusCode))
             {
-                return await MakeApiRequestWithTimeout(prompt, imageDataUrl, fallbackModel, timeout);
+                OnModelFallback?.Invoke();
+                return await MakeApiRequestWithTimeout(
+                    prompt,
+                    imageDataUrl,
+                    fallbackModel,
+                    timeout,
+                    thinkingLevel: null,
+                    maxOutputTokens: style.Careful ? CAREFUL_MAX_OUTPUT_TOKENS : FAST_MAX_OUTPUT_TOKENS);
             }
         }
 
         private async Task<string> GetFactCheckResponseText(string prompt, AiRequestStyle style, string? imageDataUrl)
         {
-            string responseText = await MakeTextOnlyAiRequestWithFallback(prompt, style, maxOutputTokens: 700, imageDataUrl);
+            string responseText = await MakeTextOnlyAiRequestWithFallback(
+                prompt,
+                style,
+                maxOutputTokens: style.Careful ? CAREFUL_MAX_OUTPUT_TOKENS : FAST_MAX_OUTPUT_TOKENS,
+                imageDataUrl);
             return ExtractFactCheckText(responseText);
         }
 
         private async Task<string> GetFactCheckResponseText(string prompt, string? imageDataUrl)
         {
-            string responseText = await MakeTextOnlyApiRequestWithTimeout(
-                prompt,
-                CAREFUL_LEGACY_MODEL,
-                timeoutSeconds: 45,
-                mediumReasoning: false,
-                maxOutputTokens: 1600,
-                imageDataUrl,
-                enableGoogleSearch: true);
+            string responseText;
+            try
+            {
+                responseText = await MakeTextOnlyApiRequestWithTimeout(
+                    prompt,
+                    CAREFUL_MODEL,
+                    timeoutSeconds: 45,
+                    thinkingLevel: CAREFUL_THINKING_LEVEL,
+                    maxOutputTokens: CAREFUL_MAX_OUTPUT_TOKENS,
+                    imageDataUrl,
+                    enableGoogleSearch: true);
+            }
+            catch (OperationCanceledException)
+            {
+                OnModelFallback?.Invoke();
+                responseText = await MakeTextOnlyApiRequestWithTimeout(
+                    prompt,
+                    CAREFUL_LEGACY_MODEL,
+                    timeoutSeconds: 45,
+                    thinkingLevel: null,
+                    maxOutputTokens: CAREFUL_MAX_OUTPUT_TOKENS,
+                    imageDataUrl,
+                    enableGoogleSearch: true);
+            }
+            catch (GeminiApiException ex) when (IsUnsupportedModelStatus(ex.StatusCode))
+            {
+                OnModelFallback?.Invoke();
+                responseText = await MakeTextOnlyApiRequestWithTimeout(
+                    prompt,
+                    CAREFUL_LEGACY_MODEL,
+                    timeoutSeconds: 45,
+                    thinkingLevel: null,
+                    maxOutputTokens: CAREFUL_MAX_OUTPUT_TOKENS,
+                    imageDataUrl,
+                    enableGoogleSearch: true);
+            }
 
             return ExtractFactCheckText(responseText, includeSources: true);
         }
@@ -759,20 +828,39 @@ Only return the JSON array, nothing else.";
 
             try
             {
-                return await MakeTextOnlyApiRequestWithTimeout(prompt, primaryModel, timeout, style.Careful, maxOutputTokens, imageDataUrl);
+                return await MakeTextOnlyApiRequestWithTimeout(
+                    prompt,
+                    primaryModel,
+                    timeout,
+                    style.Careful ? CAREFUL_THINKING_LEVEL : FAST_THINKING_LEVEL,
+                    maxOutputTokens,
+                    imageDataUrl);
             }
             catch (OperationCanceledException) when (style.Careful)
             {
                 OnModelFallback?.Invoke();
-                return await MakeTextOnlyApiRequestWithTimeout(prompt, fallbackModel, 45, mediumReasoning: false, maxOutputTokens, imageDataUrl);
+                return await MakeTextOnlyApiRequestWithTimeout(
+                    prompt,
+                    fallbackModel,
+                    45,
+                    thinkingLevel: null,
+                    maxOutputTokens,
+                    imageDataUrl);
             }
             catch (GeminiApiException ex) when (IsUnsupportedModelStatus(ex.StatusCode))
             {
-                return await MakeTextOnlyApiRequestWithTimeout(prompt, fallbackModel, timeout, mediumReasoning: false, maxOutputTokens, imageDataUrl);
+                OnModelFallback?.Invoke();
+                return await MakeTextOnlyApiRequestWithTimeout(
+                    prompt,
+                    fallbackModel,
+                    timeout,
+                    thinkingLevel: null,
+                    maxOutputTokens,
+                    imageDataUrl);
             }
         }
 
-        private async Task<string> MakeTextOnlyApiRequestWithTimeout(string prompt, string model, int timeoutSeconds, bool mediumReasoning, int maxOutputTokens, string? imageDataUrl = null, bool enableGoogleSearch = false)
+        private async Task<string> MakeTextOnlyApiRequestWithTimeout(string prompt, string model, int timeoutSeconds, string? thinkingLevel, int maxOutputTokens, string? imageDataUrl = null, bool enableGoogleSearch = false)
         {
             var generationConfig = new Dictionary<string, object>
             {
@@ -781,11 +869,11 @@ Only return the JSON array, nothing else.";
                 ["responseMimeType"] = "text/plain"
             };
 
-            if (mediumReasoning)
+            if (!string.IsNullOrWhiteSpace(thinkingLevel))
             {
                 generationConfig["thinkingConfig"] = new
                 {
-                    thinkingLevel = "medium"
+                    thinkingLevel
                 };
             }
 
@@ -855,7 +943,7 @@ Only return the JSON array, nothing else.";
             throw new GeminiApiException(HttpStatusCode.ServiceUnavailable, "Gemini API did not return a response.");
         }
 
-        private async Task<string> MakeApiRequestWithTimeout(string prompt, string imageDataUrl, string model, int timeoutSeconds, bool mediumReasoning = false)
+        private async Task<string> MakeApiRequestWithTimeout(string prompt, string imageDataUrl, string model, int timeoutSeconds, string? thinkingLevel, int maxOutputTokens)
         {
             string base64Image = imageDataUrl;
             const string jpegPrefix = "data:image/jpeg;base64,";
@@ -865,7 +953,7 @@ Only return the JSON array, nothing else.";
             var generationConfig = new Dictionary<string, object>
             {
                 ["temperature"] = 0.35,
-                ["maxOutputTokens"] = 800,
+                ["maxOutputTokens"] = maxOutputTokens,
                 ["responseMimeType"] = "application/json",
                 ["responseJsonSchema"] = new
                 {
@@ -874,11 +962,11 @@ Only return the JSON array, nothing else.";
                 }
             };
 
-            if (mediumReasoning)
+            if (!string.IsNullOrWhiteSpace(thinkingLevel))
             {
                 generationConfig["thinkingConfig"] = new
                 {
-                    thinkingLevel = "medium"
+                    thinkingLevel
                 };
             }
 

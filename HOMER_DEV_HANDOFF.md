@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-08-14 — RED 2.0.21 — Gemini 3.7 Flash low/medium routing
+
+- **Files changed:** `InspectionEditor.csproj`, `Services/GrokApiClient.cs`, new `tests/gemini_37_routing_static_test.py`, `tests/camera_crash_safety_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
+- **What changed:** RED hard-codes Gemini 3.7 Flash for Get 3, Transcribe, and fact-check primary requests. Fast and Transcribe calls send `thinkingLevel: low` with an 800-token response budget; careful and grounded fact-check calls send `thinkingLevel: medium` with a 1,600-token budget. Gemini 2.5 Flash remains the fallback and receives no 3.7 thinking-level field.
+- **Basis:** A 20-call paired RED-style benchmark scored Gemini 3.7 Flash at 94.3 quality versus 92.3 for 3.6, with 2.185-second average and 3.310-second P90 latency versus 2.437 and 4.740 seconds. The extra estimated cost was about $0.05 per 1,000 calls.
+- **Verification/deployment:** All 53 Python regression tests passed; Debug compilation succeeded with 0 errors and 16 existing warnings. Live Gemini 3.7 probes returned HTTP 200/STOP for low-thinking structured vision, medium-thinking structured vision, and medium-thinking grounded search. Release build, publish, GitHub release, hashes, updater URLs, and Dropbox parity are pending in this entry until deployment is complete.
+
 ### 2026-08-11 — RED 2.0.20 — STRADA equipment-match airflow targets
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `Services/EnergyComplianceService.cs`, new `Services/EquipmentAirflowService.cs`, new `tests/EquipmentAirflowHarness/`, new `tests/equipment_airflow_ui_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.
