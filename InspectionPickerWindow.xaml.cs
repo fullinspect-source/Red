@@ -569,7 +569,31 @@ namespace InspectionEditor
             SettingsPanel.Visibility = Visibility.Collapsed;
             OrdersPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Visible;
+            RefreshAboutDataStatus();
             SetActiveTab(AboutTabButton);
+        }
+
+        private void RefreshAboutDataStatus()
+        {
+            AboutQuickCommentsDateText.Text = InspectionEditor.Services.DataUpdateService.GetLocalQuickCommentsDate();
+            AboutInspectorStatsDateText.Text = InspectionEditor.Services.DataUpdateService.GetLocalStatsDate();
+            AboutInspectionTypesDateText.Text = InspectionEditor.Services.DataUpdateService.GetLocalInspectionTypesDate();
+            AboutLastDataCheckText.Text = InspectionEditor.Services.DataUpdateService.GetLastDataCheckDate();
+
+            SetAboutDatasetStatus(AboutQuickCommentsStatusText,
+                InspectionEditor.Services.DataUpdateService.IsLocalQuickCommentsStale());
+            SetAboutDatasetStatus(AboutInspectorStatsStatusText,
+                InspectionEditor.Services.DataUpdateService.IsLocalStatsStale());
+            SetAboutDatasetStatus(AboutInspectionTypesStatusText,
+                InspectionEditor.Services.DataUpdateService.IsLocalInspectionTypesStale());
+        }
+
+        private static void SetAboutDatasetStatus(TextBlock textBlock, bool isStale)
+        {
+            textBlock.Text = isStale ? "Stale" : "Current";
+            textBlock.Foreground = new SolidColorBrush(isStale
+                ? Color.FromRgb(180, 80, 0)
+                : Color.FromRgb(46, 125, 50));
         }
 
         private void SetActiveTab(Button activeButton)
@@ -766,6 +790,7 @@ namespace InspectionEditor
                 AboutTeamStatsNowText,
                 AboutTeamStatsStatusText,
                 InspectionEditor.Services.DataUpdateService.GetLocalTeamStatsDate());
+            RefreshAboutDataStatus();
         }
 
         private static void PopulateAboutStatsRow(

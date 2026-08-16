@@ -777,6 +777,53 @@
                                 <TranslateTransform x:Name="AboutTaglineTranslate" Y="-20"/>
                             </TextBlock.RenderTransform>
                         </TextBlock>
+
+                        <Border Width="520"
+                                Background="#F8FAFB"
+                                BorderBrush="#D7DEE3"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="18,14"
+                                Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="CURRENT DATA"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           Foreground="#66737F"
+                                           Margin="0,0,0,9"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="145"/>
+                                        <ColumnDefinition Width="145"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="6"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="6"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="6"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Quick Comments" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="AboutQuickCommentsDateText" Grid.Row="0" Grid.Column="1" Foreground="#455A64"/>
+                                    <TextBlock x:Name="AboutQuickCommentsStatusText" Grid.Row="0" Grid.Column="2" FontWeight="SemiBold"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Inspector Stats" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="AboutInspectorStatsDateText" Grid.Row="2" Grid.Column="1" Foreground="#455A64"/>
+                                    <TextBlock x:Name="AboutInspectorStatsStatusText" Grid.Row="2" Grid.Column="2" FontWeight="SemiBold"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Inspection Types" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="AboutInspectionTypesDateText" Grid.Row="4" Grid.Column="1" Foreground="#455A64"/>
+                                    <TextBlock x:Name="AboutInspectionTypesStatusText" Grid.Row="4" Grid.Column="2" FontWeight="SemiBold"/>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Last update check" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="AboutLastDataCheckText" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Foreground="#455A64"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                         <!--<Border Background="#8B0000"
                                 CornerRadius="10"
                                 BorderBrush="#600000"
@@ -913,7 +960,7 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="Triple-click RED to check for updates and refresh datasets."
+                        <TextBlock Text="Triple-click the RED icon to force updates."
                                    FontSize="13"
                                    Foreground="#66737F"
                                    HorizontalAlignment="Center"

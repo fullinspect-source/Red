@@ -33,6 +33,22 @@ class QuickCommentsRefreshTests(unittest.TestCase):
         self.assertIn("remoteGenerated.Value < localGenerated.Value", source)
         self.assertIn('Regex.IsMatch(content, "\\\"items\\\"', source)
 
+    def test_about_tab_displays_dataset_dates_before_forced_refresh(self):
+        xaml = (ROOT / "InspectionPickerWindow.xaml").read_text()
+        code = (ROOT / "InspectionPickerWindow.xaml.cs").read_text()
+        data_service = (ROOT / "Services" / "DataUpdateService.cs").read_text()
+        for name in (
+            "AboutQuickCommentsDateText",
+            "AboutInspectorStatsDateText",
+            "AboutInspectionTypesDateText",
+            "AboutLastDataCheckText",
+        ):
+            self.assertIn(name, xaml)
+        self.assertIn("RefreshAboutDataStatus();", code)
+        self.assertIn("Triple-click the RED icon to force updates.", xaml)
+        self.assertIn("GetLocalQuickCommentsDate", data_service)
+        self.assertIn("GetLastDataCheckDate", data_service)
+
 
 if __name__ == "__main__":
     unittest.main()

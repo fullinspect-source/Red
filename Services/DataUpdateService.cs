@@ -50,7 +50,7 @@ namespace InspectionEditor.Services
         private static readonly TimeSpan StaleDataThreshold = TimeSpan.FromDays(14);
 
         /// <summary>
-        /// Check if data files are stale (older than 10 days).
+        /// Check if data files are stale (older than 14 days).
         /// Returns warning message if stale, null if OK.
         /// </summary>
         public static string? CheckForStaleData()
@@ -85,9 +85,7 @@ namespace InspectionEditor.Services
             if (!File.Exists(filePath))
                 return true; // Missing file counts as stale
 
-            // Inspector stats should use its embedded generated date because the data itself is time-based.
-            // Quick comments and inspection types should use last successful refresh time: those files can be
-            // unchanged for weeks while still being the current published dataset.
+            // Generated JSON datasets use their embedded timestamp. Other files use their local refresh time.
             if (useGeneratedDate)
             {
                 try
@@ -155,6 +153,40 @@ namespace InspectionEditor.Services
             }
             catch { }
             return "unknown";
+        }
+
+        public static string GetLocalQuickCommentsDate() => GetGeneratedDateDisplay(QuickCommentsPath);
+
+        public static string GetLocalInspectionTypesDate() => GetFileDateDisplay(InspectionTypesPath);
+
+        public static string GetLastDataCheckDate() => GetFileDateDisplay(LastCheckFile, includeTime: true);
+
+        public static bool IsLocalQuickCommentsStale() => IsFileStale(QuickCommentsPath, useGeneratedDate: true);
+
+        public static bool IsLocalStatsStale() => IsFileStale(InspectorStatsPath, useGeneratedDate: true);
+
+        public static bool IsLocalInspectionTypesStale() => IsFileStale(InspectionTypesPath);
+
+        private static string GetGeneratedDateDisplay(string path)
+        {
+            try
+            {
+                if (!File.Exists(path)) return "not installed";
+                var generated = GetGeneratedDate(File.ReadAllText(path));
+                return generated.HasValue ? generated.Value.ToString("MMM d, yyyy") : "unknown";
+            }
+            catch { return "unknown"; }
+        }
+
+        private static string GetFileDateDisplay(string path, bool includeTime = false)
+        {
+            try
+            {
+                if (!File.Exists(path)) return "never";
+                var timestamp = File.GetLastWriteTime(path);
+                return timestamp.ToString(includeTime ? "MMM d, yyyy h:mm tt" : "MMM d, yyyy");
+            }
+            catch { return "unknown"; }
         }
 
         /// <summary>
