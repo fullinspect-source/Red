@@ -17,14 +17,18 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("EditorScrollViewer.Visibility = _selectedItemToolsCollapsed", CODE)
         self.assertIn("InlineChecklistPanel.Visibility = _inlineEditorMode ? Visibility.Visible", CODE)
 
-    def test_right_pane_opens_by_default_and_keeps_edge_handle_when_collapsed(self):
+    def test_right_pane_opens_by_default_and_splitter_is_the_collapse_control(self):
         self.assertIn("private bool _selectedItemToolsCollapsed = false;", CODE)
-        self.assertIn('x:Name="SelectedItemToolsPaneButton"', XAML)
-        self.assertIn('Grid.Column="3"', XAML)
+        self.assertIn('x:Name="ChecklistGridSplitter"', XAML)
+        self.assertIn('PreviewMouseLeftButtonDown="ChecklistGridSplitter_PreviewMouseLeftButtonDown"', XAML)
+        self.assertIn('x:Name="SelectedItemToolsPaneGlyph"', XAML)
+        self.assertNotIn('x:Name="SelectedItemToolsPaneButton"', XAML)
+        self.assertIn("private void ChecklistGridSplitter_PreviewMouseLeftButtonDown", CODE)
         self.assertIn("if (e.ClickCount >= 2)", CODE)
         self.assertIn("SelectedItemToolsColumn.Width = _selectedItemToolsCollapsed", CODE)
         self.assertIn("? new GridLength(0)", CODE)
-        self.assertIn('? "Click to reopen selected-item tools"', CODE)
+        self.assertIn("ChecklistGridSplitter.Visibility = Visibility.Visible;", CODE)
+        self.assertIn('? "Click divider to reopen selected-item tools"', CODE)
 
     def test_bottom_action_row_and_existing_inline_drawers_remain(self):
         for control in ("MessagesButton", "SeeDocsButton", "SlabEngButton"):
@@ -38,6 +42,18 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("LoadItemEditor(item);", body)
         self.assertIn("if (e.ClickCount >= 2)", body)
         self.assertIn("ToggleInlineItem(item);", body)
+
+    def test_duplicate_is_a_small_left_edge_action_not_right_pane_header_chrome(self):
+        self.assertIn('x:Name="RightPaneNavigation" Visibility="Collapsed"', XAML)
+        self.assertIn('x:Name="RightPaneDuplicateActions" Grid.Column="2" Orientation="Horizontal" Visibility="Collapsed"', XAML)
+        self.assertIn('x:Name="ItemQuestionText" Visibility="Collapsed"', XAML)
+        header_start = CODE.index("private Grid CreateInlineItemHeader")
+        header_end = CODE.index("private Border? CreateInlineRoomPressureBalanceChip", header_start)
+        header = CODE[header_start:header_end]
+        self.assertIn('Content = "[+]"', header)
+        self.assertIn("duplicateButton.Click += InlineDuplicateButton_Click;", header)
+        self.assertIn("Grid.SetColumn(duplicateButton, 0);", header)
+        self.assertNotIn('Content = "Duplicate +"', CODE)
 
     def test_selected_item_panel_preserves_all_tools(self):
         for control in (

@@ -165,19 +165,31 @@
         <Grid Grid.Row="1" x:Name="MainContentGrid">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftColumn" Width="2.15*" MinWidth="250"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="24"/>
                 <ColumnDefinition x:Name="SelectedItemToolsColumn" Width="*" MinWidth="390"/>
-                <ColumnDefinition Width="28"/>
             </Grid.ColumnDefinitions>
 
-            <!-- RED 2.1 splitter between the complete checklist workspace and selected-item tools -->
+            <!-- The divider is also the pane control: drag to resize, double-click to collapse. -->
             <GridSplitter x:Name="ChecklistGridSplitter"
-                          Grid.Column="1" Width="10"
-                          Background="#BDC3C7"
-                          HorizontalAlignment="Center"
+                          Grid.Column="1" Width="24"
+                          Background="#CBD5E1"
+                          HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
                           Cursor="SizeWE"
-                          DragCompleted="GridSplitter_DragCompleted"/>
+                          ToolTip="Drag to resize; double-click to collapse selected-item tools"
+                          DragCompleted="GridSplitter_DragCompleted"
+                          PreviewMouseLeftButtonDown="ChecklistGridSplitter_PreviewMouseLeftButtonDown"/>
+
+            <Border Grid.Column="1"
+                    Width="18" Height="72"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Background="#E8EDF2" BorderBrush="#94A3B8" BorderThickness="1"
+                    CornerRadius="5" IsHitTestVisible="False" Panel.ZIndex="2">
+                <TextBlock x:Name="SelectedItemToolsPaneGlyph"
+                           Text="›" FontSize="18" FontWeight="Bold"
+                           Foreground="#475569"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
 
             <!-- Left Column: Panel + Docs Button -->
             <Grid x:Name="ChecklistColumnGrid" Grid.Column="0">
@@ -579,13 +591,13 @@
                     <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
 
                         <!-- Item Header with Nav, slab info, and Duplicate Buttons -->
-                        <Grid Margin="5,8,5,0">
+                        <Grid Margin="5,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel x:Name="RightPaneNavigation" Visibility="Collapsed" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button x:Name="PrevItemButton" Content="◀" Click="PrevItemButton_Click"
                                         Width="36" Height="28" FontSize="14" Margin="0,0,8,0"
                                         Background="#E8E8E8" BorderBrush="#CCC" ToolTip="Previous item"
@@ -670,7 +682,7 @@
                                 </WrapPanel>
                             </Border>
                             </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <StackPanel x:Name="RightPaneDuplicateActions" Grid.Column="2" Orientation="Horizontal" Visibility="Collapsed">
                                 <Button x:Name="RemoveDuplicateButton"
                                         Content="➖ _Remove"
                                         Click="RemoveDuplicateButton_Click"
@@ -695,7 +707,7 @@
                                         TabIndex="83"/>
                             </StackPanel>
                         </Grid>
-                        <TextBlock x:Name="ItemQuestionText" TextWrapping="Wrap" FontSize="14" Margin="5,0,5,15" Foreground="#333"/>
+                        <TextBlock x:Name="ItemQuestionText" Visibility="Collapsed" TextWrapping="Wrap" FontSize="14" Margin="5,0,5,15" Foreground="#333"/>
 
                         <!-- STATUS/VALUE Selector - Dynamic based on item ControlName -->
                         <Border x:Name="StatusBorder" BorderBrush="#8B0000" BorderThickness="1" Padding="8" Margin="0,0,0,10" Background="#F0F8FF">
@@ -1150,21 +1162,6 @@
                 </Grid>
             </ScrollViewer>
 
-            <!-- Double-click while open to collapse right; click the narrow edge handle to reopen. -->
-            <Button x:Name="SelectedItemToolsPaneButton"
-                    Grid.Column="3"
-                    Content="›"
-                    FontSize="18"
-                    FontWeight="Bold"
-                    Padding="0"
-                    Margin="2,8,2,8"
-                    Background="#E8EDF2"
-                    Foreground="#475569"
-                    BorderBrush="#CBD5E1"
-                    BorderThickness="1"
-                    Cursor="Hand"
-                    ToolTip="Double-click to collapse selected-item tools"
-                    MouseLeftButtonUp="SelectedItemToolsPaneButton_MouseLeftButtonUp"/>
         </Grid>
     </Grid>
 </Window>

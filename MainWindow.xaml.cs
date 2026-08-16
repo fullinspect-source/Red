@@ -4369,27 +4369,31 @@ namespace InspectionEditor
             ApplySelectedItemToolsPaneState();
         }
 
-        private void SelectedItemToolsPaneButton_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void ChecklistGridSplitter_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            bool stateChanged = false;
             if (_selectedItemToolsCollapsed)
             {
                 _selectedItemToolsCollapsed = false;
                 _ignorePaneButtonUntil = DateTime.UtcNow.AddMilliseconds(System.Windows.Forms.SystemInformation.DoubleClickTime + 75);
                 ApplySelectedItemToolsPaneState();
+                stateChanged = true;
             }
             else if (DateTime.UtcNow >= _ignorePaneButtonUntil && e.ClickCount >= 2)
             {
                 _selectedItemToolsCollapsed = true;
                 ApplySelectedItemToolsPaneState();
+                stateChanged = true;
             }
 
-            e.Handled = true;
+            if (stateChanged)
+                e.Handled = true;
         }
 
         private void ApplySelectedItemToolsPaneState()
         {
             if (SelectedItemToolsColumn == null || EditorScrollViewer == null ||
-                ChecklistGridSplitter == null || SelectedItemToolsPaneButton == null)
+                ChecklistGridSplitter == null || SelectedItemToolsPaneGlyph == null)
                 return;
 
             SelectedItemToolsColumn.MinWidth = _selectedItemToolsCollapsed ? 0 : 390;
@@ -4399,13 +4403,12 @@ namespace InspectionEditor
             EditorScrollViewer.Visibility = _selectedItemToolsCollapsed
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-            ChecklistGridSplitter.Visibility = _selectedItemToolsCollapsed
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-            SelectedItemToolsPaneButton.Content = _selectedItemToolsCollapsed ? "‹" : "›";
-            SelectedItemToolsPaneButton.ToolTip = _selectedItemToolsCollapsed
-                ? "Click to reopen selected-item tools"
-                : "Double-click to collapse selected-item tools";
+            ChecklistGridSplitter.Visibility = Visibility.Visible;
+            ChecklistGridSplitter.Cursor = _selectedItemToolsCollapsed ? Cursors.Hand : Cursors.SizeWE;
+            ChecklistGridSplitter.ToolTip = _selectedItemToolsCollapsed
+                ? "Click divider to reopen selected-item tools"
+                : "Drag to resize; double-click divider to collapse selected-item tools";
+            SelectedItemToolsPaneGlyph.Text = _selectedItemToolsCollapsed ? "‹" : "›";
         }
 
         private void PopulateInlineChecklist(string? filter = null)
@@ -4820,9 +4823,29 @@ namespace InspectionEditor
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var duplicateButton = new Button
+            {
+                Content = "[+]",
+                Tag = item,
+                Width = 38,
+                Height = 32,
+                Padding = new Thickness(0),
+                Margin = new Thickness(3, 0, 3, 0),
+                FontSize = Math.Max(12, _checklistFontSize),
+                FontWeight = FontWeights.Bold,
+                Background = new SolidColorBrush(Color.FromRgb(219, 234, 254)),
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(96, 165, 250)),
+                ToolTip = "Duplicate this checklist item"
+            };
+            duplicateButton.Click += InlineDuplicateButton_Click;
+            Grid.SetColumn(duplicateButton, 0);
+            grid.Children.Add(duplicateButton);
 
             var hudIcon = CreateInlineStatHudIcon(item);
-            Grid.SetColumn(hudIcon, 0);
+            Grid.SetColumn(hudIcon, 1);
             grid.Children.Add(hudIcon);
 
             var chevron = new TextBlock
@@ -4834,12 +4857,12 @@ namespace InspectionEditor
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(2, 0, 8, 0)
             };
-            Grid.SetColumn(chevron, 1);
+            Grid.SetColumn(chevron, 2);
             grid.Children.Add(chevron);
 
             var numberBadge = CreateInlineBadge(item.Number ?? "", GetStatusBrush(item), Brushes.White, FontWeights.Bold);
             numberBadge.Margin = new Thickness(0, 8, 8, 8);
-            Grid.SetColumn(numberBadge, 2);
+            Grid.SetColumn(numberBadge, 3);
             grid.Children.Add(numberBadge);
 
             var center = new Grid { VerticalAlignment = VerticalAlignment.Center };
@@ -4885,7 +4908,7 @@ namespace InspectionEditor
                 center.Children.Add(middleContent);
             }
 
-            Grid.SetColumn(center, 3);
+            Grid.SetColumn(center, 4);
             grid.Children.Add(center);
 
             var chips = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 10, 6) };
@@ -4922,11 +4945,11 @@ namespace InspectionEditor
             var designChip = CreateInlineDesignAssistChip(section, item);
             if (designChip != null)
                 chips.Children.Add(designChip);
-            Grid.SetColumn(chips, 4);
+            Grid.SetColumn(chips, 5);
             grid.Children.Add(chips);
 
             var statusControl = CreateInlineStatusHeaderControl(item);
-            Grid.SetColumn(statusControl, 5);
+            Grid.SetColumn(statusControl, 6);
             grid.Children.Add(statusControl);
 
             return grid;
@@ -6560,24 +6583,6 @@ namespace InspectionEditor
                 removeButton.Click += InlineRemoveDuplicateButton_Click;
                 panel.Children.Add(removeButton);
             }
-
-            var duplicateButton = new Button
-            {
-                Content = "Duplicate +",
-                Tag = item,
-                MinWidth = 116,
-                MinHeight = 36,
-                Padding = new Thickness(12, 5, 12, 5),
-                Margin = new Thickness(0, 0, 6, 0),
-                FontSize = Math.Max(11, _checklistFontSize - 1),
-                FontWeight = FontWeights.SemiBold,
-                Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(29, 78, 216)),
-                ToolTip = "Duplicate this checklist item"
-            };
-            duplicateButton.Click += InlineDuplicateButton_Click;
-            panel.Children.Add(duplicateButton);
 
             return panel;
         }
