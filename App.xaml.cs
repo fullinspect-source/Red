@@ -141,9 +141,10 @@ namespace InspectionEditor
             if (startupInternetRequired)
             {
                 MessageBox.Show(
-                    "RED couldn't check for updates because this device is offline.\n\n" +
-                    AppUpdateService.InternetRequiredMessage,
-                    "Internet Connection Needed",
+                    "RED couldn't check for app updates because this device is offline.\n\n" +
+                    "RED still works normally offline. Only the automatic update check was skipped.\n\n" +
+                    "No action is required. RED will check again when internet is available.",
+                    "Update Check Skipped",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
