@@ -96,6 +96,10 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn('x:Name="PhotoImage" Grid.Column="1"', XAML)
         self.assertIn('x:Name="NoPhotoPlaceholder" Grid.Column="1"', XAML)
         self.assertIn('x:Name="PhotoActionsPanel" Grid.Column="3"', XAML)
+        self.assertLess(XAML.index('x:Name="SavedCommentsBorder"'), XAML.index('x:Name="PhotoBorder"'))
+        self.assertLess(XAML.index('x:Name="GenAiBorder"'), XAML.index('x:Name="PhotoBorder"'))
+        self.assertIn('x:Name="PhotoBorder" Height="125"', XAML)
+        self.assertIn('x:Name="PhotoImage" Grid.Column="1" Width="180" Height="105"', XAML)
         self.assertIn('x:Name="PrevPhotoButton" Grid.Column="0"', XAML)
         self.assertIn('x:Name="NextPhotoButton" Grid.Column="2"', XAML)
         self.assertIn('Visibility="Collapsed"', XAML[XAML.index('x:Name="PrevPhotoButton"'):XAML.index('x:Name="PrevPhotoButton"') + 500])
@@ -104,10 +108,13 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("IsDescendantOf(source, StatusScrollViewer)", CODE)
         self.assertIn("IsDescendantOf(source, PrefixScrollViewer)", CODE)
         self.assertIn("IsDescendantOf(source, SuffixScrollViewer)", CODE)
+        self.assertIn('PanningRatio="1"', XAML)
+        self.assertIn('PanningDeceleration="0.001"', XAML)
+        self.assertNotIn('PreviewMouseLeftButtonDown="EditorScrollViewer_PreviewMouseLeftButtonDown"', XAML)
 
     def test_saved_comments_and_ai_have_fixed_heights_with_internal_scrolling(self):
-        self.assertIn('x:Name="SavedCommentsBorder" Height="210"', XAML)
-        self.assertIn('x:Name="GenAiBorder" Height="210"', XAML)
+        self.assertIn('x:Name="SavedCommentsBorder" Height="140"', XAML)
+        self.assertIn('x:Name="GenAiBorder" Height="150"', XAML)
         self.assertIn('x:Name="SavedCommentsScrollViewer"', XAML)
         self.assertIn('x:Name="SuggestionsScrollViewer"', XAML)
 
