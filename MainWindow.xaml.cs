@@ -124,7 +124,7 @@ namespace InspectionEditor
         private bool _incFilterActive = false;
         
         // Checklist font size (adjustable)
-        private const double DefaultChecklistFontSize = 18;
+        private const double DefaultChecklistFontSize = 16;
         private double _checklistFontSize = DefaultChecklistFontSize;
         
         // Read-only mode for unsupported inspection types (BWT, SCI)
@@ -180,6 +180,8 @@ namespace InspectionEditor
         private int _currentSequenceNumber = 1;
 
         private bool _inlineEditorMode = true;
+        private bool _selectedItemToolsCollapsed = false;
+        private DateTime _ignorePaneButtonUntil = DateTime.MinValue;
         private double _classicLeftPanelWidth = 350;
         private string? _expandedInlineItemKey;
         private Item? _expandedInlineItemInstance;
@@ -269,6 +271,7 @@ namespace InspectionEditor
         
         private void LoadPreferences()
         {
+            bool compactSplitLayoutV21Applied = false;
             try
             {
                 string prefPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "preferences.txt");
@@ -308,6 +311,10 @@ namespace InspectionEditor
                         {
                             bool.TryParse(line.Substring("InlineEditorModeV2=".Length), out _inlineEditorMode);
                         }
+                        else if (line.StartsWith("CompactSplitLayoutV21="))
+                        {
+                            bool.TryParse(line.Substring("CompactSplitLayoutV21=".Length), out compactSplitLayoutV21Applied);
+                        }
                         else if (line.StartsWith("EditorWindowLeft="))
                         {
                             if (double.TryParse(line.Substring("EditorWindowLeft=".Length), out double left))
@@ -338,6 +345,16 @@ namespace InspectionEditor
                         }
                     }
                 }
+
+                if (!compactSplitLayoutV21Applied)
+                {
+                    // One-time 2.1 migration: users who still have the old 18 pt default get
+                    // the compact split-screen default. Explicit custom font choices survive.
+                    if (Math.Abs(_checklistFontSize - 18) < 0.01)
+                        _checklistFontSize = DefaultChecklistFontSize;
+                    _inlineEditorMode = true;
+                    compactSplitLayoutV21Applied = true;
+                }
                 if (IsReasonableEditorWindowPosition(Left, Top))
                     WindowStartupLocation = WindowStartupLocation.Manual;
             }
@@ -360,6 +377,7 @@ namespace InspectionEditor
                               $"LastPhotoDirectory={_lastPhotoDirectory ?? ""}\n" +
                               $"AiTone={NormalizeAiTone(_aiTone)}\n" +
                               $"InlineEditorModeV2={_inlineEditorMode}\n" +
+                              $"CompactSplitLayoutV21=True\n" +
                               $"EditorWindowLeft={bounds.Left}\n" +
                               $"EditorWindowTop={bounds.Top}\n" +
                               $"EditorWindowWidth={bounds.Width}\n" +
@@ -4333,20 +4351,59 @@ namespace InspectionEditor
             InlineChecklistPanel.Visibility = _inlineEditorMode ? Visibility.Visible : Visibility.Collapsed;
             if (_inlineEditorMode && LeftColumn.ActualWidth >= 250 && LeftColumn.ActualWidth <= 900)
                 _classicLeftPanelWidth = LeftColumn.ActualWidth;
-            ChecklistColumnGrid.SetValue(Grid.ColumnSpanProperty, _inlineEditorMode ? 3 : 1);
-            ChecklistGridSplitter.Visibility = _inlineEditorMode ? Visibility.Collapsed : Visibility.Visible;
-            EditorScrollViewer.Visibility = _inlineEditorMode ? Visibility.Collapsed : Visibility.Visible;
+            // RED 2.1 keeps the complete inline checklist on the left and the selected-item
+            // editor available on the right. Classic mode remains available.
+            ChecklistColumnGrid.SetValue(Grid.ColumnSpanProperty, 1);
+            LeftColumn.MinWidth = _inlineEditorMode ? 620 : 250;
             LeftColumn.MaxWidth = _inlineEditorMode ? double.PositiveInfinity : 900;
             LeftColumn.Width = _inlineEditorMode
-                ? new GridLength(1, GridUnitType.Star)
+                ? new GridLength(2.15, GridUnitType.Star)
                 : new GridLength(_classicLeftPanelWidth);
-            InlineEditorToggleButton.Content = _inlineEditorMode ? "Classic" : "v2.0 UI";
+            InlineEditorToggleButton.Content = _inlineEditorMode ? "Classic" : "v2.1 UI";
             InlineEditorToggleButton.Background = _inlineEditorMode
                 ? new SolidColorBrush(Color.FromRgb(139, 0, 0))
                 : new SolidColorBrush(Color.FromRgb(37, 99, 235));
-            InlineEditorToggleButton.Foreground = _inlineEditorMode
-                ? Brushes.White
-                : Brushes.White;
+            InlineEditorToggleButton.Foreground = Brushes.White;
+            ApplySelectedItemToolsPaneState();
+        }
+
+        private void SelectedItemToolsPaneButton_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_selectedItemToolsCollapsed)
+            {
+                _selectedItemToolsCollapsed = false;
+                _ignorePaneButtonUntil = DateTime.UtcNow.AddMilliseconds(System.Windows.Forms.SystemInformation.DoubleClickTime + 75);
+                ApplySelectedItemToolsPaneState();
+            }
+            else if (DateTime.UtcNow >= _ignorePaneButtonUntil && e.ClickCount >= 2)
+            {
+                _selectedItemToolsCollapsed = true;
+                ApplySelectedItemToolsPaneState();
+            }
+
+            e.Handled = true;
+        }
+
+        private void ApplySelectedItemToolsPaneState()
+        {
+            if (SelectedItemToolsColumn == null || EditorScrollViewer == null ||
+                ChecklistGridSplitter == null || SelectedItemToolsPaneButton == null)
+                return;
+
+            SelectedItemToolsColumn.MinWidth = _selectedItemToolsCollapsed ? 0 : 390;
+            SelectedItemToolsColumn.Width = _selectedItemToolsCollapsed
+                ? new GridLength(0)
+                : new GridLength(1, GridUnitType.Star);
+            EditorScrollViewer.Visibility = _selectedItemToolsCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            ChecklistGridSplitter.Visibility = _selectedItemToolsCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            SelectedItemToolsPaneButton.Content = _selectedItemToolsCollapsed ? "‹" : "›";
+            SelectedItemToolsPaneButton.ToolTip = _selectedItemToolsCollapsed
+                ? "Click to reopen selected-item tools"
+                : "Double-click to collapse selected-item tools";
         }
 
         private void PopulateInlineChecklist(string? filter = null)
@@ -4585,9 +4642,10 @@ namespace InspectionEditor
                 Background = new SolidColorBrush(progressColor),
                 BorderBrush = isExpanded ? new SolidColorBrush(Color.FromRgb(120, 174, 205)) : new SolidColorBrush(DarkenColor(progressColor, 0.10)),
                 BorderThickness = isExpanded ? new Thickness(2) : new Thickness(0, 0, 0, 1),
-                Margin = new Thickness(0, 0, 0, 4),
+                Margin = new Thickness(0, 0, 0, 2),
                 Child = panel,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                ToolTip = "Click to select; double-click to open inline tools"
             };
             row.MouseLeftButtonUp += InlineItemRow_MouseLeftButtonUp;
             StretchInlineWidth(row);
@@ -4751,7 +4809,7 @@ namespace InspectionEditor
         {
             var grid = new Grid
             {
-                MinHeight = 54,
+                MinHeight = 48,
                 Background = isExpanded ? new SolidColorBrush(Color.FromRgb(235, 243, 248)) : Brushes.Transparent
             };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -7313,7 +7371,13 @@ namespace InspectionEditor
             if (sender is not FrameworkElement element || element.Tag is not Item item) return;
 
             AutoApplyCurrentItem();
-            ToggleInlineItem(item);
+            LoadItemEditor(item);
+            SelectItemInTreeView(item);
+
+            // RED 2.1: a single click selects the item for the fixed right panel. Inline
+            // drawers remain available, but only by deliberate double-click.
+            if (e.ClickCount >= 2)
+                ToggleInlineItem(item);
             e.Handled = true;
         }
 
