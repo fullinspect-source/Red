@@ -8,6 +8,12 @@ LOOKUP = (ROOT / "Services" / "EquipmentAirflowService.cs").read_text(encoding="
 
 
 class EquipmentAirflowUiStaticTests(unittest.TestCase):
+    def test_image_only_rotated_ec_reports_retry_ocr_orientation(self):
+        self.assertIn("RotateFlipType.Rotate90FlipNone", ENERGY)
+        self.assertIn("RotateFlipType.Rotate180FlipNone", ENERGY)
+        self.assertIn("RotateFlipType.Rotate270FlipNone", ENERGY)
+        self.assertIn("if (bestText.Trim().Length >= 50)", ENERGY)
+
     def test_all_approved_matchups_are_present(self):
         for outdoor, indoor, cfm in (
             ("GZV6SA24", "AHVE24BP13", "773"),

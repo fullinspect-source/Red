@@ -1049,6 +1049,39 @@ namespace InspectionEditor.Services
                     ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
                 Marshal.Copy(bgraBytes, 0, bmpData.Scan0, bgraBytes.Length);
                 bmp.UnlockBits(bmpData);
+
+                // PDFium can return image-only pages in their unrotated bitmap orientation even
+                // when the PDF's page metadata says Rotate=90. Tesseract often returns an empty
+                // string for those sideways pages, so retry all orientations and keep the most text.
+                string bestText = OcrBitmapEc(bmp, engine);
+                if (bestText.Trim().Length >= 50) return bestText;
+
+                foreach (var rotation in new[]
+                {
+                    RotateFlipType.Rotate90FlipNone,
+                    RotateFlipType.Rotate180FlipNone,
+                    RotateFlipType.Rotate270FlipNone
+                })
+                {
+                    using var rotated = (Bitmap)bmp.Clone();
+                    rotated.RotateFlip(rotation);
+                    string candidate = OcrBitmapEc(rotated, engine);
+                    if (candidate.Trim().Length > bestText.Trim().Length)
+                        bestText = candidate;
+                }
+                return bestText;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"EC OCR page error: {ex.Message}");
+                return "";
+            }
+        }
+
+        private static string OcrBitmapEc(Bitmap bmp, TesseractEngine engine)
+        {
+            try
+            {
                 using var ms = new MemoryStream();
                 bmp.Save(ms, DrawingImageFormat.Png);
                 using var pix = Pix.LoadFromMemory(ms.ToArray());
