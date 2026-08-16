@@ -93,9 +93,14 @@ class Red21LayoutTests(unittest.TestCase):
         editor_start = XAML.index('x:Name="EditorScrollViewer"')
         self.assertIn('VerticalScrollBarVisibility="Auto"', XAML[editor_start:editor_start + 400])
         self.assertIn('x:Name="PhotoWorkspaceGrid"', XAML)
-        self.assertIn('x:Name="PhotoImage" Grid.Column="0"', XAML)
-        self.assertIn('x:Name="NoPhotoPlaceholder" Grid.Column="0"', XAML)
-        self.assertIn('x:Name="PhotoActionsPanel" Grid.Column="1"', XAML)
+        self.assertIn('x:Name="PhotoImage" Grid.Column="1"', XAML)
+        self.assertIn('x:Name="NoPhotoPlaceholder" Grid.Column="1"', XAML)
+        self.assertIn('x:Name="PhotoActionsPanel" Grid.Column="3"', XAML)
+        self.assertIn('x:Name="PrevPhotoButton" Grid.Column="0"', XAML)
+        self.assertIn('x:Name="NextPhotoButton" Grid.Column="2"', XAML)
+        self.assertIn('Visibility="Collapsed"', XAML[XAML.index('x:Name="PrevPhotoButton"'):XAML.index('x:Name="PrevPhotoButton"') + 500])
+        self.assertIn("(_currentPhotoIndex - 1 + photoCount) % photoCount", CODE)
+        self.assertIn("(_currentPhotoIndex + 1) % photoCount", CODE)
         self.assertIn("IsDescendantOf(source, StatusScrollViewer)", CODE)
         self.assertIn("IsDescendantOf(source, PrefixScrollViewer)", CODE)
         self.assertIn("IsDescendantOf(source, SuffixScrollViewer)", CODE)
@@ -105,6 +110,13 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn('x:Name="GenAiBorder" Height="210"', XAML)
         self.assertIn('x:Name="SavedCommentsScrollViewer"', XAML)
         self.assertIn('x:Name="SuggestionsScrollViewer"', XAML)
+
+    def test_comment_actions_stack_and_flag_uses_double_on_single_off(self):
+        self.assertIn('x:Name="CommentActionsPanel" Grid.Column="1" Orientation="Vertical"', XAML)
+        self.assertIn('PreviewMouseLeftButtonDown="SpecialistFlagButton_PreviewMouseLeftButtonDown"', XAML)
+        self.assertIn("e.ClickCount >= 2", CODE)
+        self.assertIn("CommentWithoutSpecialistFlag(comment)", CODE)
+        self.assertIn("RepeatBehavior = RepeatBehavior.Forever", CODE)
 
     def test_get_three_and_transcription_share_one_output_surface(self):
         self.assertEqual(XAML.count('x:Name="SuggestionsStack"'), 1)

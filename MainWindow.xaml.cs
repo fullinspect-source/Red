@@ -146,17 +146,13 @@ namespace InspectionEditor
         private List<string>? _lastTranscriptionOptions;
         private string _aiTone = "Technical";
 
-        // Bottom-right panel touch scroll state
-        private Point? _savedCommentsScrollStartPoint;
-        private double _savedCommentsScrollStartOffset;
-        private double _savedCommentsParentScrollStartOffset;
-        private bool _savedCommentsIsScrolling = false;
-        private bool _savedCommentsScrollStarted = false;
-        private Point? _suggestionsScrollStartPoint;
-        private double _suggestionsScrollStartOffset;
-        private double _suggestionsParentScrollStartOffset;
-        private bool _suggestionsIsScrolling = false;
-        private bool _suggestionsScrollStarted = false;
+        // Shared state for nested Value/Prefix/Suffix/Saved/AI vertical scrollers.
+        private ScrollViewer? _nestedVerticalScrollViewer;
+        private Point? _nestedVerticalScrollStartPoint;
+        private double _nestedVerticalScrollStartOffset;
+        private double _nestedVerticalParentScrollStartOffset;
+        private bool _nestedVerticalIsScrolling;
+        private bool _nestedVerticalScrollStarted;
 
         // MegaStats overlay scroll state
         private Point? _megaScrollStartPoint;
@@ -2009,20 +2005,32 @@ namespace InspectionEditor
             UpdateClassicSpecialistFlagButtonState();
         }
 
-        private void SpecialistFlagButton_Click(object sender, RoutedEventArgs e)
+        private void SpecialistFlagButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             string comment = CommentsTextBox.Text ?? "";
-            if (!CanAddSpecialistFlag(comment))
+            bool isFlagged = HasSpecialistFlag(comment);
+
+            // An active flag turns off with one click. An inactive flag requires a deliberate double-click.
+            if (isFlagged && e.ClickCount == 1)
             {
+                CommentsTextBox.Text = CommentWithoutSpecialistFlag(comment);
+                CommentsTextBox.CaretIndex = CommentsTextBox.Text.Length;
                 UpdateClassicSpecialistFlagButtonState();
+                MarkUnsaved();
+                e.Handled = true;
                 return;
             }
 
-            CommentsTextBox.Text = AddSpecialistFlag(comment);
-            CommentsTextBox.CaretIndex = CommentsTextBox.Text.Length;
-            CommentsTextBox.Focus();
-            UpdateClassicSpecialistFlagButtonState();
-            MarkUnsaved();
+            if (!isFlagged && e.ClickCount >= 2 && CanAddSpecialistFlag(comment))
+            {
+                CommentsTextBox.Text = AddSpecialistFlag(comment);
+                CommentsTextBox.CaretIndex = CommentsTextBox.Text.Length;
+                CommentsTextBox.Focus();
+                UpdateClassicSpecialistFlagButtonState();
+                MarkUnsaved();
+            }
+
+            e.Handled = true;
         }
 
         private void CameraButton_Click(object sender, RoutedEventArgs e)
@@ -7629,13 +7637,13 @@ namespace InspectionEditor
                 button.Background = blinkingRed;
                 button.Foreground = Brushes.White;
                 button.BorderBrush = new SolidColorBrush(Color.FromRgb(127, 29, 29));
-                button.IsEnabled = false;
+                button.IsEnabled = ReferenceEquals(button, SpecialistFlagButton);
                 button.Opacity = 1.0;
                 blinkingRed.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
                 {
                     From = Color.FromRgb(153, 27, 27),
                     To = Color.FromRgb(220, 38, 38),
-                    Duration = TimeSpan.FromMilliseconds(900),
+                    Duration = TimeSpan.FromMilliseconds(1200),
                     AutoReverse = true,
                     RepeatBehavior = RepeatBehavior.Forever
                 });
@@ -12006,46 +12014,37 @@ namespace InspectionEditor
 
         private void TouchScrollViewer_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender == SavedCommentsScrollViewer)
-            {
-                _savedCommentsScrollStartPoint = e.GetPosition(SavedCommentsScrollViewer);
-                _savedCommentsScrollStartOffset = SavedCommentsScrollViewer.VerticalOffset;
-                _savedCommentsParentScrollStartOffset = EditorScrollViewer.VerticalOffset;
-                _savedCommentsIsScrolling = true;
-                _savedCommentsScrollStarted = false;
-            }
-            else if (sender == SuggestionsScrollViewer)
-            {
-                _suggestionsScrollStartPoint = e.GetPosition(SuggestionsScrollViewer);
-                _suggestionsScrollStartOffset = SuggestionsScrollViewer.VerticalOffset;
-                _suggestionsParentScrollStartOffset = EditorScrollViewer.VerticalOffset;
-                _suggestionsIsScrolling = true;
-                _suggestionsScrollStarted = false;
-            }
+            if (sender is not ScrollViewer scrollViewer) return;
+            _nestedVerticalScrollViewer = scrollViewer;
+            _nestedVerticalScrollStartPoint = e.GetPosition(scrollViewer);
+            _nestedVerticalScrollStartOffset = scrollViewer.VerticalOffset;
+            _nestedVerticalParentScrollStartOffset = EditorScrollViewer.VerticalOffset;
+            _nestedVerticalIsScrolling = true;
+            _nestedVerticalScrollStarted = false;
         }
 
         private void TouchScrollViewer_PreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (sender == SavedCommentsScrollViewer)
-            {
-                HandleTouchStyleScroll(SavedCommentsScrollViewer, ref _savedCommentsScrollStartPoint, ref _savedCommentsScrollStartOffset, ref _savedCommentsParentScrollStartOffset, ref _savedCommentsIsScrolling, ref _savedCommentsScrollStarted, e);
-            }
-            else if (sender == SuggestionsScrollViewer)
-            {
-                HandleTouchStyleScroll(SuggestionsScrollViewer, ref _suggestionsScrollStartPoint, ref _suggestionsScrollStartOffset, ref _suggestionsParentScrollStartOffset, ref _suggestionsIsScrolling, ref _suggestionsScrollStarted, e);
-            }
+            if (sender is ScrollViewer scrollViewer && ReferenceEquals(scrollViewer, _nestedVerticalScrollViewer))
+                HandleTouchStyleScroll(scrollViewer, ref _nestedVerticalScrollStartPoint, ref _nestedVerticalScrollStartOffset, ref _nestedVerticalParentScrollStartOffset, ref _nestedVerticalIsScrolling, ref _nestedVerticalScrollStarted, e);
         }
 
         private void TouchScrollViewer_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (sender == SavedCommentsScrollViewer)
-            {
-                FinishTouchStyleScroll(ref _savedCommentsIsScrolling, ref _savedCommentsScrollStartPoint, ref _savedCommentsScrollStarted, e);
-            }
-            else if (sender == SuggestionsScrollViewer)
-            {
-                FinishTouchStyleScroll(ref _suggestionsIsScrolling, ref _suggestionsScrollStartPoint, ref _suggestionsScrollStarted, e);
-            }
+            if (sender is not ScrollViewer scrollViewer || !ReferenceEquals(scrollViewer, _nestedVerticalScrollViewer)) return;
+            FinishTouchStyleScroll(ref _nestedVerticalIsScrolling, ref _nestedVerticalScrollStartPoint, ref _nestedVerticalScrollStarted, e);
+            _nestedVerticalScrollViewer = null;
+        }
+
+        private void NestedVerticalScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is not ScrollViewer scrollViewer) return;
+            double delta = -e.Delta / 3.0;
+            if (CanScrollVertically(scrollViewer, delta))
+                scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + delta);
+            else
+                EditorScrollViewer.ScrollToVerticalOffset(EditorScrollViewer.VerticalOffset + delta);
+            e.Handled = true;
         }
 
         private void HandleTouchStyleScroll(ScrollViewer scrollViewer, ref Point? startPoint, ref double startOffset, ref double parentStartOffset, ref bool isScrolling, ref bool scrollStarted, MouseEventArgs e)
@@ -12260,6 +12259,8 @@ namespace InspectionEditor
                 TranscribeButton.IsEnabled = false;
                 PrevPhotoButton.IsEnabled = false;
                 NextPhotoButton.IsEnabled = false;
+                PrevPhotoButton.Visibility = Visibility.Collapsed;
+                NextPhotoButton.Visibility = Visibility.Collapsed;
                 DeletePhotoButton.IsEnabled = false;
                 PhotoCounterText.Text = "No photos";
                 // Red placeholder when picture is required but missing
@@ -12310,9 +12311,12 @@ namespace InspectionEditor
                 TranscribeButton.IsEnabled = false;
             }
 
-            // Enable/disable navigation arrows based on position
-            PrevPhotoButton.IsEnabled = _currentPhotoIndex > 0;
-            NextPhotoButton.IsEnabled = _currentPhotoIndex < _editorLoadedItem.Pictures.Count - 1;
+            // Looping navigation only appears when there is actually more than one photo.
+            bool hasMultiplePhotos = _editorLoadedItem.Pictures.Count > 1;
+            PrevPhotoButton.Visibility = hasMultiplePhotos ? Visibility.Visible : Visibility.Collapsed;
+            NextPhotoButton.Visibility = hasMultiplePhotos ? Visibility.Visible : Visibility.Collapsed;
+            PrevPhotoButton.IsEnabled = hasMultiplePhotos;
+            NextPhotoButton.IsEnabled = hasMultiplePhotos;
             DeletePhotoButton.IsEnabled = true; // Can delete current photo
             
             // Always show photo counter
@@ -12356,15 +12360,17 @@ namespace InspectionEditor
 
         private void PrevPhotoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_editorLoadedItem == null || _currentPhotoIndex <= 0) return;
-            _currentPhotoIndex--;
+            if (_editorLoadedItem == null || _editorLoadedItem.Pictures.Count <= 1) return;
+            int photoCount = _editorLoadedItem.Pictures.Count;
+            _currentPhotoIndex = (_currentPhotoIndex - 1 + photoCount) % photoCount;
             LoadCurrentPhoto();
         }
 
         private void NextPhotoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_editorLoadedItem == null || _currentPhotoIndex >= _editorLoadedItem.Pictures.Count - 1) return;
-            _currentPhotoIndex++;
+            if (_editorLoadedItem == null || _editorLoadedItem.Pictures.Count <= 1) return;
+            int photoCount = _editorLoadedItem.Pictures.Count;
+            _currentPhotoIndex = (_currentPhotoIndex + 1) % photoCount;
             LoadCurrentPhoto();
         }
 

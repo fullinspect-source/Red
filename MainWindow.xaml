@@ -749,6 +749,7 @@
                                     <ScrollViewer x:Name="StatusScrollViewer" Grid.Row="4"
                                                   HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                                                   PanningMode="VerticalOnly" CanContentScroll="False"
+                                                  PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
                                                   PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
                                                   PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
@@ -764,6 +765,7 @@
                                     <ScrollViewer x:Name="PrefixScrollViewer" Grid.Row="1"
                                                   HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                                                   PanningMode="VerticalOnly" CanContentScroll="False"
+                                                  PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
                                                   PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
                                                   PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
@@ -787,6 +789,7 @@
                                     <ScrollViewer x:Name="SuffixScrollViewer" Grid.Row="2"
                                                   HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                                                   PanningMode="VerticalOnly" CanContentScroll="False"
+                                                  PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
                                                   PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
                                                   PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
@@ -804,43 +807,44 @@
                             </Grid.RowDefinitions>
 
                             <!-- Photo Section (moved to right column) -->
-                            <Border x:Name="PhotoBorder" Grid.Row="1" Height="170" BorderBrush="#BDC3C7" BorderThickness="1" Padding="6" Background="#F0F8FF" Margin="0,6,0,0">
+                            <Border x:Name="PhotoBorder" Grid.Row="1" Height="145" BorderBrush="#BDC3C7" BorderThickness="1" Padding="5" Background="#F0F8FF" Margin="0,6,0,0">
                                 <Grid x:Name="PhotoWorkspaceGrid">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="145"/>
+                                        <ColumnDefinition Width="34"/>
+                                        <ColumnDefinition Width="165"/>
+                                        <ColumnDefinition Width="34"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <Image x:Name="PhotoImage" Grid.Column="0" Width="140" Height="150" Stretch="Uniform"
+                                    <Button x:Name="PrevPhotoButton" Grid.Column="0" Content="◀" Click="PrevPhotoButton_Click"
+                                            Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0"
+                                            Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="44"/>
+
+                                    <Image x:Name="PhotoImage" Grid.Column="1" Width="160" Height="130" Stretch="Uniform"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                            MouseLeftButtonDown="PhotoImage_Click" Cursor="Hand" ToolTip="Click thumbnail to edit photo"/>
-                                    <Border x:Name="NoPhotoPlaceholder" Grid.Column="0" Background="#E2E8F0"
-                                            Width="140" Height="140" CornerRadius="4"
+                                    <Border x:Name="NoPhotoPlaceholder" Grid.Column="1" Background="#E2E8F0"
+                                            Width="160" Height="125" CornerRadius="4"
                                             HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <TextBlock Text="NO PHOTO" Foreground="#64748B" FontWeight="SemiBold"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <Border x:Name="PhotoRequiredPlaceholder" Grid.Column="0"
+                                    <Border x:Name="PhotoRequiredPlaceholder" Grid.Column="1"
                                             Background="#8B0000" Visibility="Collapsed"
-                                            Width="140" Height="140"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                                            CornerRadius="4"/>
+                                            Width="160" Height="125"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="4"/>
+                                    <TextBlock x:Name="PhotoCounterText" Grid.Column="1" Text="No photos"
+                                               FontSize="10" Foreground="#334155" Background="#CCFFFFFF" Padding="4,1"
+                                               HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
 
-                                    <StackPanel x:Name="PhotoActionsPanel" Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock x:Name="PhotoCounterText" Text="No photos" FontSize="11" Foreground="#666" Margin="3,0,0,5"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                            <Button x:Name="PrevPhotoButton" Content="◀" Click="PrevPhotoButton_Click"
-                                                    Background="#555" Foreground="White" BorderThickness="0"
-                                                    Padding="10,4" FontSize="14" MinWidth="36" IsEnabled="False" TabIndex="44"/>
-                                            <Button x:Name="NextPhotoButton" Content="▶" Click="NextPhotoButton_Click"
-                                                    Background="#555" Foreground="White" BorderThickness="0"
-                                                    Padding="10,4" FontSize="14" MinWidth="36" IsEnabled="False" TabIndex="45"/>
-                                        </StackPanel>
-                                        <WrapPanel Orientation="Horizontal">
-                                            <Button x:Name="SelectPhotoButton" Content="📁 _File" Click="SelectPhotoButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="8,5" ToolTip="Select photo file (Alt+F)" TabIndex="40"/>
-                                            <Button x:Name="CameraButton" Content="📷 Ca_mera" Click="CameraButton_Click" Background="#9B59B6" Foreground="White" BorderThickness="0" Padding="8,5" ToolTip="Take photo with camera (Alt+M)" TabIndex="41"/>
-                                            <Button x:Name="DeletePhotoButton" Content="🗑️ De_lete" Click="DeletePhotoButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,5" IsEnabled="False" ToolTip="Delete current photo (Alt+L)" TabIndex="42"/>
-                                        </WrapPanel>
+                                    <Button x:Name="NextPhotoButton" Grid.Column="2" Content="▶" Click="NextPhotoButton_Click"
+                                            Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0"
+                                            Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="45"/>
+
+                                    <StackPanel x:Name="PhotoActionsPanel" Grid.Column="3" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <Button x:Name="SelectPhotoButton" Content="📁 _File" Click="SelectPhotoButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="8,5" Margin="0,1" ToolTip="Select photo file (Alt+F)" TabIndex="40"/>
+                                        <Button x:Name="CameraButton" Content="📷 Ca_mera" Click="CameraButton_Click" Background="#9B59B6" Foreground="White" BorderThickness="0" Padding="8,5" Margin="0,1" ToolTip="Take photo with camera (Alt+M)" TabIndex="41"/>
+                                        <Button x:Name="DeletePhotoButton" Content="🗑️ De_lete" Click="DeletePhotoButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,5" Margin="0,1" IsEnabled="False" ToolTip="Delete current photo (Alt+L)" TabIndex="42"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -851,7 +855,8 @@
                                     <TextBlock Text="COMMENT (editable)" FontWeight="Bold" FontSize="12" Foreground="#1E8449" Margin="0,0,0,5"/>
                                     <!-- Grid wrapper for CommentsTextBox + Quick Suggestions overlay -->
                                     <Grid>
-                                        <TextBox x:Name="CommentsTextBox"
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CommentsTextBox" Grid.Column="0"
                                                  TextWrapping="Wrap"
                                                  AcceptsReturn="True"
                                                  MinHeight="80"
@@ -862,7 +867,7 @@
                                                  TextChanged="CommentsTextBox_TextChanged"
                                                  TabIndex="50"/>
                                         <!-- Quick Suggestions Overlay - 3 columns side by side -->
-                                        <Grid x:Name="QuickSuggestionsOverlay"
+                                        <Grid x:Name="QuickSuggestionsOverlay" Grid.Column="0"
                                               Visibility="Collapsed"
                                               Margin="1">
                                             <Grid.ColumnDefinitions>
@@ -929,23 +934,23 @@
                                                            Foreground="#444"/>
                                             </Button>
                                         </Grid>
-                                    </Grid>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <StackPanel x:Name="CommentActionsPanel" Grid.Column="1" Orientation="Vertical" Margin="8,0,0,0" VerticalAlignment="Center">
                                         <Button x:Name="SpecialistFlagButton"
                                                 Content="&#x1F6A9;"
-                                                Click="SpecialistFlagButton_Click"
+                                                PreviewMouseLeftButtonDown="SpecialistFlagButton_PreviewMouseLeftButtonDown"
                                                 FontFamily="Segoe UI Emoji"
                                                 Background="#FFF1F2"
                                                 Foreground="#BE123C"
                                                 BorderBrush="#FB7185"
                                                 Padding="8,5"
-                                                Margin="0,0,12,0"
-                                                ToolTip="Flag this comment for specialist review"
+                                                Margin="0,1"
+                                                ToolTip="Double-click to flag; single-click an active flag to remove"
                                                 IsEnabled="False"
                                                 TabIndex="50"/>
-                                        <Button x:Name="ClearButton" Content="🗑️ _Clear" Click="ClearButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,5" Margin="0,0,12,0" ToolTip="Clear comment (Alt+C)" TabIndex="51"/>
-                                        <Button x:Name="ApplyToItemButton" Content="✓ Appl_y" Click="ApplyToItemButton_Click" Background="#8B0000" Foreground="White" BorderThickness="0" Padding="8,5" ToolTip="Apply changes to item (Alt+Y)" TabIndex="70"/>
-                                    </StackPanel>
+                                        <Button x:Name="ClearButton" Content="🗑️ _Clear" Click="ClearButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,5" Margin="0,1" ToolTip="Clear comment (Alt+C)" TabIndex="51"/>
+                                        <Button x:Name="ApplyToItemButton" Content="✓ Appl_y" Click="ApplyToItemButton_Click" Background="#8B0000" Foreground="White" BorderThickness="0" Padding="8,5" Margin="0,1" ToolTip="Apply changes to item (Alt+Y)" TabIndex="70"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -969,6 +974,7 @@
                                                   VerticalScrollBarVisibility="Auto"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   PanningMode="VerticalOnly"
+                                                  PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
                                                   PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
                                                   PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
@@ -1001,6 +1007,7 @@
                                                   VerticalScrollBarVisibility="Auto"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   PanningMode="VerticalOnly"
+                                                  PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
                                                   PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
                                                   PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
