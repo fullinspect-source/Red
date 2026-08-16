@@ -13,6 +13,9 @@ class EquipmentAirflowUiStaticTests(unittest.TestCase):
         self.assertIn("RotateFlipType.Rotate180FlipNone", ENERGY)
         self.assertIn("RotateFlipType.Rotate270FlipNone", ENERGY)
         self.assertIn("if (bestText.Trim().Length >= 50)", ENERGY)
+        self.assertIn("InspectionEditor.Resources.eng.traineddata", ENERGY)
+        self.assertIn("_tessDataPath ??= ExtractEmbeddedTessData();", ENERGY)
+        self.assertIn("OCR language data is unavailable", ENERGY)
 
     def test_all_approved_matchups_are_present(self):
         for outdoor, indoor, cfm in (

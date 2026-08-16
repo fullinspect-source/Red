@@ -1007,8 +1007,11 @@ namespace InspectionEditor.Services
             if (raw.Trim().Length < 50)
             {
                 string? tessData = GetTessDataPath();
-                if (tessData != null)
-                    raw = OcrAllPages(pdfPath, tessData);
+                if (tessData == null)
+                    throw new InvalidOperationException("OCR language data is unavailable. Repair or update RED and try again.");
+                raw = OcrAllPages(pdfPath, tessData);
+                if (raw.Trim().Length < 50)
+                    throw new InvalidDataException("OCR ran but could not read this image-only EC report.");
             }
 
             try { File.WriteAllText(DebugTextPath, $"PDF: {pdfPath}\n\n{raw}"); } catch { }
@@ -1113,7 +1116,37 @@ namespace InspectionEditor.Services
             };
             _tessDataPath = candidates.FirstOrDefault(p =>
                 Directory.Exists(p) && File.Exists(Path.Combine(p, "eng.traineddata")));
+            _tessDataPath ??= ExtractEmbeddedTessData();
             return _tessDataPath;
+        }
+
+        private static string? ExtractEmbeddedTessData()
+        {
+            try
+            {
+                string tessDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "RED", "OCR", "tessdata");
+                string trainedDataPath = Path.Combine(tessDir, "eng.traineddata");
+                if (File.Exists(trainedDataPath) && new FileInfo(trainedDataPath).Length > 1_000_000)
+                    return tessDir;
+
+                Directory.CreateDirectory(tessDir);
+                using Stream? source = typeof(EnergyComplianceService).Assembly
+                    .GetManifestResourceStream("InspectionEditor.Resources.eng.traineddata");
+                if (source == null) return null;
+
+                string tempPath = trainedDataPath + ".tmp";
+                using (var destination = File.Create(tempPath))
+                    source.CopyTo(destination);
+                File.Move(tempPath, trainedDataPath, true);
+                return File.Exists(trainedDataPath) ? tessDir : null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Embedded OCR data extraction failed: {ex.Message}");
+                return null;
+            }
         }
 
         private static void ParseText(string raw, EnergyComplianceInfo info)
