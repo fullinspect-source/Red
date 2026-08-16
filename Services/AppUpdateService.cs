@@ -22,7 +22,7 @@ namespace InspectionEditor.Services
 
     internal static class AppUpdateService
     {
-        internal const string InternetRequiredMessage = "RED is offline, so the automatic update check was skipped. RED can still be used normally.";
+        internal const string InternetRequiredMessage = "RED is offline, so the automatic update check was skipped. The updater will try again the next time RED opens.";
         private const string UpdateCheckFailedMessage = "RED couldn't check for updates. Please try again.";
         private const string LatestReleaseApi = "https://api.github.com/repos/fullinspect-source/Red/releases/latest";
         private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);

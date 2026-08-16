@@ -13,7 +13,8 @@ class OfflineUpdateMessageTests(unittest.TestCase):
     def test_notice_says_only_update_check_was_skipped(self):
         self.assertIn("RED still works normally offline.", APP)
         self.assertIn("Only the automatic update check was skipped.", APP)
-        self.assertIn("No action is required.", APP)
+        self.assertIn("The updater will try again the next time RED opens.", APP)
+        self.assertIn("If you want to update, connect to the internet before opening RED.", APP)
 
     def test_title_does_not_imply_red_requires_internet(self):
         self.assertIn('"Update Check Skipped"', APP)
