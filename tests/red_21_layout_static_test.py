@@ -89,11 +89,28 @@ class Red21LayoutTests(unittest.TestCase):
         handler = CODE[handler_start:handler_end]
         self.assertIn("PopulateInlineChecklist(SearchFilterBox.Text);", handler)
 
+    def test_right_workspace_scrolls_and_photo_controls_stay_beside_thumbnail(self):
+        editor_start = XAML.index('x:Name="EditorScrollViewer"')
+        self.assertIn('VerticalScrollBarVisibility="Auto"', XAML[editor_start:editor_start + 400])
+        self.assertIn('x:Name="PhotoWorkspaceGrid"', XAML)
+        self.assertIn('x:Name="PhotoImage" Grid.Column="0"', XAML)
+        self.assertIn('x:Name="NoPhotoPlaceholder" Grid.Column="0"', XAML)
+        self.assertIn('x:Name="PhotoActionsPanel" Grid.Column="1"', XAML)
+        self.assertIn("IsDescendantOf(source, StatusScrollViewer)", CODE)
+        self.assertIn("IsDescendantOf(source, PrefixScrollViewer)", CODE)
+        self.assertIn("IsDescendantOf(source, SuffixScrollViewer)", CODE)
+
+    def test_saved_comments_and_ai_have_fixed_heights_with_internal_scrolling(self):
+        self.assertIn('x:Name="SavedCommentsBorder" Height="210"', XAML)
+        self.assertIn('x:Name="GenAiBorder" Height="210"', XAML)
+        self.assertIn('x:Name="SavedCommentsScrollViewer"', XAML)
+        self.assertIn('x:Name="SuggestionsScrollViewer"', XAML)
+
     def test_get_three_and_transcription_share_one_output_surface(self):
         self.assertEqual(XAML.count('x:Name="SuggestionsStack"'), 1)
         self.assertIn("🤖 GENERATIVE AI", XAML)
         ai_start = XAML.index("🤖 GENERATIVE AI")
-        self.assertIn('<WrapPanel Orientation="Horizontal">', XAML[ai_start - 100:ai_start + 100])
+        self.assertIn('<WrapPanel Grid.Row="0" Orientation="Horizontal">', XAML[ai_start - 150:ai_start + 100])
         self.assertIn("await GetAISuggestionsAsync();", CODE)
         self.assertIn("await GetAISuggestionsAsync(transcribeMode: true);", CODE)
 

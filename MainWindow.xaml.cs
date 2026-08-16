@@ -12263,6 +12263,10 @@ namespace InspectionEditor
                 DeletePhotoButton.IsEnabled = false;
                 PhotoCounterText.Text = "No photos";
                 // Red placeholder when picture is required but missing
+                NoPhotoPlaceholder.Visibility =
+                    (_editorLoadedItem?.IsPictureRequired == true)
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
                 PhotoRequiredPlaceholder.Visibility =
                     (_editorLoadedItem?.IsPictureRequired == true)
                         ? Visibility.Visible
@@ -12270,6 +12274,7 @@ namespace InspectionEditor
                 return;
             }
             // Has photos — hide placeholder
+            NoPhotoPlaceholder.Visibility = Visibility.Collapsed;
             PhotoRequiredPlaceholder.Visibility = Visibility.Collapsed;
 
             // Clamp index to valid range
@@ -13658,6 +13663,10 @@ namespace InspectionEditor
         // Handle scroll wheel events to ensure scrolling works even when focus is on child controls
         private void EditorScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
+            // Let fixed-height nested lists consume the wheel before the outer workspace.
+            if (IsInsideVerticalNestedEditorScroller(e.OriginalSource as DependencyObject))
+                return;
+
             var scrollViewer = sender as ScrollViewer;
             if (scrollViewer != null)
             {
@@ -13952,6 +13961,7 @@ namespace InspectionEditor
             // Text editing and dropdowns need their normal selection behavior. Buttons still
             // participate so dragging over saved comments / AI buttons scrolls reliably.
             if (IsInsideTextEditingSurface(e.OriginalSource as DependencyObject) ||
+                IsInsideVerticalNestedEditorScroller(e.OriginalSource as DependencyObject) ||
                 FindAncestor<ComboBox>(e.OriginalSource as DependencyObject) != null)
             {
                 return;
@@ -14005,7 +14015,10 @@ namespace InspectionEditor
 
         private bool IsInsideVerticalNestedEditorScroller(DependencyObject? source)
         {
-            return IsDescendantOf(source, SavedCommentsScrollViewer) ||
+            return IsDescendantOf(source, StatusScrollViewer) ||
+                   IsDescendantOf(source, PrefixScrollViewer) ||
+                   IsDescendantOf(source, SuffixScrollViewer) ||
+                   IsDescendantOf(source, SavedCommentsScrollViewer) ||
                    IsDescendantOf(source, SuggestionsScrollViewer);
         }
 
