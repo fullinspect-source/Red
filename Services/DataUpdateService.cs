@@ -36,13 +36,15 @@ namespace InspectionEditor.Services
         // Local paths (in app directory)
         // For single-file publish, BaseDirectory is a temp folder. Use the actual exe location instead.
         private static readonly string AppFolder = Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
-        private static readonly string QuickCommentsPath  = Path.Combine(AppFolder, "quick_comments.json");
+        // Download mutable data to AppData. The install folder may be read-only, and a bundled
+        // quick_comments.json must never shadow a newer downloaded copy.
+        private static readonly string QuickCommentsPath  = Path.Combine(AppIdentity.LocalAppDataPath, "quick_comments.json");
         private static readonly string InspectorStatsPath = Path.Combine(AppFolder, "inspector_stats.json");
         private static readonly string InspectionTypesPath = Path.Combine(AppFolder, "inspection_types.csv");
         
         // Only check for updates every 12 hours (opened/closed many times per day)
         private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(12);
-        private static readonly string LastCheckFile = Path.Combine(AppFolder, ".last_data_update");
+        private static readonly string LastCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_data_update");
         
         // Warn if data files are older than this (weekly cron = max 7 days; 14 gives one missed-week buffer)
         private static readonly TimeSpan StaleDataThreshold = TimeSpan.FromDays(14);
@@ -55,7 +57,7 @@ namespace InspectionEditor.Services
         {
             try
             {
-                bool quickCommentsStale = IsFileStale(QuickCommentsPath);
+                bool quickCommentsStale = IsFileStale(QuickCommentsPath, useGeneratedDate: true);
                 bool inspectorStatsStale = IsFileStale(InspectorStatsPath, useGeneratedDate: true);
                 bool inspectionTypesStale = IsFileStale(InspectionTypesPath);
 
@@ -113,7 +115,8 @@ namespace InspectionEditor.Services
             try
             {
                 // Skip if we checked recently — UNLESS data files are stale
-                bool dataIsStale = IsFileStale(QuickCommentsPath) || IsFileStale(InspectorStatsPath, useGeneratedDate: true) || IsFileStale(InspectionTypesPath);
+                Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
+                bool dataIsStale = IsFileStale(QuickCommentsPath, useGeneratedDate: true) || IsFileStale(InspectorStatsPath, useGeneratedDate: true) || IsFileStale(InspectionTypesPath);
                 if (!dataIsStale && File.Exists(LastCheckFile))
                 {
                     var lastCheck = File.GetLastWriteTime(LastCheckFile);
@@ -123,7 +126,8 @@ namespace InspectionEditor.Services
 
                 // Update all files in parallel
                 await Task.WhenAll(
-                    DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath),
+                    DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath,
+                        IsValidQuickCommentsPayload, preserveNewerGeneratedData: true),
                     DownloadIfNewerAsync(INSPECTOR_STATS_URL, InspectorStatsPath),
                     DownloadIfNewerAsync(INSPECTION_TYPES_URL, InspectionTypesPath,
                         content => content.TrimStart().StartsWith("INS Type"))
@@ -186,7 +190,8 @@ namespace InspectionEditor.Services
                 // Always refresh companion datasets on a forced update, even if stats did not change.
                 // If their content is identical, DownloadIfNewerAsync touches the files so the stale warning
                 // reflects the successful refresh instead of the embedded/generated data age.
-                await DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath);
+                await DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath,
+                    IsValidQuickCommentsPayload, preserveNewerGeneratedData: true);
                 await DownloadIfNewerAsync(INSPECTION_TYPES_URL, InspectionTypesPath,
                     content => content.TrimStart().StartsWith("INS Type"));
 
@@ -221,7 +226,8 @@ namespace InspectionEditor.Services
         private static async Task DownloadIfNewerAsync(
             string url,
             string localPath,
-            Func<string, bool>? isValid = null)
+            Func<string, bool>? isValid = null,
+            bool preserveNewerGeneratedData = false)
         {
             if (url.Contains("PLACEHOLDER"))
                 return;
@@ -230,7 +236,9 @@ namespace InspectionEditor.Services
 
             try
             {
-                var response = await _httpClient.GetAsync(url);
+                string separator = url.Contains('?') ? "&" : "?";
+                string requestUrl = $"{url}{separator}_={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                var response = await _httpClient.GetAsync(requestUrl);
                 if (!response.IsSuccessStatusCode)
                     return;
 
@@ -238,6 +246,15 @@ namespace InspectionEditor.Services
                 remoteContent = remoteContent.Trim();
                 if (!isValid(remoteContent))
                     return;
+
+                if (preserveNewerGeneratedData && File.Exists(localPath))
+                {
+                    var remoteGenerated = GetGeneratedDate(remoteContent);
+                    var localGenerated = GetGeneratedDate(File.ReadAllText(localPath));
+                    if (remoteGenerated.HasValue && localGenerated.HasValue &&
+                        remoteGenerated.Value < localGenerated.Value)
+                        return;
+                }
 
                 if (File.Exists(localPath))
                 {
@@ -249,13 +266,31 @@ namespace InspectionEditor.Services
                     }
                 }
 
-                File.WriteAllText(localPath, remoteContent);
+                Directory.CreateDirectory(Path.GetDirectoryName(localPath) ?? AppIdentity.LocalAppDataPath);
+                string temporaryPath = localPath + ".download";
+                File.WriteAllText(temporaryPath, remoteContent);
+                File.Move(temporaryPath, localPath, true);
                 System.Diagnostics.Debug.WriteLine($"Updated {Path.GetFileName(localPath)} from cloud");
             }
             catch
             {
                 // Silently fail for individual file
             }
+        }
+
+        private static bool IsValidQuickCommentsPayload(string content)
+        {
+            return content.StartsWith("{") &&
+                   Regex.IsMatch(content, "\"generated\"\\s*:\\s*\"[^\"]+\"") &&
+                   Regex.IsMatch(content, "\"items\"\\s*:\\s*\\{");
+        }
+
+        private static DateTime? GetGeneratedDate(string content)
+        {
+            var match = Regex.Match(content, "\"generated\"\\s*:\\s*\"([^\"]+)\"");
+            return match.Success && DateTime.TryParse(match.Groups[1].Value, out var generated)
+                ? generated
+                : null;
         }
     }
 }

@@ -55,8 +55,8 @@ class CameraCrashSafetyTests(unittest.TestCase):
         self.assertIn('DiagnosticLogService.Log("WPF dispatcher exception"', APP)
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.0.21</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-08-14</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.0.22</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-08-16</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

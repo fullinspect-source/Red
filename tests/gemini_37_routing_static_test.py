@@ -47,9 +47,9 @@ class Gemini37RoutingStaticTests(unittest.TestCase):
         self.assertGreaterEqual(len(fallback_calls), 3)
         self.assertTrue(all('thinkingLevel: null' in call for call in fallback_calls))
 
-    def test_release_metadata_is_2021_upgrade(self):
-        self.assertIn("<Version>2.0.21</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-08-14</ReleaseDate>", PROJECT)
+    def test_release_metadata_is_current(self):
+        self.assertIn("<Version>2.0.22</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-08-16</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

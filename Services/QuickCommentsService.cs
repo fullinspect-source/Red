@@ -14,10 +14,16 @@ namespace InspectionEditor.Services
     {
         private Dictionary<string, List<QuickComment>> _comments = new();
         private DateTime _lastLoadTime = DateTime.MinValue;
+        private string? _loadedPath;
+        private DateTime _loadedWriteTimeUtc = DateTime.MinValue;
         private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(24);
 
         private static readonly string[] SearchPaths = new[]
         {
+            // Mutable downloaded copy first. A bundled release file is fallback only.
+            Path.Combine(AppIdentity.LocalAppDataPath, "quick_comments.json"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                AppIdentity.LegacyAppDataFolderName, "quick_comments.json"),
             // Same folder as executable (use ProcessPath for single-file publish)
             Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory, "quick_comments.json"),
             Path.Combine(AppContext.BaseDirectory, "quick_comments.json"),
@@ -27,28 +33,27 @@ namespace InspectionEditor.Services
                 "Dropbox", "P", "quick_comments.json"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
                 "Library", "CloudStorage", "Dropbox-Personal", "P", "quick_comments.json"),
-            // AppData location (for team members who download from Drive)
-            Path.Combine(AppIdentity.LocalAppDataPath, "quick_comments.json"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                AppIdentity.LegacyAppDataFolderName, "quick_comments.json"),
             // Current directory fallback
             "quick_comments.json"
         };
 
         public void LoadComments()
         {
-            // Check cache validity
-            if (_comments.Count > 0 && DateTime.Now - _lastLoadTime < CacheDuration)
-            {
-                return;
-            }
-
             foreach (var path in SearchPaths)
             {
                 try
                 {
                     if (File.Exists(path))
                     {
+                        var writeTimeUtc = File.GetLastWriteTimeUtc(path);
+                        if (_comments.Count > 0 &&
+                            string.Equals(_loadedPath, path, StringComparison.OrdinalIgnoreCase) &&
+                            writeTimeUtc == _loadedWriteTimeUtc &&
+                            DateTime.Now - _lastLoadTime < CacheDuration)
+                        {
+                            return;
+                        }
+
                         var json = File.ReadAllText(path);
                         var data = JsonConvert.DeserializeObject<QuickCommentsData>(json);
                         
@@ -56,6 +61,8 @@ namespace InspectionEditor.Services
                         {
                             _comments = data.Items;
                             _lastLoadTime = DateTime.Now;
+                            _loadedPath = path;
+                            _loadedWriteTimeUtc = writeTimeUtc;
                             System.Diagnostics.Debug.WriteLine($"[QuickComments] Loaded {_comments.Count} items from {path}");
                             return;
                         }
