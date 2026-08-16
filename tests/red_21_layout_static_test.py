@@ -73,6 +73,13 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("StatusQuickPanel.Children.Add(btn);", CODE)
         self.assertIn("StatusKeyPanel.Children.Add(btn);", CODE)
 
+    def test_checklist_number_badges_stay_compact_and_status_choices_cannot_clip(self):
+        self.assertIn("InlineEmptyNumberBadgeBrush", CODE)
+        self.assertIn("grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });\n            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });", CODE)
+        self.assertIn("if (options != null)", CODE)
+        self.assertIn("return panel;", CODE)
+        self.assertNotIn("MinWidth = 180, MaxWidth = 520", CODE)
+
     def test_selected_item_comment_preview_hides_and_both_surfaces_share_neon_highlight(self):
         self.assertIn("!ReferenceEquals(item, _editorLoadedItem)", CODE)
         self.assertIn("SelectedItemHighlightColor", CODE)

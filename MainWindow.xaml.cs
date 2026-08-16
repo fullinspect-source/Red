@@ -33,6 +33,7 @@ namespace InspectionEditor
         private static readonly TimeSpan AppUpdateCheckInterval = TimeSpan.FromHours(24);
         private static readonly string LastAppUpdateCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
         private static readonly Color SelectedItemHighlightColor = Color.FromRgb(72, 229, 255);
+        private static readonly Brush InlineEmptyNumberBadgeBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240));
         
         private InspectionFile? _currentInspection;
         private Item? _currentItem;
@@ -170,11 +171,6 @@ namespace InspectionEditor
         // Remember last photo file picker directory across items
         private static string? _lastPhotoDirectory;
         
-        // Welcome screen logo triple-click easter egg
-        private int _logoClickCount = 0;
-        private DateTime _lastLogoClick = DateTime.MinValue;
-        private bool _taglineVisible = false;
-
         private readonly InspectionEditor.Services.InspectionTypeService _inspTypeService =
             new InspectionEditor.Services.InspectionTypeService();
         private bool _openedAsCompanion = false;
@@ -707,6 +703,8 @@ namespace InspectionEditor
         }
 
         internal bool HasOpenInspection => _currentInspection != null;
+        internal string? OpenInspectionFilePath => _currentFilePath;
+        internal string? OpenInspectionCode => _currentInspectionCode;
 
         internal void BringInspectionToFront()
         {
@@ -736,10 +734,6 @@ namespace InspectionEditor
         {
             Cursor = Cursors.Wait;
             Title = $"Opening {Path.GetFileName(filePath)}...";
-            WelcomePanel.Visibility = Visibility.Visible;
-            WelcomeHint.Text = $"Opening {Path.GetFileName(filePath)}...";
-            WelcomeHint.Foreground = new SolidColorBrush(Color.FromRgb(139, 0, 0));
-            WelcomeHint.Visibility = Visibility.Visible;
             FileNameText.Text = $"Opening {Path.GetFileName(filePath)}...";
         }
         
@@ -961,9 +955,6 @@ namespace InspectionEditor
             ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
             ClearSearchButton.BorderThickness = new Thickness(3);
             
-            // Animate "Click Open INS" hint sliding in from the left
-            StartWelcomeHintAnimation();
-
             // Secondary safety check for editor-only launches; normal RED startup uses the same 24-hour marker.
             if (ShouldRunStartupAppUpdateCheck())
             {
@@ -996,92 +987,9 @@ namespace InspectionEditor
             catch { }
         }
         
-        private void StartWelcomeHintAnimation()
-        {
-            var slideIn = new DoubleAnimation
-            {
-                From = -300,
-                To = 0,
-                Duration = TimeSpan.FromMilliseconds(600),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-                BeginTime = TimeSpan.FromMilliseconds(300) // Slight delay after load
-            };
-            HintTranslate.BeginAnimation(TranslateTransform.XProperty, slideIn);
-        }
-        
-        // Easter egg: triple-click on logo to toggle tagline + check for updates
-        private void WelcomeLogo_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            var now = DateTime.Now;
-            if ((now - _lastLogoClick).TotalMilliseconds > 500)
-                _logoClickCount = 0;
-
-            _logoClickCount++;
-            _lastLogoClick = now;
-
-            if (_logoClickCount >= 3)
-            {
-                _logoClickCount = 0;
-                // Toggle tagline, and always run force update
-                if (_taglineVisible) HideTagline(); else ShowTagline();
-                CheckForUpdatesAsync();
-            }
-        }
-        
-        private void ShowTagline()
-        {
-            _taglineVisible = true;
-            WelcomeTagline.Visibility = Visibility.Visible;
-            
-            var fadeIn = new DoubleAnimation
-            {
-                From = 0,
-                To = 1,
-                Duration = TimeSpan.FromMilliseconds(300),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            
-            var slideDown = new DoubleAnimation
-            {
-                From = -20,
-                To = 0,
-                Duration = TimeSpan.FromMilliseconds(300),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            
-            WelcomeTagline.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-            TaglineTranslate.BeginAnimation(TranslateTransform.YProperty, slideDown);
-        }
-        
-        private void HideTagline()
-        {
-            _taglineVisible = false;
-            
-            var fadeOut = new DoubleAnimation
-            {
-                From = 1,
-                To = 0,
-                Duration = TimeSpan.FromMilliseconds(200),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-            };
-            
-            var slideUp = new DoubleAnimation
-            {
-                From = 0,
-                To = -20,
-                Duration = TimeSpan.FromMilliseconds(200),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-            };
-            
-            fadeOut.Completed += (s, e) => WelcomeTagline.Visibility = Visibility.Collapsed;
-            
-            WelcomeTagline.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            TaglineTranslate.BeginAnimation(TranslateTransform.YProperty, slideUp);
-        }
-        
         /// <summary>
         /// Update check - works via direct HTTP to public GitHub repo (no gh CLI needed).
-        /// Triggered by triple-clicking the welcome logo, or automatically on startup.
+        /// Runs automatically for editor-only launches; About owns the visible manual update UI.
         /// </summary>
         private async void CheckForUpdatesAsync(bool silent = false)
         {
@@ -4827,8 +4735,8 @@ namespace InspectionEditor
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -4867,14 +4775,21 @@ namespace InspectionEditor
             Grid.SetColumn(chevron, 2);
             grid.Children.Add(chevron);
 
-            var numberBadge = CreateInlineBadge(item.Number ?? "", GetStatusBrush(item), Brushes.White, FontWeights.Bold);
+            string headerValue = item.Value?.ToString() ?? "";
+            bool hasHeaderValue = !string.IsNullOrWhiteSpace(headerValue);
+            var numberBadge = CreateInlineBadge(
+                item.Number ?? "",
+                hasHeaderValue ? GetStatusBrush(item) : InlineEmptyNumberBadgeBrush,
+                hasHeaderValue ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+                FontWeights.Bold);
             numberBadge.Margin = new Thickness(0, 8, 8, 8);
+            numberBadge.HorizontalAlignment = HorizontalAlignment.Left;
             Grid.SetColumn(numberBadge, 3);
             grid.Children.Add(numberBadge);
 
             var center = new Grid { VerticalAlignment = VerticalAlignment.Center };
             center.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
-            center.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star), MinWidth = 180, MaxWidth = 520 });
+            center.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MaxWidth = 320 });
 
             var prompt = new TextBlock
             {
@@ -5205,6 +5120,12 @@ namespace InspectionEditor
                 valueBox.LostFocus += InlineValueBox_LostFocus;
                 valueBox.MouseLeftButtonUp += (_, e) => e.Handled = true;
                 panel.Children.Add(valueBox);
+            }
+
+            if (options != null)
+            {
+                panel.Margin = new Thickness(0, 6, 0, 6);
+                return panel;
             }
 
             var scroller = new ScrollViewer

@@ -1032,35 +1032,9 @@
                                    HorizontalAlignment="Center" Margin="0,8,0,0"/>
                     </StackPanel>
 
-                    <!-- Welcome Message -->
-                    <StackPanel x:Name="WelcomePanel" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock x:Name="WelcomeLogo"
-                                   Text="🔴 Red"
-                                   FontSize="48"
-                                   FontWeight="Bold"
-                                   Foreground="#8B0000"
-                                   HorizontalAlignment="Center"
-                                   Cursor="Hand"
-                                   Background="Transparent"
-                                   Padding="20,10"
-                                   MouseLeftButtonDown="WelcomeLogo_MouseLeftButtonDown"/>
-                        <TextBlock x:Name="WelcomeTagline"
-                                   Text="Professional Language Assistant&#10;for Construction Evaluation, Notation &amp; Trade Assignment"
-                                   FontSize="11"
-                                   Foreground="#666"
-                                   TextAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="400"
-                                   Margin="0,5,0,20"
-                                   Visibility="Collapsed"
-                                   Opacity="0">
-                            <TextBlock.RenderTransform>
-                                <TranslateTransform x:Name="TaglineTranslate" Y="-20"/>
-                            </TextBlock.RenderTransform>
-                        </TextBlock>
-
-                        <!-- Force-update panel (triple-click) -->
+                    <!-- Hidden host retained only for the editor-only update worker. -->
+                    <StackPanel x:Name="WelcomePanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Update status controls stay hidden; About owns the visible update UI. -->
                         <Border x:Name="UpdatePanel"
                                 Visibility="Collapsed"
                                 Margin="0,12,0,0"
@@ -1147,17 +1121,6 @@
                                              Foreground="#8B0000"/>
                             </StackPanel>
                         </Border>
-                        <TextBlock x:Name="WelcomeHint"
-                                   Text="Click 'Open INS' to get started"
-                                   FontSize="18"
-                                   Foreground="#777"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,40,0,0"
-                                   RenderTransformOrigin="0.5,0.5">
-                            <TextBlock.RenderTransform>
-                                <TranslateTransform x:Name="HintTranslate" X="-300"/>
-                            </TextBlock.RenderTransform>
-                        </TextBlock>
                     </StackPanel>
                 </Grid>
             </ScrollViewer>

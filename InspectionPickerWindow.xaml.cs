@@ -1811,12 +1811,57 @@ namespace InspectionEditor
             }
         }
 
+        private bool TryBringOpenInspectionToFront(InspectionFileInfo selected)
+        {
+            var openWindows = Application.Current.Windows
+                .OfType<MainWindow>()
+                .Where(w => w.HasOpenInspection)
+                .ToList();
+
+            MainWindow? openInspection = openWindows.FirstOrDefault(w =>
+                PathEquals(w.OpenInspectionFilePath, selected.FilePath));
+
+            string inspectionCode = GetInspectionCodeFromFileName(selected.FilePath);
+            openInspection ??= openWindows.FirstOrDefault(w =>
+                !string.IsNullOrWhiteSpace(inspectionCode) &&
+                string.Equals(w.OpenInspectionCode, inspectionCode, StringComparison.OrdinalIgnoreCase));
+
+            if (openInspection == null)
+                return false;
+
+            openInspection.BringInspectionToFront();
+            StatusText.Text = $"Brought {selected.FileName} to the front.";
+            InspectionListView.SelectedItem = null;
+            return true;
+        }
+
+        private static bool PathEquals(string? left, string? right)
+        {
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+                return false;
+
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(left),
+                    Path.GetFullPath(right),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
         private async void OpenInspection(InspectionFileInfo selected)
         {
             if (_isLoading || selected == null) return;
 
             if (selected.IsTypeAlreadyOpen)
             {
+                if (TryBringOpenInspectionToFront(selected))
+                    return;
+
                 StatusText.Text = string.IsNullOrWhiteSpace(selected.InspectionCode)
                     ? "That inspection type is already open."
                     : $"{selected.InspectionTypeName} is already open.";
@@ -1835,6 +1880,9 @@ namespace InspectionEditor
                 (!string.IsNullOrWhiteSpace(inspectionCode) && _openInspectionTypes.Contains(inspectionCode)))
             {
                 _openingFilePaths.Remove(fullPath);
+                if (TryBringOpenInspectionToFront(selected))
+                    return;
+
                 MessageBox.Show(
                     string.IsNullOrWhiteSpace(inspectionCode)
                         ? "That inspection is already open in another RED window."
