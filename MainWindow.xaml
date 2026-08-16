@@ -917,7 +917,7 @@
                             </Grid.RowDefinitions>
 
                             <!-- Saved Comments -->
-                            <Border x:Name="SavedCommentsBorder" Height="140" Grid.Row="0" BorderBrush="#9B59B6" BorderThickness="1" Padding="6" Background="#FDF8FF">
+                            <Border x:Name="SavedCommentsBorder" Height="135" Grid.Row="0" BorderBrush="#9B59B6" BorderThickness="1" Padding="6" Background="#FDF8FF">
                                 <Grid>
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
@@ -938,13 +938,49 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Shared output for whichever action was invoked: Get 3 or Transcribe. -->
-                            <Border x:Name="GenAiBorder" Height="150" Grid.Row="1" BorderBrush="#E67E22" BorderThickness="1" Padding="6" Background="#FFFBF5" Margin="0,6,0,0">
+                            <!-- AI helper moved below the photo workspace. -->
+
+                        </Grid>
+
+
+                        <!-- Compact photo workspace stays near the bottom of the right pane. -->
+                        <Border x:Name="PhotoBorder" Height="120" BorderBrush="#BDC3C7" BorderThickness="1" Padding="4" Background="#F0F8FF" Margin="0,0,0,6">
+                            <Grid x:Name="PhotoWorkspaceGrid">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="34"/>
+                                    <ColumnDefinition Width="185"/>
+                                    <ColumnDefinition Width="34"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="PrevPhotoButton" Grid.Column="0" Content="◀" Click="PrevPhotoButton_Click" Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0" Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="44"/>
+                                <Image x:Name="PhotoImage" Grid.Column="1" Width="180" Height="100" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Top" MouseLeftButtonDown="PhotoImage_Click" Cursor="Hand" ToolTip="Click thumbnail to edit photo"/>
+                                <Border x:Name="NoPhotoPlaceholder" Grid.Column="1" Background="#E2E8F0" Width="180" Height="100" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Top">
+                                    <TextBlock Text="NO PHOTO" Foreground="#64748B" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Border x:Name="PhotoRequiredPlaceholder" Grid.Column="1" Background="#8B0000" Visibility="Collapsed" Width="180" Height="100" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="4"/>
+                                <TextBlock x:Name="PhotoCounterText" Grid.Column="1" Text="No photos" FontSize="10" Foreground="#334155" Background="#CCFFFFFF" Padding="4,1" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                                <Button x:Name="NextPhotoButton" Grid.Column="2" Content="▶" Click="NextPhotoButton_Click" Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0" Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="45"/>
+                                <StackPanel x:Name="PhotoActionsPanel" Grid.Column="3" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <Button x:Name="SelectPhotoButton" Content="📁 _File" Click="SelectPhotoButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" ToolTip="Select photo file (Alt+F)" TabIndex="40"/>
+                                    <Button x:Name="CameraButton" Content="📷 Ca_mera" Click="CameraButton_Click" Background="#9B59B6" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" ToolTip="Take photo with camera (Alt+M)" TabIndex="41"/>
+                                    <Button x:Name="DeletePhotoButton" Content="🗑️ De_lete" Click="DeletePhotoButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" IsEnabled="False" ToolTip="Delete current photo (Alt+L)" TabIndex="42"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                            <!-- Compact AI helper stays at the bottom of the selected-item pane. -->
+                            <Border x:Name="GenAiBorder" Height="130" BorderBrush="#E67E22" BorderThickness="1" Padding="6" Background="#FFFBF5" Margin="0,6,0,0">
                                 <Grid>
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                                    <WrapPanel Grid.Row="0" Orientation="Horizontal">
-                                        <TextBlock Text="🤖 GENERATIVE AI" FontWeight="Bold" FontSize="12" Foreground="#D35400" Margin="0,0,10,5"/>
-                                        <ComboBox x:Name="AiToneComboBox" Width="148" Height="26" SelectedIndex="0" FontSize="11" Margin="0,0,8,0" ToolTip="AI tone and speed" SelectionChanged="AiToneComboBox_SelectionChanged">
+                                    <Grid Grid.Row="0" Margin="0,0,0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="AI helper" FontWeight="Bold" FontSize="12" Foreground="#D35400" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <ComboBox x:Name="AiToneComboBox" Grid.Column="1" MinWidth="90" MaxWidth="118" Height="24" SelectedIndex="0" FontSize="10" Margin="0,0,6,0" ToolTip="AI tone and speed" SelectionChanged="AiToneComboBox_SelectionChanged">
                                             <ComboBoxItem Content="Technical - fast"/>
                                             <ComboBoxItem Content="Technical - careful"/>
                                             <ComboBoxItem Content="Nice - fast"/>
@@ -952,9 +988,9 @@
                                             <ComboBoxItem Content="Strict - fast"/>
                                             <ComboBoxItem Content="Strict - careful"/>
                                         </ComboBox>
-                                        <Button x:Name="GetSuggestionsButton" Content="_Get 3" Click="GetSuggestionsButton_Click" Background="#E67E22" Foreground="White" BorderThickness="0" Padding="14,4" MinWidth="86" FontSize="11" IsEnabled="False" Margin="0,0,12,0" ToolTip="Get AI suggestions (Alt+G)" TabIndex="76"/>
-                                        <Button x:Name="TranscribeButton" Content="Tra_nscribe" Click="TranscribeButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="8,3" FontSize="11" IsEnabled="False" Visibility="Collapsed" ToolTip="Transcribe label/sticker (Alt+N)" TabIndex="77"/>
-                                    </WrapPanel>
+                                        <Button x:Name="GetSuggestionsButton" Grid.Column="2" Content="_Get 3" Click="GetSuggestionsButton_Click" Background="#E67E22" Foreground="White" BorderThickness="0" Padding="8,3" MinWidth="58" FontSize="10" IsEnabled="False" Margin="0,0,5,0" ToolTip="Get AI suggestions (Alt+G)" TabIndex="76"/>
+                                        <Button x:Name="TranscribeButton" Grid.Column="3" Content="AI _OCR" Click="TranscribeButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="7,3" MinWidth="58" FontSize="10" IsEnabled="False" Visibility="Collapsed" ToolTip="OCR label/sticker text (Alt+N)" TabIndex="77"/>
+                                    </Grid>
                                     <TextBlock x:Name="LoadingText" Grid.Row="1" Text="⏳ Analyzing image..." Foreground="#E67E22" Visibility="Collapsed" Margin="0,5"/>
                                     <ScrollViewer x:Name="SuggestionsScrollViewer" Grid.Row="2"
                                                   VerticalScrollBarVisibility="Auto"
@@ -969,33 +1005,6 @@
                                     </ScrollViewer>
                                 </Grid>
                             </Border>
-                        </Grid>
-
-
-                        <!-- Compact photo workspace stays near the bottom of the right pane. -->
-                        <Border x:Name="PhotoBorder" Height="125" BorderBrush="#BDC3C7" BorderThickness="1" Padding="4" Background="#F0F8FF" Margin="0,0,0,6">
-                            <Grid x:Name="PhotoWorkspaceGrid">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="185"/>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="PrevPhotoButton" Grid.Column="0" Content="◀" Click="PrevPhotoButton_Click" Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0" Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="44"/>
-                                <Image x:Name="PhotoImage" Grid.Column="1" Width="180" Height="105" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Top" MouseLeftButtonDown="PhotoImage_Click" Cursor="Hand" ToolTip="Click thumbnail to edit photo"/>
-                                <Border x:Name="NoPhotoPlaceholder" Grid.Column="1" Background="#E2E8F0" Width="180" Height="105" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Top">
-                                    <TextBlock Text="NO PHOTO" Foreground="#64748B" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <Border x:Name="PhotoRequiredPlaceholder" Grid.Column="1" Background="#8B0000" Visibility="Collapsed" Width="180" Height="105" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="4"/>
-                                <TextBlock x:Name="PhotoCounterText" Grid.Column="1" Text="No photos" FontSize="10" Foreground="#334155" Background="#CCFFFFFF" Padding="4,1" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
-                                <Button x:Name="NextPhotoButton" Grid.Column="2" Content="▶" Click="NextPhotoButton_Click" Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0" Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="45"/>
-                                <StackPanel x:Name="PhotoActionsPanel" Grid.Column="3" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <Button x:Name="SelectPhotoButton" Content="📁 _File" Click="SelectPhotoButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" ToolTip="Select photo file (Alt+F)" TabIndex="40"/>
-                                    <Button x:Name="CameraButton" Content="📷 Ca_mera" Click="CameraButton_Click" Background="#9B59B6" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" ToolTip="Take photo with camera (Alt+M)" TabIndex="41"/>
-                                    <Button x:Name="DeletePhotoButton" Content="🗑️ De_lete" Click="DeletePhotoButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" IsEnabled="False" ToolTip="Delete current photo (Alt+L)" TabIndex="42"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
                     </StackPanel>
 
                     <!-- Select Item Prompt - shown when inspection loaded but no item selected -->

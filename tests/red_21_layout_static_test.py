@@ -100,9 +100,9 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn('x:Name="NoPhotoPlaceholder" Grid.Column="1"', XAML)
         self.assertIn('x:Name="PhotoActionsPanel" Grid.Column="3"', XAML)
         self.assertLess(XAML.index('x:Name="SavedCommentsBorder"'), XAML.index('x:Name="PhotoBorder"'))
-        self.assertLess(XAML.index('x:Name="GenAiBorder"'), XAML.index('x:Name="PhotoBorder"'))
-        self.assertIn('x:Name="PhotoBorder" Height="125"', XAML)
-        self.assertIn('x:Name="PhotoImage" Grid.Column="1" Width="180" Height="105"', XAML)
+        self.assertLess(XAML.index('x:Name="PhotoBorder"'), XAML.index('x:Name="GenAiBorder"'))
+        self.assertIn('x:Name="PhotoBorder" Height="120"', XAML)
+        self.assertIn('x:Name="PhotoImage" Grid.Column="1" Width="180" Height="100"', XAML)
         self.assertIn('x:Name="PrevPhotoButton" Grid.Column="0"', XAML)
         self.assertIn('x:Name="NextPhotoButton" Grid.Column="2"', XAML)
         self.assertIn('Visibility="Collapsed"', XAML[XAML.index('x:Name="PrevPhotoButton"'):XAML.index('x:Name="PrevPhotoButton"') + 500])
@@ -116,10 +116,24 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertNotIn('PreviewMouseLeftButtonDown="EditorScrollViewer_PreviewMouseLeftButtonDown"', XAML)
 
     def test_saved_comments_and_ai_have_fixed_heights_with_internal_scrolling(self):
-        self.assertIn('x:Name="SavedCommentsBorder" Height="140"', XAML)
-        self.assertIn('x:Name="GenAiBorder" Height="150"', XAML)
+        self.assertIn('x:Name="SavedCommentsBorder" Height="135"', XAML)
+        self.assertIn('x:Name="GenAiBorder" Height="130"', XAML)
         self.assertIn('x:Name="SavedCommentsScrollViewer"', XAML)
         self.assertIn('x:Name="SuggestionsScrollViewer"', XAML)
+
+    def test_ai_helper_header_is_compact_and_actions_share_one_row(self):
+        self.assertIn('Text="AI helper"', XAML)
+        self.assertIn('x:Name="AiToneComboBox" Grid.Column="1" MinWidth="90" MaxWidth="118"', XAML)
+        self.assertIn('x:Name="GetSuggestionsButton" Grid.Column="2"', XAML)
+        self.assertIn('x:Name="TranscribeButton" Grid.Column="3" Content="AI _OCR"', XAML)
+
+    def test_checklist_prompt_has_priority_and_comment_truncates(self):
+        self.assertIn('Width = new GridLength(2, GridUnitType.Star)', CODE)
+        self.assertIn('MinWidth = 180', CODE)
+        self.assertIn('Width = new GridLength(1, GridUnitType.Star)', CODE)
+        self.assertIn('MaxWidth = 220', CODE)
+        self.assertIn('TextTrimming = TextTrimming.CharacterEllipsis', CODE)
+        self.assertIn('TextWrapping = TextWrapping.NoWrap', CODE)
 
     def test_comment_actions_stack_and_flag_uses_double_on_single_off(self):
         self.assertIn('x:Name="CommentActionsPanel" Grid.Column="1" Orientation="Vertical"', XAML)
@@ -130,9 +144,9 @@ class Red21LayoutTests(unittest.TestCase):
 
     def test_get_three_and_transcription_share_one_output_surface(self):
         self.assertEqual(XAML.count('x:Name="SuggestionsStack"'), 1)
-        self.assertIn("🤖 GENERATIVE AI", XAML)
-        ai_start = XAML.index("🤖 GENERATIVE AI")
-        self.assertIn('<WrapPanel Grid.Row="0" Orientation="Horizontal">', XAML[ai_start - 150:ai_start + 100])
+        self.assertIn('Text="AI helper"', XAML)
+        ai_start = XAML.index('Text="AI helper"')
+        self.assertIn('<Grid Grid.Row="0" Margin="0,0,0,3">', XAML[ai_start - 800:ai_start])
         self.assertIn("await GetAISuggestionsAsync();", CODE)
         self.assertIn("await GetAISuggestionsAsync(transcribeMode: true);", CODE)
 

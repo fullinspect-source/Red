@@ -4794,9 +4794,17 @@ namespace InspectionEditor
             Grid.SetColumn(numberBadge, 3);
             grid.Children.Add(numberBadge);
 
-            var center = new Grid { VerticalAlignment = VerticalAlignment.Center };
-            center.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
-            center.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MaxWidth = 320 });
+            var center = new Grid { VerticalAlignment = VerticalAlignment.Center, ClipToBounds = true };
+            center.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(2, GridUnitType.Star),
+                MinWidth = 180
+            });
+            center.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(1, GridUnitType.Star),
+                MaxWidth = 220
+            });
 
             var prompt = new TextBlock
             {
