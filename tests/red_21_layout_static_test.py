@@ -10,6 +10,9 @@ CODE = (ROOT / "MainWindow.xaml.cs").read_text(encoding="utf-8")
 
 
 class Red21LayoutTests(unittest.TestCase):
+    def test_document_button_names_the_complete_project_document_set(self):
+        self.assertIn('SeeDocsButton.Content = $"all project documents ({docCount})";', CODE)
+
     def test_complete_inline_checklist_and_selected_item_tools_share_window(self):
         self.assertIn('x:Name="LeftColumn" Width="2.15*"', XAML)
         self.assertIn('x:Name="SelectedItemToolsColumn"', XAML)

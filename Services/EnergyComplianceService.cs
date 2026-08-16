@@ -1024,6 +1024,34 @@ namespace InspectionEditor.Services
             try
             {
                 using var engine = new TesseractEngine(tessDataPath, "eng", EngineMode.Default);
+
+                // Image-only EC reports usually contain one full-page image per PDF page.
+                // OCR those image streams directly first. This avoids depending on PDFium's
+                // native renderer, which can fail immediately on an otherwise readable report.
+                using (var pdf = PdfDocument.Open(pdfPath))
+                {
+                    foreach (var page in pdf.GetPages())
+                    {
+                        string bestPageText = "";
+                        foreach (var image in page.GetImages()
+                            .Where(i => i.WidthInSamples >= 500 && i.HeightInSamples >= 500)
+                            .OrderByDescending(i => (long)i.WidthInSamples * i.HeightInSamples))
+                        {
+                            if (!image.TryGetPng(out byte[] pngBytes)) continue;
+                            string candidate = OcrPngEc(pngBytes, engine);
+                            if (candidate.Trim().Length > bestPageText.Trim().Length)
+                                bestPageText = candidate;
+                        }
+                        sb.AppendLine(bestPageText);
+                        sb.AppendLine("---PAGE_BREAK---");
+                    }
+                }
+
+                if (LooksLikeUsefulEcOcrText(sb.ToString()))
+                    return sb.ToString();
+
+                // Last-resort renderer for PDFs whose image streams cannot be decoded directly.
+                sb.Clear();
                 using var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(3.0));
                 int pageCount = docReader.GetPageCount();
                 for (int i = 0; i < pageCount; i++)
@@ -1043,6 +1071,77 @@ namespace InspectionEditor.Services
             return sb.ToString();
         }
 
+        private static string OcrPngEc(byte[] pngBytes, TesseractEngine engine)
+        {
+            try
+            {
+                using var stream = new MemoryStream(pngBytes);
+                using var loaded = new Bitmap(stream);
+                using var ink = CreatePdfImageInkBitmap(loaded);
+                return OcrBitmapWithOrientationsEc(ink, engine);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"EC direct-image OCR error: {ex.Message}");
+                return "";
+            }
+        }
+
+        private static Bitmap CreatePdfImageInkBitmap(Bitmap source)
+        {
+            // Ekotrope image streams use a soft mask for the white page. PdfPig exposes the
+            // RGB image but not that mask, leaving a black background with near-black text.
+            // Convert every non-black source pixel to black ink on white so OCR sees the text.
+            int width = source.Width;
+            int height = source.Height;
+            using var normalized = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            using (var graphics = Graphics.FromImage(normalized))
+                graphics.DrawImageUnscaled(source, 0, 0);
+            var result = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+            var rect = new Rectangle(0, 0, width, height);
+            var srcData = normalized.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            var dstData = result.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format24bppRgb);
+            try
+            {
+                int srcStride = Math.Abs(srcData.Stride);
+                int dstStride = Math.Abs(dstData.Stride);
+                var src = new byte[srcStride * height];
+                var dst = Enumerable.Repeat((byte)255, dstStride * height).ToArray();
+                Marshal.Copy(srcData.Scan0, src, 0, src.Length);
+
+                for (int y = 0; y < height; y++)
+                {
+                    int srcRow = y * srcStride;
+                    int dstRow = y * dstStride;
+                    for (int x = 0; x < width; x++)
+                    {
+                        int si = srcRow + x * 4;
+                        int di = dstRow + x * 3;
+                        byte ink = Math.Max(src[si], Math.Max(src[si + 1], src[si + 2])) > 3
+                            ? (byte)0 : (byte)255;
+                        dst[di] = dst[di + 1] = dst[di + 2] = ink;
+                    }
+                }
+                Marshal.Copy(dst, 0, dstData.Scan0, dst.Length);
+            }
+            finally
+            {
+                normalized.UnlockBits(srcData);
+                result.UnlockBits(dstData);
+            }
+            return result;
+        }
+
+        private static bool LooksLikeUsefulEcOcrText(string text)
+        {
+            string[] labels =
+            {
+                "Conditioned Floor Area", "House Tightness", "Duct Leakage",
+                "HERS Index Score", "Ventilation", "WindowType"
+            };
+            return labels.Count(label => text.Contains(label, StringComparison.OrdinalIgnoreCase)) >= 2;
+        }
+
         private static string OcrBytesEc(byte[] bgraBytes, int width, int height, TesseractEngine engine)
         {
             try
@@ -1053,11 +1152,23 @@ namespace InspectionEditor.Services
                 Marshal.Copy(bgraBytes, 0, bmpData.Scan0, bgraBytes.Length);
                 bmp.UnlockBits(bmpData);
 
-                // PDFium can return image-only pages in their unrotated bitmap orientation even
-                // when the PDF's page metadata says Rotate=90. Tesseract often returns an empty
-                // string for those sideways pages, so retry all orientations and keep the most text.
+                return OcrBitmapWithOrientationsEc(bmp, engine);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"EC OCR page error: {ex.Message}");
+                return "";
+            }
+        }
+
+        private static string OcrBitmapWithOrientationsEc(Bitmap bmp, TesseractEngine engine)
+        {
+            try
+            {
+                // Full-page images may carry their rotation only in PDF metadata. Retry each
+                // physical orientation and keep the strongest OCR result.
                 string bestText = OcrBitmapEc(bmp, engine);
-                if (bestText.Trim().Length >= 50) return bestText;
+                if (bestText.Trim().Length >= 500) return bestText;
 
                 foreach (var rotation in new[]
                 {
@@ -1071,6 +1182,8 @@ namespace InspectionEditor.Services
                     string candidate = OcrBitmapEc(rotated, engine);
                     if (candidate.Trim().Length > bestText.Trim().Length)
                         bestText = candidate;
+                    if (bestText.Trim().Length >= 500)
+                        return bestText;
                 }
                 return bestText;
             }
@@ -1156,6 +1269,7 @@ namespace InspectionEditor.Services
             // HERS Index
             info.HersIndex = First(text,
                 @"As Designed Home ERI \(HERS\)[:\s]*(\d+)",
+                @"HERS(?:®)?\s*Index Score[:\s]*(\d+)",
                 @"HERS Index Score[:\s]*(\d+)",
                 @"ERI[:\s]+(\d{2,3})(?!\d)");
 
@@ -1209,6 +1323,7 @@ namespace InspectionEditor.Services
             // Handles "CFM @ 50 Pa", "CFM at 50 Pa" (Ekotrope detail reports), "CFM50" (IECC label).
             // \s* in these patterns also matches newlines (\n) in .NET regex, so column-extracted text is covered.
             string? bdCfm = First(text,
+                @"House\s+Tightness[:\s]*([\d,.]+)\s*CFM(?:50|5[O0]|S[O0])",
                 @"([\d,.]+)\s*CFM\s*@\s*50\s*Pa",
                 @"([\d,.]+)\s*CFM\s*at\s*50\s*Pa",
                 @"([\d,.]+)\s*CFM@50Pa",

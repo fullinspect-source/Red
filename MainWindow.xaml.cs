@@ -3032,14 +3032,13 @@ namespace InspectionEditor
             // Update button based on doc count
             if (docCount > 0)
             {
-                string baseLabel = !string.IsNullOrEmpty(offerFileLabel) ? offerFileLabel : "📄 See All PDFs";
-                SeeDocsButton.Content = $"{baseLabel} ({docCount})";
+                SeeDocsButton.Content = $"all project documents ({docCount})";
                 SeeDocsButton.IsEnabled = true;
-                SeeDocsButton.ToolTip = $"View {docCount} engineering plans and inspection reports";
+                SeeDocsButton.ToolTip = $"View all {docCount} project documents";
             }
             else
             {
-                SeeDocsButton.Content = !string.IsNullOrEmpty(offerFileLabel) ? offerFileLabel : "📄 See All PDFs";
+                SeeDocsButton.Content = "all project documents (0)";
                 SeeDocsButton.IsEnabled = false;
                 SeeDocsButton.ToolTip = "No documents found for this job";
             }

@@ -12,10 +12,18 @@ class EquipmentAirflowUiStaticTests(unittest.TestCase):
         self.assertIn("RotateFlipType.Rotate90FlipNone", ENERGY)
         self.assertIn("RotateFlipType.Rotate180FlipNone", ENERGY)
         self.assertIn("RotateFlipType.Rotate270FlipNone", ENERGY)
-        self.assertIn("if (bestText.Trim().Length >= 50)", ENERGY)
+        self.assertIn("if (bestText.Trim().Length >= 500)", ENERGY)
         self.assertIn("InspectionEditor.Resources.eng.traineddata", ENERGY)
         self.assertIn("_tessDataPath ??= ExtractEmbeddedTessData();", ENERGY)
         self.assertIn("OCR language data is unavailable", ENERGY)
+        self.assertIn("page.GetImages()", ENERGY)
+        self.assertIn("image.TryGetPng(out byte[] pngBytes)", ENERGY)
+        self.assertIn("OcrPngEc(pngBytes, engine)", ENERGY)
+        self.assertIn("CreatePdfImageInkBitmap(loaded)", ENERGY)
+        self.assertIn("LooksLikeUsefulEcOcrText(sb.ToString())", ENERGY)
+        self.assertIn("leaving a black background with near-black text", ENERGY)
+        self.assertIn('HERS(?:®)?\\s*Index Score', ENERGY)
+        self.assertIn('House\\s+Tightness', ENERGY)
 
     def test_all_approved_matchups_are_present(self):
         for outdoor, indoor, cfm in (
