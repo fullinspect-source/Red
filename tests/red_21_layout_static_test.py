@@ -63,6 +63,25 @@ class Red21LayoutTests(unittest.TestCase):
         ):
             self.assertEqual(XAML.count(f'x:Name="{control}"'), 1, control)
 
+    def test_value_prefix_and_suffix_are_three_independently_scrolled_columns(self):
+        self.assertIn('x:Name="SelectedItemEntryGrid"', XAML)
+        self.assertIn('x:Name="StatusQuickPanel"', XAML)
+        self.assertIn('x:Name="StatusKeyPanel"', XAML)
+        self.assertIn('x:Name="StatusPanel" Orientation="Vertical"', XAML)
+        self.assertIn('x:Name="PrefixPanel" Orientation="Vertical"', XAML)
+        self.assertIn('x:Name="SuffixPanel" Orientation="Vertical"', XAML)
+        self.assertIn("StatusQuickPanel.Children.Add(btn);", CODE)
+        self.assertIn("StatusKeyPanel.Children.Add(btn);", CODE)
+
+    def test_selected_item_comment_preview_hides_and_both_surfaces_share_neon_highlight(self):
+        self.assertIn("!ReferenceEquals(item, _editorLoadedItem)", CODE)
+        self.assertIn("SelectedItemHighlightColor", CODE)
+        self.assertIn("EditorScrollViewer.Background = new SolidColorBrush(SelectedItemHighlightColor);", CODE)
+        handler_start = CODE.index("private void InlineItemRow_MouseLeftButtonUp")
+        handler_end = CODE.index("private void ToggleInlineItem", handler_start)
+        handler = CODE[handler_start:handler_end]
+        self.assertIn("PopulateInlineChecklist(SearchFilterBox.Text);", handler)
+
     def test_get_three_and_transcription_share_one_output_surface(self):
         self.assertEqual(XAML.count('x:Name="SuggestionsStack"'), 1)
         self.assertIn("🤖 GENERATIVE AI", XAML)

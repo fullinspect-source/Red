@@ -32,6 +32,7 @@ namespace InspectionEditor
         private static readonly string AppVersion = AppIdentity.Version;
         private static readonly TimeSpan AppUpdateCheckInterval = TimeSpan.FromHours(24);
         private static readonly string LastAppUpdateCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
+        private static readonly Color SelectedItemHighlightColor = Color.FromRgb(72, 229, 255);
         
         private InspectionFile? _currentInspection;
         private Item? _currentItem;
@@ -2670,7 +2671,8 @@ namespace InspectionEditor
             _collapsedInlineSectionKeys.Clear();
             EditorPanel.Visibility = Visibility.Collapsed;
             SelectItemPanel.Visibility = Visibility.Visible;
-            
+            EditorScrollViewer.Background = Brushes.Transparent;
+
             PopulateTreeView();
             }
             catch (Exception ex)
@@ -4635,7 +4637,10 @@ namespace InspectionEditor
         private Border CreateInlineItemRow(Section section, Item item)
         {
             bool isExpanded = IsInlineItemExpanded(item);
-            Color progressColor = GetInlineProgressColor(section, item, isExpanded ? 0.90 : 0.94);
+            bool isSelected = ReferenceEquals(item, _editorLoadedItem);
+            Color progressColor = isSelected
+                ? SelectedItemHighlightColor
+                : GetInlineProgressColor(section, item, isExpanded ? 0.90 : 0.94);
             var panel = new StackPanel { Orientation = Orientation.Vertical };
             panel.Children.Add(CreateInlineItemHeader(section, item, isExpanded));
             if (isExpanded)
@@ -4645,8 +4650,8 @@ namespace InspectionEditor
             {
                 Tag = item,
                 Background = new SolidColorBrush(progressColor),
-                BorderBrush = isExpanded ? new SolidColorBrush(Color.FromRgb(120, 174, 205)) : new SolidColorBrush(DarkenColor(progressColor, 0.10)),
-                BorderThickness = isExpanded ? new Thickness(2) : new Thickness(0, 0, 0, 1),
+                BorderBrush = isSelected || isExpanded ? new SolidColorBrush(Color.FromRgb(0, 122, 153)) : new SolidColorBrush(DarkenColor(progressColor, 0.10)),
+                BorderThickness = isSelected || isExpanded ? new Thickness(2) : new Thickness(0, 0, 0, 1),
                 Margin = new Thickness(0, 0, 0, 2),
                 Child = panel,
                 Cursor = Cursors.Hand,
@@ -4815,7 +4820,9 @@ namespace InspectionEditor
             var grid = new Grid
             {
                 MinHeight = 48,
-                Background = isExpanded ? new SolidColorBrush(Color.FromRgb(235, 243, 248)) : Brushes.Transparent
+                Background = ReferenceEquals(item, _editorLoadedItem)
+                    ? new SolidColorBrush(SelectedItemHighlightColor)
+                    : isExpanded ? new SolidColorBrush(Color.FromRgb(235, 243, 248)) : Brushes.Transparent
             };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -4883,7 +4890,7 @@ namespace InspectionEditor
             center.Children.Add(prompt);
 
             UIElement? middleContent = null;
-            if (!string.IsNullOrWhiteSpace(item.Comments))
+            if (!string.IsNullOrWhiteSpace(item.Comments) && !ReferenceEquals(item, _editorLoadedItem))
             {
                 middleContent = new TextBlock
                 {
@@ -7385,6 +7392,11 @@ namespace InspectionEditor
             // drawers remain available, but only by deliberate double-click.
             if (e.ClickCount >= 2)
                 ToggleInlineItem(item);
+            else
+            {
+                PopulateInlineChecklist(SearchFilterBox.Text);
+                KeepInlineItemHeaderVisible(item);
+            }
             e.Handled = true;
         }
 
@@ -10683,6 +10695,7 @@ namespace InspectionEditor
             _currentPhotoIndex = 0;
             SelectItemPanel.Visibility = Visibility.Collapsed;
             EditorPanel.Visibility = Visibility.Visible;
+            EditorScrollViewer.Background = new SolidColorBrush(SelectedItemHighlightColor);
 
             ItemNumberText.Text = $"Item {item.Number}";
             ItemQuestionText.Text = ExpandAbbreviations(item.Name);
@@ -10871,6 +10884,8 @@ namespace InspectionEditor
         private void LoadStatusControls(Item item)
         {
             StatusPanel.Children.Clear();
+            StatusQuickPanel.Children.Clear();
+            StatusKeyPanel.Children.Clear();
             _statusButtons.Clear();
             StatusTextBox.Visibility = Visibility.Collapsed;
             NiValueButton.Visibility = Visibility.Collapsed;
@@ -10918,7 +10933,7 @@ namespace InspectionEditor
                 {
                     var btn = CreateStatusButton(option, currentValue);
                     btn.TabIndex = statusTabIndex++;
-                    StatusPanel.Children.Add(btn);
+                    StatusQuickPanel.Children.Add(btn);
                     _statusButtons.Add(btn);
                 }
             }
@@ -10930,7 +10945,7 @@ namespace InspectionEditor
                 {
                     var btn = CreateStatusButton(option, currentValue);
                     btn.TabIndex = statusTabIndex++;
-                    StatusPanel.Children.Add(btn);
+                    StatusQuickPanel.Children.Add(btn);
                     _statusButtons.Add(btn);
                 }
             }
@@ -10942,7 +10957,7 @@ namespace InspectionEditor
                 {
                     var btn = CreateStatusButton(option, currentValue);
                     btn.TabIndex = statusTabIndex++;
-                    StatusPanel.Children.Add(btn);
+                    StatusQuickPanel.Children.Add(btn);
                     _statusButtons.Add(btn);
                 }
             }
@@ -10966,14 +10981,7 @@ namespace InspectionEditor
                     StatusPanel.Children.Add(btn);
                     _statusButtons.Add(btn);
                 }
-                // For LookupNaNi, also add NI option
-                if (controlName == "lookupnani")
-                {
-                    var niBtn = CreateStatusButton("NI", currentValue);
-                    niBtn.TabIndex = statusTabIndex++;
-                    StatusPanel.Children.Add(niBtn);
-                    _statusButtons.Add(niBtn);
-                }
+                // LookupNaNi uses the compact NI button beside the value textbox.
             }
             else if (controlName == "numberpad")
             {
@@ -11009,7 +11017,7 @@ namespace InspectionEditor
                         TabIndex = statusTabIndex++
                     };
                     btn.Click += NumberPadButton_Click;
-                    StatusPanel.Children.Add(btn);
+                    StatusKeyPanel.Children.Add(btn);
                 }
             }
             else if (controlName == "text" || controlName == "textbox" || controlName == "number")
@@ -11490,9 +11498,11 @@ namespace InspectionEditor
             {
                 Content = isSelected ? $"✓ {option}" : option,
                 Tag = option,
-                Padding = new Thickness(12, 6, 12, 6),
-                Margin = new Thickness(2),
-                FontSize = 12,
+                Padding = new Thickness(6, 3, 6, 3),
+                Margin = new Thickness(1),
+                FontSize = 10,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 FontWeight = isSelected ? FontWeights.Bold : FontWeights.Normal,
                 BorderThickness = isSelected ? new Thickness(3) : new Thickness(1),
                 IsChecked = isSelected

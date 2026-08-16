@@ -21,9 +21,10 @@
         </Style>
 
         <Style x:Key="PrefixButton" TargetType="ToggleButton">
-            <Setter Property="Padding" Value="10,6"/>
-            <Setter Property="Margin" Value="2"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Background" Value="#E8E8E8"/>
             <Setter Property="BorderBrush" Value="#CCCCCC"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -37,9 +38,10 @@
         </Style>
 
         <Style x:Key="SuffixButton" TargetType="ToggleButton">
-            <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="Margin" Value="2"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Background" Value="#F0F0F0"/>
             <Setter Property="BorderBrush" Value="#CCCCCC"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -709,90 +711,88 @@
                         </Grid>
                         <TextBlock x:Name="ItemQuestionText" Visibility="Collapsed" TextWrapping="Wrap" FontSize="14" Margin="5,0,5,15" Foreground="#333"/>
 
-                        <!-- STATUS/VALUE Selector - Dynamic based on item ControlName -->
-                        <Border x:Name="StatusBorder" BorderBrush="#8B0000" BorderThickness="1" Padding="8" Margin="0,0,0,10" Background="#F0F8FF">
-                            <StackPanel>
-                                <TextBlock x:Name="StatusLabel" Text="STATUS" FontWeight="Bold" FontSize="12" Foreground="#8B0000" Margin="0,0,0,5"/>
-                                <ScrollViewer x:Name="StatusScrollViewer"
-                                              HorizontalScrollBarVisibility="Hidden"
-                                              VerticalScrollBarVisibility="Disabled"
-                                              PanningMode="HorizontalOnly"
-                                              PreviewMouseLeftButtonDown="StatusScrollViewer_PreviewMouseLeftButtonDown"
-                                              PreviewMouseMove="StatusScrollViewer_PreviewMouseMove"
-                                              PreviewMouseLeftButtonUp="StatusScrollViewer_PreviewMouseLeftButtonUp">
-                                    <StackPanel x:Name="StatusPanel" Orientation="Horizontal">
-                                        <!-- Status buttons/controls added dynamically based on ControlName -->
-                                    </StackPanel>
-                                </ScrollViewer>
-                                <!-- Text input for free-form values + NI + Clear buttons -->
-                                <DockPanel Margin="0,5,0,0">
-                                    <!-- Broom clears the current value to allow re-entry; DockPanel.Dock="Right" items stack right-to-left in XAML order, so declare rightmost first -->
-                                    <Button x:Name="ClearValueButton" Content="🗑️" Visibility="Collapsed"
-                                            DockPanel.Dock="Right"
-                                            Width="34" FontSize="13"
-                                            Margin="5,0,0,0" Padding="2,8"
-                                            Background="#FFF3E0" Foreground="#E65100"
-                                            BorderBrush="#FFCC80" BorderThickness="1"
-                                            ToolTip="Clear this value (allows re-entry or plan data insertion)"
-                                            Click="ClearValueButton_Click" TabIndex="27"/>
-                                    <Button x:Name="NiValueButton" Content="NI" Visibility="Collapsed"
-                                            DockPanel.Dock="Right"
-                                            Width="40" FontSize="13" FontWeight="Bold"
-                                            Margin="5,0,0,0" Padding="4,8"
-                                            Background="#E0E0E0" Foreground="#555555"
-                                            BorderBrush="#BBBBBB" BorderThickness="1"
-                                            ToolTip="Set value to NI (Not Inspected)"
-                                            Click="NiValueButton_Click" TabIndex="26"/>
-                                    <TextBox x:Name="StatusTextBox" Visibility="Collapsed" FontSize="13" Padding="8" TextChanged="StatusTextBox_TextChanged" LostFocus="StatusTextBox_LostFocus" TabIndex="25"/>
-                                </DockPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- RED 2.1: prefix and suffix stay visible together for the selected item. -->
-                        <Grid Margin="0,0,0,6">
+                        <!-- Three equal-height, independently scrolling selected-item entry columns. -->
+                        <Grid x:Name="SelectedItemEntryGrid" Height="270" Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MinWidth="120"/>
+                                <ColumnDefinition Width="5"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="6"/>
+                                <ColumnDefinition Width="5"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0" BorderBrush="#3498DB" BorderThickness="1" Padding="6" Background="#F8FBFF">
-                                <StackPanel>
-                                    <TextBlock Text="TRADE PREFIX" FontWeight="Bold" FontSize="11" Foreground="#2980B9" Margin="0,0,0,5"/>
-                                    <ScrollViewer x:Name="PrefixScrollViewer"
-                                                  HorizontalScrollBarVisibility="Hidden"
-                                                  VerticalScrollBarVisibility="Disabled"
-                                                  PanningMode="HorizontalOnly"
-                                                  PreviewMouseLeftButtonDown="PrefixScrollViewer_PreviewMouseLeftButtonDown"
-                                                  PreviewMouseMove="PrefixScrollViewer_PreviewMouseMove"
-                                                  PreviewMouseLeftButtonUp="PrefixScrollViewer_PreviewMouseLeftButtonUp">
-                                        <StackPanel Orientation="Horizontal">
-                                            <StackPanel x:Name="PrefixPanel" Orientation="Horizontal"/>
-                                            <Button Content="+" Style="{StaticResource AddButton}" Click="AddPrefixButton_Click" ToolTip="Add custom trade" TabIndex="39"/>
-                                        </StackPanel>
+                            <!-- Value/status column: compact value controls above vertical options. -->
+                            <Border x:Name="StatusBorder" Grid.Column="0" BorderBrush="#8B0000" BorderThickness="1" Padding="5" Background="#F0F8FF">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock x:Name="StatusLabel" Grid.Row="0" Text="VALUE" FontWeight="Bold" FontSize="10" Foreground="#8B0000" Margin="0,0,0,3"/>
+                                    <DockPanel Grid.Row="1" Margin="0,0,0,3">
+                                        <Button x:Name="ClearValueButton" Content="🗑️" Visibility="Collapsed" DockPanel.Dock="Right"
+                                                Width="28" FontSize="10" Margin="2,0,0,0" Padding="1,4"
+                                                Background="#FFF3E0" Foreground="#E65100" BorderBrush="#FFCC80" BorderThickness="1"
+                                                ToolTip="Clear this value" Click="ClearValueButton_Click" TabIndex="27"/>
+                                        <Button x:Name="NiValueButton" Content="NI" Visibility="Collapsed" DockPanel.Dock="Right"
+                                                Width="30" FontSize="10" FontWeight="Bold" Margin="2,0,0,0" Padding="2,4"
+                                                Background="#E0E0E0" Foreground="#555555" BorderBrush="#BBBBBB" BorderThickness="1"
+                                                ToolTip="Set value to NI (Not Inspected)" Click="NiValueButton_Click" TabIndex="26"/>
+                                        <TextBox x:Name="StatusTextBox" Visibility="Collapsed" Height="28" FontSize="10" Padding="4"
+                                                 TextChanged="StatusTextBox_TextChanged" LostFocus="StatusTextBox_LostFocus" TabIndex="25"/>
+                                    </DockPanel>
+                                    <WrapPanel x:Name="StatusQuickPanel" Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,3"/>
+                                    <WrapPanel x:Name="StatusKeyPanel" Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,3"/>
+                                    <ScrollViewer x:Name="StatusScrollViewer" Grid.Row="4"
+                                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                                  PanningMode="VerticalOnly" CanContentScroll="False"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
+                                        <StackPanel x:Name="StatusPanel" Orientation="Vertical"/>
                                     </ScrollViewer>
-                                </StackPanel>
+                                </Grid>
                             </Border>
 
-                            <Border Grid.Column="2" BorderBrush="#27AE60" BorderThickness="1" Padding="6" Background="#F8FFF8">
-                                <StackPanel>
-                                    <TextBlock Text="LOCATION SUFFIX" FontWeight="Bold" FontSize="11" Foreground="#1E8449" Margin="0,0,0,5"/>
-                                    <ScrollViewer x:Name="SuffixScrollViewer"
-                                                  HorizontalScrollBarVisibility="Hidden"
-                                                  VerticalScrollBarVisibility="Disabled"
-                                                  PanningMode="HorizontalOnly"
-                                                  PreviewMouseLeftButtonDown="SuffixScrollViewer_PreviewMouseLeftButtonDown"
-                                                  PreviewMouseMove="SuffixScrollViewer_PreviewMouseMove"
-                                                  PreviewMouseLeftButtonUp="SuffixScrollViewer_PreviewMouseLeftButtonUp">
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="📅" Click="DateTimeSuffixButton_Click" ToolTip="Add current date/time"
-                                                    Background="#2E86AB" Foreground="White" FontSize="14" Padding="8,4"
-                                                    Margin="0,0,4,0" BorderThickness="0" TabIndex="60"/>
-                                            <StackPanel x:Name="SuffixPanel" Orientation="Horizontal"/>
-                                            <Button Content="+" Style="{StaticResource AddButton}" Click="AddSuffixButton_Click" ToolTip="Add custom location" TabIndex="69"/>
+                            <Border Grid.Column="2" BorderBrush="#3498DB" BorderThickness="1" Padding="5" Background="#F8FBFF">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                    <TextBlock Text="TRADE PREFIX" FontWeight="Bold" FontSize="10" Foreground="#2980B9" Margin="0,0,0,3"/>
+                                    <ScrollViewer x:Name="PrefixScrollViewer" Grid.Row="1"
+                                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                                  PanningMode="VerticalOnly" CanContentScroll="False"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
+                                        <StackPanel Orientation="Vertical">
+                                            <Button Content="+ Add" Click="AddPrefixButton_Click" ToolTip="Add custom trade" FontSize="10" Padding="4,2" TabIndex="39"/>
+                                            <StackPanel x:Name="PrefixPanel" Orientation="Vertical"/>
                                         </StackPanel>
                                     </ScrollViewer>
-                                </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="4" BorderBrush="#27AE60" BorderThickness="1" Padding="5" Background="#F8FFF8">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                    <TextBlock Text="LOCATION SUFFIX" FontWeight="Bold" FontSize="10" Foreground="#1E8449" Margin="0,0,0,3"/>
+                                    <WrapPanel Grid.Row="1" Orientation="Horizontal">
+                                        <Button Content="📅" Click="DateTimeSuffixButton_Click" ToolTip="Add current date/time"
+                                                Background="#2E86AB" Foreground="White" FontSize="10" Padding="4,2" BorderThickness="0" TabIndex="60"/>
+                                        <Button Content="+ Add" Click="AddSuffixButton_Click" ToolTip="Add custom location" FontSize="10" Padding="4,2" TabIndex="69"/>
+                                    </WrapPanel>
+                                    <ScrollViewer x:Name="SuffixScrollViewer" Grid.Row="2"
+                                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                                  PanningMode="VerticalOnly" CanContentScroll="False"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
+                                        <StackPanel x:Name="SuffixPanel" Orientation="Vertical"/>
+                                    </ScrollViewer>
+                                </Grid>
                             </Border>
                         </Grid>
 
