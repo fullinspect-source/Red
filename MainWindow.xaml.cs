@@ -4356,9 +4356,11 @@ namespace InspectionEditor
             ChecklistColumnGrid.SetValue(Grid.ColumnSpanProperty, 1);
             LeftColumn.MinWidth = _inlineEditorMode ? 620 : 250;
             LeftColumn.MaxWidth = _inlineEditorMode ? double.PositiveInfinity : 900;
+            double usableWindowWidth = ActualWidth > 0 ? ActualWidth : Width;
+            double classicWidth = Math.Min(_classicLeftPanelWidth, Math.Max(250, usableWindowWidth - 430));
             LeftColumn.Width = _inlineEditorMode
                 ? new GridLength(2.15, GridUnitType.Star)
-                : new GridLength(_classicLeftPanelWidth);
+                : new GridLength(classicWidth);
             InlineEditorToggleButton.Content = _inlineEditorMode ? "Classic" : "v2.1 UI";
             InlineEditorToggleButton.Background = _inlineEditorMode
                 ? new SolidColorBrush(Color.FromRgb(139, 0, 0))

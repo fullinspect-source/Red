@@ -50,8 +50,14 @@ class Red21LayoutTests(unittest.TestCase):
     def test_get_three_and_transcription_share_one_output_surface(self):
         self.assertEqual(XAML.count('x:Name="SuggestionsStack"'), 1)
         self.assertIn("🤖 GENERATIVE AI", XAML)
+        ai_start = XAML.index("🤖 GENERATIVE AI")
+        self.assertIn('<WrapPanel Orientation="Horizontal">', XAML[ai_start - 100:ai_start + 100])
         self.assertIn("await GetAISuggestionsAsync();", CODE)
         self.assertIn("await GetAISuggestionsAsync(transcribeMode: true);", CODE)
+
+    def test_classic_width_cannot_squeeze_the_fixed_tool_pane(self):
+        self.assertIn("usableWindowWidth - 430", CODE)
+        self.assertIn("new GridLength(classicWidth)", CODE)
 
     def test_compact_layout_has_versioned_one_time_migration(self):
         self.assertIn("private const double DefaultChecklistFontSize = 16;", CODE)
