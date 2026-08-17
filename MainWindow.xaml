@@ -989,7 +989,7 @@
                                             <ComboBoxItem Content="Strict - careful"/>
                                         </ComboBox>
                                         <Button x:Name="GetSuggestionsButton" Grid.Column="2" Content="_Get 3" Click="GetSuggestionsButton_Click" Background="#E67E22" Foreground="White" BorderThickness="0" Padding="8,3" MinWidth="58" FontSize="10" IsEnabled="False" Margin="0,0,5,0" ToolTip="Get AI suggestions (Alt+G)" TabIndex="76"/>
-                                        <Button x:Name="TranscribeButton" Grid.Column="3" Content="AI _OCR" Click="TranscribeButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="7,3" MinWidth="58" FontSize="10" IsEnabled="False" Visibility="Collapsed" ToolTip="OCR label/sticker text (Alt+N)" TabIndex="77"/>
+                                        <Button x:Name="TranscribeButton" Grid.Column="3" Content="AI _OCR" Click="TranscribeButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="7,3" MinWidth="58" FontSize="10" IsEnabled="False" Visibility="Visible" ToolTip="OCR label/sticker text (Alt+N)" TabIndex="77"/>
                                     </Grid>
                                     <TextBlock x:Name="LoadingText" Grid.Row="1" Text="⏳ Analyzing image..." Foreground="#E67E22" Visibility="Collapsed" Margin="0,5"/>
                                     <ScrollViewer x:Name="SuggestionsScrollViewer" Grid.Row="2"

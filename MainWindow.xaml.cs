@@ -2492,13 +2492,8 @@ namespace InspectionEditor
             // In "read-only" mode: looks grayed but secretly still works
             SaveFileButton.Opacity = _readOnlyMode ? 0.4 : 1.0;
             
-            // Show Transcribe button only for energy inspections (HER, IER, HET, IEF, IAP, AFI)
-            string upperCode = (_currentInspectionCode ?? "").ToUpperInvariant();
-            bool isEnergyInspection = upperCode == "HER" || upperCode == "IER" || 
-                                       upperCode == "HET" || upperCode == "IEF" || 
-                                       upperCode == "HEF" || upperCode == "IAP" || 
-                                       upperCode == "AFI";
-            TranscribeButton.Visibility = isEnergyInspection ? Visibility.Visible : Visibility.Collapsed;
+            // AI OCR is useful for labels and stickers in every inspection type.
+            TranscribeButton.Visibility = Visibility.Visible;
             
             UpdateSeeDocsButton(filePath);
             SaveTemplateButton.IsEnabled = true;

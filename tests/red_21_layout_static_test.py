@@ -126,6 +126,9 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn('x:Name="AiToneComboBox" Grid.Column="1" MinWidth="90" MaxWidth="118"', XAML)
         self.assertIn('x:Name="GetSuggestionsButton" Grid.Column="2"', XAML)
         self.assertIn('x:Name="TranscribeButton" Grid.Column="3" Content="AI _OCR"', XAML)
+        self.assertIn('Content="AI _OCR" Click="TranscribeButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="7,3" MinWidth="58" FontSize="10" IsEnabled="False" Visibility="Visible"', XAML)
+        self.assertIn('TranscribeButton.Visibility = Visibility.Visible;', CODE)
+        self.assertNotIn('TranscribeButton.Visibility = isEnergyInspection', CODE)
 
     def test_checklist_prompt_has_priority_and_comment_truncates(self):
         self.assertIn('Width = new GridLength(2, GridUnitType.Star)', CODE)
