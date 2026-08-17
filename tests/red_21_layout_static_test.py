@@ -114,7 +114,32 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("IsDescendantOf(source, SuffixScrollViewer)", CODE)
         self.assertIn('PanningRatio="1"', XAML)
         self.assertIn('PanningDeceleration="0.001"', XAML)
-        self.assertNotIn('PreviewMouseLeftButtonDown="EditorScrollViewer_PreviewMouseLeftButtonDown"', XAML)
+        self.assertIn('PreviewMouseLeftButtonDown="EditorScrollViewer_PreviewMouseLeftButtonDown"', XAML)
+        self.assertIn('PreviewMouseMove="EditorScrollViewer_PreviewMouseMove"', XAML)
+        self.assertIn('PreviewMouseLeftButtonUp="EditorScrollViewer_PreviewMouseLeftButtonUp"', XAML)
+
+        for scroller in (
+            "StatusScrollViewer", "PrefixScrollViewer", "SuffixScrollViewer",
+            "SavedCommentsScrollViewer", "SuggestionsScrollViewer",
+        ):
+            start = XAML.index(f'x:Name="{scroller}"')
+            header = XAML[start:XAML.index(">", start)]
+            self.assertIn('PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"', header, scroller)
+            self.assertIn('PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"', header, scroller)
+            self.assertIn('PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp"', header, scroller)
+
+        right_drag = CODE[CODE.index("private void EditorScrollViewer_PreviewMouseLeftButtonDown"):CODE.index("private bool IsInsideVerticalNestedEditorScroller")]
+        self.assertIn("Math.Abs(deltaY) > 15", right_drag)
+        self.assertIn("Mouse.Capture(EditorScrollViewer);", right_drag)
+        self.assertIn("EditorScrollViewer.ScrollToVerticalOffset(_editorScrollStartOffset + deltaY);", right_drag)
+        self.assertIn("if (wasScrolling)", right_drag)
+        self.assertIn("e.Handled = true;", right_drag)
+
+        nested_drag = CODE[CODE.index("private void TouchScrollViewer_PreviewMouseLeftButtonDown"):CODE.index("private void DeleteSavedCommentButton_Click")]
+        self.assertIn("Math.Abs(deltaY) > 15", nested_drag)
+        self.assertIn("Mouse.Capture(scrollViewer);", nested_drag)
+        self.assertIn("scrollViewer.ScrollToVerticalOffset(startOffset + deltaY);", nested_drag)
+        self.assertIn("EditorScrollViewer.ScrollToVerticalOffset(parentStartOffset + deltaY);", nested_drag)
 
     def test_saved_comments_and_ai_have_fixed_heights_with_internal_scrolling(self):
         self.assertIn('x:Name="SavedCommentsBorder" Height="135"', XAML)

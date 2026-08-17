@@ -587,7 +587,10 @@
                           PanningDeceleration="0.001"
                           CanContentScroll="False"
                           Padding="10"
-                          PreviewMouseWheel="EditorScrollViewer_PreviewMouseWheel">
+                          PreviewMouseWheel="EditorScrollViewer_PreviewMouseWheel"
+                          PreviewMouseLeftButtonDown="EditorScrollViewer_PreviewMouseLeftButtonDown"
+                          PreviewMouseMove="EditorScrollViewer_PreviewMouseMove"
+                          PreviewMouseLeftButtonUp="EditorScrollViewer_PreviewMouseLeftButtonUp">
                 <Grid>
                     <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
 
@@ -750,7 +753,10 @@
                                                   PanningMode="VerticalOnly" CanContentScroll="False"
                                                   PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PanningRatio="1"
-                                                  PanningDeceleration="0.001">
+                                                  PanningDeceleration="0.001"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
                                         <StackPanel x:Name="StatusPanel" Orientation="Vertical"/>
                                     </ScrollViewer>
                                 </Grid>
@@ -765,7 +771,10 @@
                                                   PanningMode="VerticalOnly" CanContentScroll="False"
                                                   PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PanningRatio="1"
-                                                  PanningDeceleration="0.001">
+                                                  PanningDeceleration="0.001"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
                                         <StackPanel Orientation="Vertical">
                                             <Button Content="+ Add" Click="AddPrefixButton_Click" ToolTip="Add custom trade" FontSize="10" Padding="4,2" TabIndex="39"/>
                                             <StackPanel x:Name="PrefixPanel" Orientation="Vertical"/>
@@ -788,7 +797,10 @@
                                                   PanningMode="VerticalOnly" CanContentScroll="False"
                                                   PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PanningRatio="1"
-                                                  PanningDeceleration="0.001">
+                                                  PanningDeceleration="0.001"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
                                         <StackPanel x:Name="SuffixPanel" Orientation="Vertical"/>
                                     </ScrollViewer>
                                 </Grid>
@@ -931,7 +943,10 @@
                                                   PanningMode="VerticalOnly"
                                                   PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PanningRatio="1"
-                                                  PanningDeceleration="0.001">
+                                                  PanningDeceleration="0.001"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
                                         <StackPanel x:Name="SavedCommentsPanel">
                                             <TextBlock x:Name="NoSavedCommentsText" Text="No saved comments for this item yet." Foreground="#999" FontStyle="Italic" FontSize="11"/>
                                         </StackPanel>
@@ -999,7 +1014,10 @@
                                                   PanningMode="VerticalOnly"
                                                   PreviewMouseWheel="NestedVerticalScrollViewer_PreviewMouseWheel"
                                                   PanningRatio="1"
-                                                  PanningDeceleration="0.001">
+                                                  PanningDeceleration="0.001"
+                                                  PreviewMouseLeftButtonDown="TouchScrollViewer_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="TouchScrollViewer_PreviewMouseMove"
+                                                  PreviewMouseLeftButtonUp="TouchScrollViewer_PreviewMouseLeftButtonUp">
                                         <StackPanel x:Name="SuggestionsStack">
                                             <TextBlock x:Name="NoSuggestionsText" Text="Add a photo to get AI suggestions." Foreground="#999" FontStyle="Italic" FontSize="11"/>
                                         </StackPanel>
