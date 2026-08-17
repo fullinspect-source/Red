@@ -90,7 +90,8 @@ class Red21LayoutTests(unittest.TestCase):
         handler_start = CODE.index("private void InlineItemRow_MouseLeftButtonUp")
         handler_end = CODE.index("private void ToggleInlineItem", handler_start)
         handler = CODE[handler_start:handler_end]
-        self.assertIn("PopulateInlineChecklist(SearchFilterBox.Text);", handler)
+        self.assertIn("RefreshInlineItemRow(previouslySelectedItem);", handler)
+        self.assertIn("RefreshInlineItemRow(item);", handler)
 
     def test_right_workspace_scrolls_and_photo_controls_stay_beside_thumbnail(self):
         editor_start = XAML.index('x:Name="EditorScrollViewer"')
@@ -137,6 +138,21 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn('MaxWidth = 220', CODE)
         self.assertIn('TextTrimming = TextTrimming.CharacterEllipsis', CODE)
         self.assertIn('TextWrapping = TextWrapping.NoWrap', CODE)
+
+    def test_single_click_refreshes_two_rows_instead_of_rebuilding_huge_checklist(self):
+        handler = CODE[CODE.index("private void InlineItemRow_MouseLeftButtonUp"):CODE.index("private void ToggleInlineItem")]
+        self.assertIn("RefreshInlineItemRow(previouslySelectedItem);", handler)
+        self.assertIn("RefreshInlineItemRow(item);", handler)
+        self.assertNotIn("PopulateInlineChecklist", handler)
+        self.assertIn("_inlineItemRows[item] = (section, row);", CODE)
+        self.assertIn("_isRefreshingTree = true;", CODE)
+
+    def test_comment_box_click_dismisses_quick_comments_and_keeps_native_caret(self):
+        self.assertIn('PreviewMouseLeftButtonDown="CommentsTextBox_PreviewMouseLeftButtonDown"', XAML)
+        handler = CODE[CODE.index("private void CommentsTextBox_PreviewMouseLeftButtonDown"):CODE.index("private void LoadSavedComments")]
+        self.assertIn("QuickSuggestionsOverlay.Visibility = Visibility.Collapsed;", handler)
+        self.assertIn("CommentsTextBox.Focus();", handler)
+        self.assertNotIn("e.Handled = true", handler)
 
     def test_comment_actions_stack_and_flag_uses_double_on_single_off(self):
         self.assertIn('x:Name="CommentActionsPanel" Grid.Column="1" Orientation="Vertical"', XAML)

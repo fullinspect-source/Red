@@ -180,6 +180,7 @@ namespace InspectionEditor
         private Item? _expandedInlineItemInstance;
         private readonly HashSet<string> _collapsedInlineSectionKeys = new HashSet<string>();
         private Item? _inlineQuickCommentsDismissedItem;
+        private readonly Dictionary<Item, (Section Section, Border Row)> _inlineItemRows = new();
         private readonly Dictionary<Item, InlineAiResult> _inlineAiResults = new Dictionary<Item, InlineAiResult>();
         private bool _suppressAdministrativeTools = true;
         private InlineDrawerPreferences _inlineDrawerPreferences = new InlineDrawerPreferences();
@@ -4326,6 +4327,7 @@ namespace InspectionEditor
         private void PopulateInlineChecklist(string? filter = null)
         {
             InlineChecklistPanel.Children.Clear();
+            _inlineItemRows.Clear();
             _inlineNumberpadSliders.Clear();
             if (!_inlineEditorMode || _currentInspection?.Sections == null)
                 return;
@@ -4569,7 +4571,21 @@ namespace InspectionEditor
             };
             row.MouseLeftButtonUp += InlineItemRow_MouseLeftButtonUp;
             StretchInlineWidth(row);
+            _inlineItemRows[item] = (section, row);
             return row;
+        }
+
+        private void RefreshInlineItemRow(Item? item)
+        {
+            if (item == null || !_inlineItemRows.TryGetValue(item, out var entry))
+                return;
+
+            int index = InlineChecklistPanel.Children.IndexOf(entry.Row);
+            if (index < 0)
+                return;
+
+            InlineChecklistPanel.Children.RemoveAt(index);
+            InlineChecklistPanel.Children.Insert(index, CreateInlineItemRow(entry.Section, item));
         }
 
         private Brush GetInlineSectionHeaderBackground(Section section)
@@ -7315,6 +7331,7 @@ namespace InspectionEditor
 
             if (sender is not FrameworkElement element || element.Tag is not Item item) return;
 
+            Item? previouslySelectedItem = _editorLoadedItem;
             AutoApplyCurrentItem();
             LoadItemEditor(item);
             SelectItemInTreeView(item);
@@ -7325,7 +7342,11 @@ namespace InspectionEditor
                 ToggleInlineItem(item);
             else
             {
-                PopulateInlineChecklist(SearchFilterBox.Text);
+                // A full checklist rebuild is visibly expensive on Builder Confirmation.
+                // Only the old and new rows need new selection/comment visuals.
+                RefreshInlineItemRow(previouslySelectedItem);
+                if (!ReferenceEquals(previouslySelectedItem, item))
+                    RefreshInlineItemRow(item);
                 KeepInlineItemHeaderVisible(item);
             }
             e.Handled = true;
@@ -10800,9 +10821,20 @@ namespace InspectionEditor
                 {
                     if (itemNode.Tag == item)
                     {
-                        sectionNode.IsExpanded = true;
-                        itemNode.IsSelected = true;
-                        itemNode.BringIntoView();
+                        // The caller has already loaded this item. Suppress SelectedItemChanged
+                        // so programmatic synchronization does not load the right pane twice.
+                        bool wasRefreshingTree = _isRefreshingTree;
+                        _isRefreshingTree = true;
+                        try
+                        {
+                            sectionNode.IsExpanded = true;
+                            itemNode.IsSelected = true;
+                            itemNode.BringIntoView();
+                        }
+                        finally
+                        {
+                            _isRefreshingTree = wasRefreshingTree;
+                        }
                         return;
                     }
                 }
@@ -11955,6 +11987,14 @@ namespace InspectionEditor
         {
             RefreshEngDataPanel();
             RefreshEcDataPanel();
+        }
+
+        private void CommentsTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Dismiss the overlay but leave normal TextBox mouse handling in charge of
+            // placing the caret exactly where the user clicked.
+            QuickSuggestionsOverlay.Visibility = Visibility.Collapsed;
+            CommentsTextBox.Focus();
         }
 
         private void LoadSavedComments()

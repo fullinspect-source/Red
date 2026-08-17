@@ -818,6 +818,7 @@
                                                  VerticalScrollBarVisibility="Auto"
                                                  FontSize="13"
                                                  Padding="6"
+                                                 PreviewMouseLeftButtonDown="CommentsTextBox_PreviewMouseLeftButtonDown"
                                                  TextChanged="CommentsTextBox_TextChanged"
                                                  TabIndex="50"/>
                                         <!-- Quick Suggestions Overlay - 3 columns side by side -->
