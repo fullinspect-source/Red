@@ -154,6 +154,28 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("CommentsTextBox.Focus();", handler)
         self.assertNotIn("e.Handled = true", handler)
 
+    def test_prefix_suffix_and_ai_comments_dismiss_quick_comments_and_focus_editor(self):
+        classic_helper = CODE[CODE.index("private void FocusClassicCommentEditorAfterAutomatedComment"):CODE.index("private void AddPrefixButton_Click")]
+        self.assertIn("QuickSuggestionsOverlay.Visibility = Visibility.Collapsed;", classic_helper)
+        self.assertIn("CommentsTextBox.CaretIndex", classic_helper)
+        self.assertIn("Keyboard.Focus(CommentsTextBox);", classic_helper)
+
+        prefix = CODE[CODE.index("private void PrefixButton_Checked"):CODE.index("private void PrefixButton_Unchecked")]
+        suffix = CODE[CODE.index("private void SuffixButton_Changed"):CODE.index("private static bool IsTimestampSuffix")]
+        ai = CODE[CODE.index("private void AISuggestionButton_Click"):CODE.index("private void TryAutoFillAdjacentItems")]
+        self.assertIn("FocusClassicCommentEditorAfterAutomatedComment();", prefix)
+        self.assertIn("FocusClassicCommentEditorAfterAutomatedComment();", suffix)
+        self.assertIn("FocusClassicCommentEditorAfterAutomatedComment();", ai)
+
+        inline = CODE[CODE.index("private void InlinePrefixSuffixButton_Click"):CODE.index("private void FocusInlineCommentEditor")]
+        self.assertIn("_inlineQuickCommentsDismissedItem = action.Item;", inline)
+        self.assertIn("FocusInlineCommentEditor(action.Item);", inline)
+
+        inline_ai = CODE[CODE.index("private void InlineAiSuggestionButton_Click"):CODE.index("private void SetInlineItemValue")]
+        self.assertIn("_inlineQuickCommentsDismissedItem = action.Item;", inline_ai)
+        self.assertIn("if (action.Mode == InlineAiMode.GetThree)", inline_ai)
+        self.assertIn("FocusInlineCommentEditor(action.Item);", inline_ai)
+
     def test_comment_actions_stack_and_flag_uses_double_on_single_off(self):
         self.assertIn('x:Name="CommentActionsPanel" Grid.Column="1" Orientation="Vertical"', XAML)
         self.assertIn('PreviewMouseLeftButtonDown="SpecialistFlagButton_PreviewMouseLeftButtonDown"', XAML)

@@ -1799,10 +1799,7 @@ namespace InspectionEditor
             _selectedPrefix = btn.Tag?.ToString();
             UpdatePreviewText();
             MarkUnsaved();
-            
-            // Return focus to comments box so on-screen keyboard stays open
-            CommentsTextBox.Focus();
-            CommentsTextBox.CaretIndex = CommentsTextBox.Text?.Length ?? 0;
+            FocusClassicCommentEditorAfterAutomatedComment();
         }
 
         private void PrefixButton_Unchecked(object sender, RoutedEventArgs e)
@@ -1811,9 +1808,7 @@ namespace InspectionEditor
             if (_prefixButtons.All(b => b.IsChecked != true))
                 _selectedPrefix = null;
             UpdatePreviewText();
-            
-            CommentsTextBox.Focus();
-            CommentsTextBox.CaretIndex = CommentsTextBox.Text?.Length ?? 0;
+            FocusClassicCommentEditorAfterAutomatedComment();
         }
 
         private void SuffixButton_Changed(object sender, RoutedEventArgs e)
@@ -1836,6 +1831,7 @@ namespace InspectionEditor
             
             UpdatePreviewText();
             MarkUnsaved();
+            FocusClassicCommentEditorAfterAutomatedComment();
         }
         
         /// <summary>
@@ -1889,6 +1885,16 @@ namespace InspectionEditor
                 CommentsTextBox.Text = newText;
                 CommentsTextBox.CaretIndex = Math.Min(caretPos, newText.Length);
             }
+        }
+
+        private void FocusClassicCommentEditorAfterAutomatedComment()
+        {
+            // Prefixes, suffixes, Quick Comments, and AI comments all hand control
+            // straight back to typing instead of leaving an overlay over the editor.
+            QuickSuggestionsOverlay.Visibility = Visibility.Collapsed;
+            CommentsTextBox.Focus();
+            CommentsTextBox.CaretIndex = CommentsTextBox.Text?.Length ?? 0;
+            Keyboard.Focus(CommentsTextBox);
         }
 
         private void AddPrefixButton_Click(object sender, RoutedEventArgs e)
@@ -7986,12 +7992,10 @@ namespace InspectionEditor
             var suffixes = UserDataService.ExtractSuffixes(existing);
             string core = UserDataService.StripPrefixAndSuffix(existing);
 
-            bool focusCommentEditor = false;
             if (action.IsPrefix)
             {
                 bool removing = action.Value.Equals(prefix, StringComparison.OrdinalIgnoreCase);
                 prefix = removing ? "" : action.Value;
-                focusCommentEditor = !removing;
                 if (!removing)
                     RecordInlineUsage(action.Item, action.Value, "prefix");
             }
@@ -8008,11 +8012,11 @@ namespace InspectionEditor
             }
 
             action.Item.Comments = UserDataService.BuildComment(prefix, core, suffixes);
+            _inlineQuickCommentsDismissedItem = action.Item;
             MarkUnsaved();
             LoadItemEditor(action.Item);
             PopulateTreeView(SearchFilterBox.Text);
-            if (focusCommentEditor)
-                FocusInlineCommentEditor(action.Item);
+            FocusInlineCommentEditor(action.Item);
             e.Handled = true;
         }
 
@@ -9113,6 +9117,8 @@ namespace InspectionEditor
             RefreshEngDataPanel();
             RefreshEcDataPanel();
             PopulateTreeView(SearchFilterBox.Text);
+            if (action.Mode == InlineAiMode.GetThree)
+                FocusInlineCommentEditor(action.Item);
             e.Handled = true;
         }
 
@@ -12682,6 +12688,7 @@ namespace InspectionEditor
             CommentsTextBox.Text = fullComment;
             AutoSetFailIfApplicable();
             MarkUnsaved();
+            FocusClassicCommentEditorAfterAutomatedComment();
         }
         
         // ── Transcribe: auto-fill adjacent checklist items ─────────────────────
