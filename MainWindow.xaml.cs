@@ -3423,7 +3423,7 @@ namespace InspectionEditor
                 _currentInspection.ExtensionData["RedPlanCheck"] = new JObject
                 {
                     ["CompletedUtc"] = DateTime.UtcNow.ToString("o"),
-                    ["SourceAttachment"] = attachments.First().Filename,
+                    ["SourceAttachment"] = window.Result.SourceAttachmentFilename,
                     ["Checks"] = new JArray(window.Result.Findings.Select(f => new JObject
                     {
                         ["Id"] = f.Id,

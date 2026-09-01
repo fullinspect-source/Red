@@ -4,6 +4,12 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.18 — Plan Check safety hardening
+
+- **Files changed:** `InspectionEditor.csproj`, `Models/PlanCheckModels.cs`, `PlanCheckWindow.xaml`, `PlanCheckWindow.xaml.cs`, `Services/PlanCheckService.cs`, `Services/SurgicalSaveService.cs`, `MainWindow.xaml.cs`, Plan Check/release metadata tests, release notes, and this handoff.
+- **What changed:** Added attachment-load generation guards so a stale PDF cannot overwrite a newer selection; narrowed automatic marker phrases to avoid generic `steel`/`width`/`depth`/`slab` matches; records the attachment actually reviewed; adds NI / not applicable; marker taps now select without changing conclusions; and attachment persistence is gated to a completed `RedPlanCheck` result.
+- **Verification/deployment:** All 90 Python regression tests passed; Release build succeeded with 0 errors and the same 16 existing warnings; dependency audit found no vulnerable packages. Standalone publish, package security verification, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+
 ### 2026-09-01 — RED 2.1.17 — CPP Plan Check Beta rescue
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml`, `MainWindow.xaml.cs`, `Services/SurgicalSaveService.cs`, new `PlanCheckWindow.xaml`, new `PlanCheckWindow.xaml.cs`, new `Models/PlanCheckModels.cs`, new `Services/PlanCheckService.cs`, new `tests/plan_check_static_test.py`, release metadata tests, release notes, and this handoff.

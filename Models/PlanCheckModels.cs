@@ -7,7 +7,8 @@ namespace InspectionEditor.Models
     {
         Incomplete,
         Confirmed,
-        Deficient
+        Deficient,
+        NotApplicable
     }
 
     public sealed class PlanPdfAttachment
@@ -41,6 +42,7 @@ namespace InspectionEditor.Models
 
     public sealed class PlanCheckResult
     {
+        public string SourceAttachmentFilename { get; set; } = "";
         public List<PlanCheckScreenshot> Screenshots { get; } = new();
         public List<PlanCheckFinding> Findings { get; } = new();
         public JObject? AnnotatedAttachment { get; set; }

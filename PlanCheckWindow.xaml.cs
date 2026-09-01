@@ -36,6 +36,7 @@ namespace InspectionEditor
         private double _mouseDownHorizontalOffset;
         private double _mouseDownVerticalOffset;
         private double _manipulationScale = 1.0;
+        private int _attachmentLoadGeneration;
 
         public PlanCheckResult? Result { get; private set; }
 
@@ -63,6 +64,8 @@ namespace InspectionEditor
 
         private async Task LoadAttachmentAsync(int index)
         {
+            int generation = ++_attachmentLoadGeneration;
+            _renderCancellation?.Cancel();
             try
             {
                 SetBusy(true, "Opening embedded plan and locating suggested checks…");
@@ -77,23 +80,29 @@ namespace InspectionEditor
                     var findings = PlanCheckService.CreateFindings(path);
                     return (count, findings);
                 });
+                if (generation != _attachmentLoadGeneration) return;
                 _pageCount = load.count;
                 _findings = load.findings;
                 _pageIndex = 0;
                 _selectedFinding = _findings.FirstOrDefault();
                 BuildChecksPanel();
                 // Populate thumbnail placeholders, but show page one without waiting for every page.
-                _ = BuildThumbnailsAsync();
+                _ = BuildThumbnailsAsync(path, _pageCount, generation);
                 await RenderCurrentPageAsync();
+                if (generation != _attachmentLoadGeneration) return;
                 StatusText.Text = "Suggestions are labeled. Select a check and tap the plan to move its marker.";
             }
             catch (Exception ex)
             {
+                if (generation != _attachmentLoadGeneration) return;
                 StatusText.Text = "Unable to open this embedded PDF.";
                 MessageBox.Show($"RED could not open the embedded plan.\n\n{ex.Message}", "Plan Check Beta",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            finally { SetBusy(false); }
+            finally
+            {
+                if (generation == _attachmentLoadGeneration) SetBusy(false);
+            }
         }
 
         private void BuildChecksPanel()
@@ -161,7 +170,8 @@ namespace InspectionEditor
         private void Marker_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is not FrameworkElement { Tag: PlanCheckFinding finding }) return;
-            CycleFinding(finding);
+            _selectedFinding = finding;
+            BuildChecksPanel();
             e.Handled = true;
         }
 
@@ -172,6 +182,7 @@ namespace InspectionEditor
             {
                 PlanCheckState.Incomplete => PlanCheckState.Confirmed,
                 PlanCheckState.Confirmed => PlanCheckState.Deficient,
+                PlanCheckState.Deficient => PlanCheckState.NotApplicable,
                 _ => PlanCheckState.Incomplete
             };
             BuildChecksPanel();
@@ -181,6 +192,7 @@ namespace InspectionEditor
         {
             PlanCheckState.Confirmed => "✓ CONFIRMED",
             PlanCheckState.Deficient => "! DEFICIENT",
+            PlanCheckState.NotApplicable => "NI / NOT APPLICABLE",
             _ => "○ INCOMPLETE"
         };
 
@@ -188,14 +200,15 @@ namespace InspectionEditor
         {
             PlanCheckState.Confirmed => Brushes.ForestGreen,
             PlanCheckState.Deficient => Brushes.Firebrick,
+            PlanCheckState.NotApplicable => Brushes.SlateGray,
             _ => Brushes.Gray
         };
 
-        private async Task BuildThumbnailsAsync()
+        private async Task BuildThumbnailsAsync(string path, int pageCount, int generation)
         {
+            if (generation != _attachmentLoadGeneration) return;
             ThumbnailList.Items.Clear();
-            if (_pdfPath == null) return;
-            for (int i = 0; i < _pageCount; i++)
+            for (int i = 0; i < pageCount; i++)
             {
                 var item = new StackPanel { Margin = new Thickness(5), Tag = i };
                 item.Children.Add(new Border
@@ -210,13 +223,13 @@ namespace InspectionEditor
             }
             ThumbnailList.SelectedIndex = 0;
 
-            string path = _pdfPath;
-            for (int i = 0; i < _pageCount; i++)
+            for (int i = 0; i < pageCount; i++)
             {
                 try
                 {
                     int captured = i;
                     var rendered = await Task.Run(() => PlanCheckService.RenderPage(path, captured, 0.22));
+                    if (generation != _attachmentLoadGeneration) return;
                     var source = CreateBitmap(rendered.Bytes, rendered.Width, rendered.Height);
                     if (ThumbnailList.Items[captured] is StackPanel panel && panel.Children[0] is Border border)
                         border.Child = new Image { Source = source, Stretch = Stretch.Uniform };
@@ -427,7 +440,7 @@ namespace InspectionEditor
             try
             {
                 SetBusy(true, "Creating deficiency crops and optional annotated PDF…");
-                var result = new PlanCheckResult();
+                var result = new PlanCheckResult { SourceAttachmentFilename = _attachment.Filename };
                 result.Findings.AddRange(_findings);
                 foreach (var finding in _findings.Where(f => f.State == PlanCheckState.Deficient))
                 {

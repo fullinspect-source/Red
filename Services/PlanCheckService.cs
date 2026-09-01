@@ -24,11 +24,11 @@ namespace InspectionEditor.Services
 
         private static readonly CheckDefinition[] Definitions =
         {
-            new("steel", "Steel / rebar callouts on footprint", "rebar, reinforcing steel, bars", new[] { "rebar", "reinforcing", "reinforcement", "steel", "#4", "#5" }),
-            new("beam", "Beam design width / depth", "beam width and depth", new[] { "beam", "grade beam", "width", "depth" }),
-            new("slab", "Design slab thickness", "slab thickness", new[] { "slab", "thickness", "thick", "thk" }),
-            new("hold-down", "Wind-strap / hold-down count", "hold-down, holddown, strap, STHD", new[] { "hold-down", "holddown", "hold down", "strap", "sthd" }),
-            new("cables", "Cable counts", "cable, strand, tendon count", new[] { "cable", "cables", "strand", "strands", "tendon", "tendons" })
+            new("steel", "Steel / rebar callouts on footprint", "rebar and reinforcing steel", new[] { "rebar", "reinforcing steel", "reinforcement schedule" }),
+            new("beam", "Beam design width / depth", "grade-beam width and depth", new[] { "grade beam", "beam width", "beam depth" }),
+            new("slab", "Design slab thickness", "slab thickness", new[] { "slab thickness", "thickened slab", "slab thk" }),
+            new("hold-down", "Wind-strap / hold-down count", "hold-down, holddown, STHD", new[] { "hold-down", "holddown", "hold down", "sthd" }),
+            new("cables", "Cable counts", "cable, strand, and tendon count", new[] { "cable count", "strand count", "tendon count", "total number of strands", "post tension" })
         };
 
         public static IReadOnlyList<PlanPdfAttachment> GetEmbeddedPdfAttachments(InspectionFile inspection)

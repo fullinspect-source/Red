@@ -1,5 +1,12 @@
 # RED 2.0 Release Notes
 
+## 2.1.18 — Plan Check safety hardening
+
+- Prevents a slower, previously selected PDF from replacing the currently selected Plan Check attachment during rapid attachment changes.
+- Uses narrower plan phrases for automatic marker suggestions, records the attachment actually reviewed, and adds NI / not applicable as a valid completed review state.
+- Makes plan-marker taps select and reposition checks without accidentally changing their confirmed/deficient conclusion.
+- Limits attachment persistence to inspections with a newly completed Plan Check result.
+
 ## 2.1.17 — CPP Plan Check Beta
 
 - Adds a CPP-only **Plan Check Beta** that opens valid PDF attachments embedded in the INS file and keeps the original plan unchanged.

@@ -119,6 +119,9 @@ namespace InspectionEditor.Services
         private void PatchAddedAttachments(InspectionFile inspection)
         {
             if (_originalJson == null || inspection.Attachments == null) return;
+            if (inspection.ExtensionData == null ||
+                !inspection.ExtensionData.TryGetValue("RedPlanCheck", out object? metadata) || metadata == null)
+                return;
 
             var originalAttachments = _originalJson["Attachments"] as JArray;
             if (originalAttachments == null)
