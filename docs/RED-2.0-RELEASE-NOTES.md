@@ -1,5 +1,13 @@
 # RED 2.0 Release Notes
 
+## 2.1.22 — Complete single-tap and OCR isolation hardening
+
+- Fail/status badges and value-choice affordances now select/load their row without opening inline tools.
+- Drawer close state is cleared before the close animation, preventing delayed callbacks or checklist rebuilds from leaving a drawer logically stuck open.
+- OCR option sets are stored per checklist item, so tapping an older result cannot consume a different item's latest transcription.
+- OCR chooses the option with the most parsed labeled pairs rather than merely counting slash characters.
+- Pair matching searches both `DisplayLabel` and `Name`, so a short display label cannot hide a U-Factor, SHGC, model, or serial match from the full prompt.
+
 ## 2.1.21 — Checklist drawer and AI OCR workflow fixes
 
 - The Photo Required badge now selects the checklist row, loads its fixed right-side editor, and launches the camera without opening the inline tool drawer.

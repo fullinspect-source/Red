@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.22 — complete single-tap and OCR isolation hardening
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.
+- **Interaction fix:** Removed the remaining single-tap drawer expansion paths from Fail/status and value-choice badges, and made drawer close state synchronous before animation.
+- **OCR fix:** Transcription option sets are item-scoped, best-option selection counts parsed pairs, and matching searches the combined display label plus full item name.
+- **Verification/deployment:** Verification and production deployment pending.
+
 ### 2026-09-01 — RED 2.1.21 — checklist drawer and AI OCR workflow fixes
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.

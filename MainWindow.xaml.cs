@@ -144,7 +144,7 @@ namespace InspectionEditor
         
         // Transcribe mode - when true, clicking suggestion puts value in Value field (not Comments)
         private bool _isTranscribeMode = false;
-        private List<string>? _lastTranscriptionOptions;
+        private readonly Dictionary<Item, List<string>> _transcriptionOptionsByItem = new();
         private string _aiTone = "Technical";
 
         // Shared state for nested Value/Prefix/Suffix/Saved/AI vertical scrollers.
@@ -2450,6 +2450,7 @@ namespace InspectionEditor
             _currentInspection = await Task.Run(() => _saveService.Load(filePath));
             _inlineUnlockedNumberpadSliderItems.Clear();
             _inlineDrawerClosingItems.Clear();
+            _transcriptionOptionsByItem.Clear();
             _currentFilePath = filePath;
             _currentInspectionCode = _currentInspection.InspectionCode;
             _rulesAcknowledged = false;
@@ -7513,10 +7514,19 @@ namespace InspectionEditor
             if (!_inlineEditorMode)
                 return;
 
-            if (!expand && animate && IsInlineItemExpanded(item) &&
-                TryAnimateInlineDrawerClose(item, () => SetInlineItemExpanded(item, false, animate: false)))
+            if (!expand && IsInlineItemExpanded(item))
             {
-                return;
+                // Logical state closes immediately. Animation is visual-only so another
+                // selection or rebuild cannot resurrect a drawer that is already closing.
+                _expandedInlineItemKey = null;
+                _expandedInlineItemInstance = null;
+                _inlineQuickCommentsDismissedItem = null;
+                if (animate && TryAnimateInlineDrawerClose(
+                    item,
+                    () => PopulateInlineChecklist(SearchFilterBox.Text)))
+                {
+                    return;
+                }
             }
 
             if (expand)
@@ -7527,12 +7537,6 @@ namespace InspectionEditor
                 _expandedInlineItemInstance = item;
                 LoadItemEditor(item);
                 SelectItemInTreeView(item);
-            }
-            else if (IsInlineItemExpanded(item))
-            {
-                _expandedInlineItemKey = null;
-                _expandedInlineItemInstance = null;
-                _inlineQuickCommentsDismissedItem = null;
             }
 
             PopulateInlineChecklist(SearchFilterBox.Text);
@@ -8020,7 +8024,9 @@ namespace InspectionEditor
             if (sender is Button { Tag: Item item })
             {
                 AutoApplyCurrentItem();
-                SetInlineItemExpanded(item, expand: true);
+                LoadItemEditor(item);
+                SelectItemInTreeView(item);
+                UpdateInlineItemSelectionVisual(item);
                 e.Handled = true;
             }
         }
@@ -9178,7 +9184,7 @@ namespace InspectionEditor
                 {
                     _isTranscribeMode = true;
                     suggestions = await _grokClient.TranscribeLabelMultiple(photoData);
-                    _lastTranscriptionOptions = suggestions;
+                    _transcriptionOptionsByItem[item] = suggestions;
                 }
                 else
                 {
@@ -9269,9 +9275,8 @@ namespace InspectionEditor
         private void SetInlineItemValue(Item item, string value)
         {
             LoadItemEditor(item);
+            SelectItemInTreeView(item);
             string currentValue = item.Value?.ToString() ?? "";
-            bool shouldExpandTools = !value.Equals(currentValue, StringComparison.OrdinalIgnoreCase) &&
-                IsInlineFailValue(value);
             if (value.Equals(currentValue, StringComparison.OrdinalIgnoreCase))
             {
                 item.Value = "";
@@ -9292,19 +9297,7 @@ namespace InspectionEditor
             LoadItemEditor(item);
             RefreshEngDataPanel();
             RefreshEcDataPanel();
-            if (shouldExpandTools && _inlineEditorMode)
-            {
-                _expandedInlineItemKey = GetInlineItemKey(item);
-                _expandedInlineItemInstance = item;
-                _inlineQuickCommentsDismissedItem = null;
-            }
             PopulateTreeView(SearchFilterBox.Text);
-        }
-
-        private bool IsInlineFailValue(string value)
-        {
-            string normalized = value.Trim().ToLowerInvariant();
-            return normalized == "fail" || normalized.Contains("defect");
         }
 
         private void RecordInlineValueUsage(Item item, string value)
@@ -12613,6 +12606,8 @@ namespace InspectionEditor
             if (_currentPhotoData == null || _currentItem == null)
                 return;
 
+            Item requestItem = _currentItem;
+
             SuggestionsStack.Children.Clear();
             NoSuggestionsText.Visibility = Visibility.Collapsed;
             LoadingText.Text = transcribeMode ? "⏳ Transcribing label..." : "⏳ Analyzing image...";
@@ -12628,7 +12623,7 @@ namespace InspectionEditor
                 {
                     // Transcribe mode - get 3 transcription options (simple → verbose)
                     suggestions = await _grokClient.TranscribeLabelMultiple(_currentPhotoData);
-                    _lastTranscriptionOptions = suggestions;
+                    _transcriptionOptionsByItem[requestItem] = suggestions;
                 }
                 else
                 {
@@ -12849,11 +12844,11 @@ namespace InspectionEditor
             // This handles the case where the user tapped the simple option (e.g. just "2.3")
             // but a more detailed option like "Post: 2.3 / U-Factor: 2.2" was also available.
             string bestTranscription = transcription;
-            if (_lastTranscriptionOptions != null && _lastTranscriptionOptions.Count > 0)
+            if (_transcriptionOptionsByItem.TryGetValue(anchor, out var transcriptionOptions) &&
+                transcriptionOptions.Count > 0)
             {
-                // Pick the option with the most pairs (most "/" separators)
-                bestTranscription = _lastTranscriptionOptions
-                    .OrderByDescending(s => s.Count(c => c == '/'))
+                bestTranscription = transcriptionOptions
+                    .OrderByDescending(s => ParseTranscriptionPairs(s).Count)
                     .First();
             }
 
@@ -12949,7 +12944,7 @@ namespace InspectionEditor
         private static bool TranscriptionKeyMatchesItem(string key, Item item)
         {
             string k = key.ToLowerInvariant().Trim();
-            string name = (item.DisplayLabel ?? item.Name ?? "").ToLowerInvariant();
+            string name = $"{item.DisplayLabel} {item.Name}".ToLowerInvariant();
 
             if (k.Contains("serial") && name.Contains("serial")) return true;
             if (k.Contains("model") && !k.Contains("serial") && name.Contains("model") && !name.Contains("serial")) return true;

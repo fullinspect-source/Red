@@ -58,6 +58,16 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("CameraButton_Click(sender, e);", body)
         self.assertNotIn("SetInlineItemExpanded", body)
 
+    def test_status_and_value_badges_select_without_opening_drawers(self):
+        status = CODE[CODE.index("private void SetInlineItemValue"):CODE.index("private void RecordInlineValueUsage")]
+        value_choice = CODE[CODE.index("private void InlineValueChoiceButton_Click"):CODE.index("private void InlineValueCombo_GotKeyboardFocus")]
+        self.assertIn("SelectItemInTreeView(item);", status)
+        self.assertNotIn("_expandedInlineItem", status)
+        self.assertNotIn("shouldExpandTools", status)
+        self.assertIn("LoadItemEditor(item);", value_choice)
+        self.assertIn("SelectItemInTreeView(item);", value_choice)
+        self.assertNotIn("SetInlineItemExpanded", value_choice)
+
     def test_selecting_another_item_collapses_the_old_inline_drawer(self):
         load = CODE[CODE.index("private void LoadItemEditor"):CODE.index("private static bool IsProperNameItem")]
         collapse = CODE[CODE.index("private void CollapseInlineDrawerForDifferentSelection"):CODE.index("private void ToggleInlineItem")]
@@ -65,6 +75,10 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("_expandedInlineItemKey = null;", collapse)
         self.assertIn("_expandedInlineItemInstance = null;", collapse)
         self.assertIn("RefreshInlineItemRow(expandedItem);", collapse)
+
+        set_expanded = CODE[CODE.index("private void SetInlineItemExpanded"):CODE.index("private Border? FindInlineDrawerHost")]
+        self.assertLess(set_expanded.index("_expandedInlineItemKey = null;"), set_expanded.index("TryAnimateInlineDrawerClose"))
+        self.assertNotIn("SetInlineItemExpanded(item, false, animate: false)", set_expanded)
 
     def test_duplicate_is_a_small_left_edge_action_not_right_pane_header_chrome(self):
         self.assertIn('x:Name="RightPaneNavigation" Visibility="Collapsed"', XAML)
@@ -205,6 +219,10 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("SelectMany(section => section.Items)", distribution)
         self.assertIn("candidate.Value = val;", distribution)
         self.assertNotIn("GetVisibleItems()", distribution)
+        self.assertIn("_transcriptionOptionsByItem.TryGetValue(anchor", distribution)
+        self.assertIn("OrderByDescending(s => ParseTranscriptionPairs(s).Count)", distribution)
+        matching = CODE[CODE.index("private static bool TranscriptionKeyMatchesItem"):CODE.index("// ── MegaStats")]
+        self.assertIn('$"{item.DisplayLabel} {item.Name}"', matching)
 
     def test_comment_box_click_dismisses_quick_comments_and_keeps_native_caret(self):
         self.assertIn('PreviewMouseLeftButtonDown="CommentsTextBox_PreviewMouseLeftButtonDown"', XAML)
