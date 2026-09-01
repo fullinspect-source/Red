@@ -9,7 +9,7 @@ This file is the concise cross-session source of development context for work pe
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml`, `MainWindow.xaml.cs`, `Services/SurgicalSaveService.cs`, new `PlanCheckWindow.xaml`, new `PlanCheckWindow.xaml.cs`, new `Models/PlanCheckModels.cs`, new `Services/PlanCheckService.cs`, new `tests/plan_check_static_test.py`, release metadata tests, release notes, and this handoff.
 - **What changed:** Selectively transplanted the useful CPP Plan Check Beta from Trent's newer Dropbox work onto live GitHub RED 2.1.16 rather than publishing the stale 2.0.22 tree. CPP reports with embedded PDF attachments now expose five inspector-owned plan checks, movable plan markers, optional deficiency crops, optional flattened annotated-PDF attachment, and durable completion metadata. Existing attachment tokens are preserved and only newly created attachments are appended during surgical save.
 - **Deliberately excluded:** The Dropbox tree's stale 2.0.22 version line and broad replacements to RED 2.1 split-pane UI, AI routing, OCR support, updater, datasets, energy logic, and quick comments were not copied because they would regress newer production behavior.
-- **Verification/deployment:** Release build succeeded with 0 errors and the same 16 existing warnings; all 89 Python regression tests passed; dependency audit found no vulnerable packages. Standalone publish, package security scan, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+- **Verification/deployment:** Source commit/tag `9d5e96e85d32a630f29e1e8bbdf7f5187a22b776` built and published standalone win-x64 with 0 errors and the same 16 existing warnings; all 89 Python regression tests passed; dependency audit found no vulnerable packages; the embedded Gemini credential returned HTTP 200 without exposing the key; package scans found no `settings.txt`, generated source, user license, INS data, or plaintext key. GitHub release `v2.1.17` is live at https://github.com/fullinspect-source/Red/releases/tag/v2.1.17. The downloaded stable assets match SHA-256 `c875a7ffc568d12fa37c3a8421148f42f8765a1dd7cb247e04f950441b7edcc4` for `Red-v2.1.17.zip` and `94724c7c5dea2777e27f856e6697818f04d74fe11e265ed3e65ac95c7578f49d` for `update_red.bat`. Dropbox tracked source and `Publish-current` were synced with verified parity after preserving 17 differing local files in a reversible pre-sync backup.
 
 ### 2026-08-14 — RED 2.0.21 — Gemini 3.7 Flash low/medium routing
 
@@ -166,11 +166,11 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 
 ## Current Production State
 
-- **Production version:** 2.0.11.
-- **Release date in the application:** 2026-07-12.
-- **Latest GitHub production release:** v2.0.11, non-draft and non-prerelease. It was published at 2026-07-13 02:19:05 UTC (2026-07-12 in the America/Chicago release session).
-- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.0.11
-- **Release asset:** `Red-v2.0.11-win-x64.zip` (90,539,960 bytes).
+- **Production version:** 2.1.17.
+- **Release date in the application:** 2026-09-01.
+- **Latest GitHub production release:** v2.1.17, non-draft and non-prerelease.
+- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.17
+- **Release asset:** `Red-v2.1.17.zip` (93,804,809 bytes), plus `update_red.bat` (8,437 bytes).
 - **Production executable/install:** `Red.exe` in `C:\Red`.
 - **Production user data:** `%LOCALAPPDATA%\RED` via `AppIdentity.LocalAppDataPath`.
 - **Runtime:** .NET 8 WPF, target `net8.0-windows10.0.19041.0`, self-contained win-x64 production publish.
@@ -181,8 +181,8 @@ Use code and live GitHub state before older prose documentation:
 
 | Concern | Authoritative source |
 |---|---|
-| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.0.11). Do not hard-code a second version elsewhere. |
-| Release date | `<ReleaseDate>` in `InspectionEditor.csproj`; emitted as assembly metadata (currently 2026-07-12). |
+| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.17). Do not hard-code a second version elsewhere. |
+| Release date | `<ReleaseDate>` in `InspectionEditor.csproj`; emitted as assembly metadata (currently 2026-09-01). |
 | Runtime identity/UI display | `AppIdentity.cs`: `Version`, `VersionDisplay`, `ReleaseDate`, `PublishedDateText`, `VersionWithPublishedDate`, window titles, and app-data folder selection. |
 | Startup app update | `App.xaml.cs`, `OnStartup()` calling `AppUpdateService.CheckAndInstallIfAvailableAsync()`. |
 | Shared updater | `Services/AppUpdateService.cs`: `AppUpdateResult`, `CheckAndInstallIfAvailableAsync`, version comparison, GitHub release parsing, download/extract, and elevated batch handoff. |
@@ -192,7 +192,7 @@ Use code and live GitHub state before older prose documentation:
 | Numberpad integration/UI | `MainWindow.xaml.cs`: `ApplyNumberpadDefaultMigration()`, `CreateCollapsedInlineNumberpadSlider()`, `CreateInlineNumberpadTouchSlider()`, `SynchronizeInlineNumberpadSliders()`, and drawer preference helpers. |
 | Build project/package inputs | `InspectionEditor.csproj`; `build-standalone.bat` is a convenience wrapper. |
 | Manual field updater | `scripts/update_red.bat`; it backs up existing installation/user state, downloads GitHub's latest ZIP, installs to `C:\Red`, restores allowed local files, repairs the shortcut, and relaunches. |
-| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` covers 2.0.9/2.0.10 but does not yet contain 2.0.11. |
+| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.17 CPP Plan Check Beta release. |
 
 `README.md`, `BUILD.md`, `docs/ARCHITECTURE.md`, and `docs/RED-2.0-DEPLOYMENT.md` contain useful background but are partially stale. Examples: several still identify 2.0.0 as current, `BUILD.md` expects `InspectionEditor.exe`/a separately copied `RedHelp.pdf`/packaged `settings.txt`, and old deployment instructions expect `version.txt`. Current code produces `Red.exe`, embeds `RedHelp.pdf`, and deliberately excludes `settings.txt`.
 
