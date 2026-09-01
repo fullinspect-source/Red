@@ -9,7 +9,7 @@ This file is the concise cross-session source of development context for work pe
 - **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/AppUpdateService.cs`, startup/release metadata tests, release notes, and this handoff.
 - **Decision:** Trent prefers the once-per-24-hours automatic app-update check. The fact that a same-day release requires triple-click or waiting for the interval is expected behavior, not a defect.
 - **What changed:** Reverted 2.1.19's every-startup GitHub check and restored the 24-hour marker, while retaining triple-click as the immediate manual bypass and keeping network failures nonblocking.
-- **Verification/deployment:** All 93 Python regression tests passed; Release build succeeded with 0 errors and the same 16 existing warnings; dependency audit found no vulnerable packages. Standalone publish, package security verification, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+- **Verification/deployment:** Source commit/tag `2e23c6cf6eece12a387bce7432aa829133167f85` built and published standalone win-x64 with 0 errors and the same 16 existing warnings; all 93 Python regression tests passed; dependency audit found no vulnerable packages; Gemini validation returned HTTP 200; package scans found no `settings.txt`, generated source, user license, INS data, or plaintext key. GitHub release `v2.1.20` is live at https://github.com/fullinspect-source/Red/releases/tag/v2.1.20. Downloaded stable assets match SHA-256 `b67fb0a3f36f8271e184f9e9d57b3f0e64df64436b3d8e8621389e7db24820cf` for `Red-v2.1.20.zip` and `94724c7c5dea2777e27f856e6697818f04d74fe11e265ed3e65ac95c7578f49d` for `update_red.bat`. Dropbox tracked source and `Publish-current` were synced with verified parity after a reversible 9-file backup.
 
 ### 2026-09-01 — RED 2.1.19 — automatic startup update check
 
@@ -186,11 +186,11 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 
 ## Current Production State
 
-- **Production version:** 2.1.19.
+- **Production version:** 2.1.20.
 - **Release date in the application:** 2026-09-01.
-- **Latest GitHub production release:** v2.1.19, non-draft and non-prerelease.
-- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.19
-- **Release asset:** `Red-v2.1.19.zip` (93,804,775 bytes), plus `update_red.bat` (8,437 bytes).
+- **Latest GitHub production release:** v2.1.20, non-draft and non-prerelease.
+- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.20
+- **Release asset:** `Red-v2.1.20.zip` (93,804,941 bytes), plus `update_red.bat` (8,437 bytes).
 - **Production executable/install:** `Red.exe` in `C:\Red`.
 - **Production user data:** `%LOCALAPPDATA%\RED` via `AppIdentity.LocalAppDataPath`.
 - **Runtime:** .NET 8 WPF, target `net8.0-windows10.0.19041.0`, self-contained win-x64 production publish.
@@ -201,7 +201,7 @@ Use code and live GitHub state before older prose documentation:
 
 | Concern | Authoritative source |
 |---|---|
-| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.19). Do not hard-code a second version elsewhere. |
+| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.20). Do not hard-code a second version elsewhere. |
 | Release date | `<ReleaseDate>` in `InspectionEditor.csproj`; emitted as assembly metadata (currently 2026-09-01). |
 | Runtime identity/UI display | `AppIdentity.cs`: `Version`, `VersionDisplay`, `ReleaseDate`, `PublishedDateText`, `VersionWithPublishedDate`, window titles, and app-data folder selection. |
 | Startup app update | `App.xaml.cs`, `OnStartup()` calling `AppUpdateService.CheckAndInstallIfAvailableAsync()`. |
@@ -212,7 +212,7 @@ Use code and live GitHub state before older prose documentation:
 | Numberpad integration/UI | `MainWindow.xaml.cs`: `ApplyNumberpadDefaultMigration()`, `CreateCollapsedInlineNumberpadSlider()`, `CreateInlineNumberpadTouchSlider()`, `SynchronizeInlineNumberpadSliders()`, and drawer preference helpers. |
 | Build project/package inputs | `InspectionEditor.csproj`; `build-standalone.bat` is a convenience wrapper. |
 | Manual field updater | `scripts/update_red.bat`; it backs up existing installation/user state, downloads GitHub's latest ZIP, installs to `C:\Red`, restores allowed local files, repairs the shortcut, and relaunches. |
-| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.19 automatic startup update fix. |
+| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.20 restoration of the preferred 24-hour update interval. |
 
 `README.md`, `BUILD.md`, `docs/ARCHITECTURE.md`, and `docs/RED-2.0-DEPLOYMENT.md` contain useful background but are partially stale. Examples: several still identify 2.0.0 as current, `BUILD.md` expects `InspectionEditor.exe`/a separately copied `RedHelp.pdf`/packaged `settings.txt`, and old deployment instructions expect `version.txt`. Current code produces `Red.exe`, embeds `RedHelp.pdf`, and deliberately excludes `settings.txt`.
 
