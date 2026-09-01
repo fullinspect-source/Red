@@ -83,7 +83,8 @@ namespace InspectionEditor
             var splash = new SplashWindow();
             splash.Show();
 
-            // Check for RED app + data updates. The app check is throttled to once every 24 hours.
+            // Check GitHub on every RED startup so a release published after an earlier same-day
+            // launch is still installed automatically. Triple-click remains a manual retry path.
             splash.SetStatus("Checking for updates...");
             bool startupInternetRequired = false;
             try

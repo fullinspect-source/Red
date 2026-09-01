@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.1.19 — Check for app updates on every startup
+
+- Removes the old 24-hour app-update throttle that could suppress a newly published RED release when the app had already checked earlier that day.
+- Checks GitHub's latest RED release every time RED opens, while retaining the triple-click updater as a manual retry path.
+- Keeps update failures nonblocking so offline or slow connections still allow RED to open normally.
+
 ## 2.1.18 — Plan Check safety hardening
 
 - Prevents a slower, previously selected PDF from replacing the currently selected Plan Check attachment during rapid attachment changes.

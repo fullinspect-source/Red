@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.19 — automatic startup update check
+
+- **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/AppUpdateService.cs`, new `tests/startup_update_check_static_test.py`, release metadata tests, release notes, and this handoff.
+- **Root cause:** RED wrote a `.last_app_update_check` marker after any successful GitHub check and skipped normal startup checks for 24 hours. If RED opened before a release was published, later openings that day did not see the new release; triple-click worked because force mode bypassed the marker.
+- **What changed:** Removed the 24-hour throttle and marker write. RED now checks GitHub latest on every startup. Triple-click remains available as a manual retry, and network failures remain nonblocking.
+- **Verification/deployment:** All 93 Python regression tests passed; Release build succeeded with 0 errors and the same 16 existing warnings; dependency audit found no vulnerable packages. Standalone publish, package security verification, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+
 ### 2026-09-01 — RED 2.1.18 — Plan Check safety hardening
 
 - **Files changed:** `InspectionEditor.csproj`, `Models/PlanCheckModels.cs`, `PlanCheckWindow.xaml`, `PlanCheckWindow.xaml.cs`, `Services/PlanCheckService.cs`, `Services/SurgicalSaveService.cs`, `MainWindow.xaml.cs`, Plan Check/release metadata tests, release notes, and this handoff.
