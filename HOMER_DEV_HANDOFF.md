@@ -9,7 +9,7 @@ This file is the concise cross-session source of development context for work pe
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.
 - **Interaction fix:** Removed the remaining single-tap drawer expansion paths from Fail/status and value-choice badges, and made drawer close state synchronous before animation.
 - **OCR fix:** Transcription option sets are item-scoped, best-option selection counts parsed pairs, and matching searches the combined display label plus full item name.
-- **Verification/deployment:** Verification and production deployment pending.
+- **Verification/deployment:** Source commit/tag `391c6ee283d886fdec0f24f0da782a8679f0e8e4` passed all 97 Python regression tests and built/published standalone win-x64 with 0 errors and the same 16 existing warnings. NuGet found no vulnerable packages, and source/package scans found no prohibited settings, license, inspection, generated-key source, or plaintext AI key. GitHub release `v2.1.22` is live at https://github.com/fullinspect-source/Red/releases/tag/v2.1.22. Downloaded stable assets match SHA-256 `fdbce3a90329d920da4704d9f61b4da332738e348ad563015b69972b72dbabd5` for `Red-v2.1.22.zip` and `94724c7c5dea2777e27f856e6697818f04d74fe11e265ed3e65ac95c7578f49d` for `update_red.bat`. Dropbox tracked source and `Publish-current` were synced with verified parity after a reversible 9-file backup.
 
 ### 2026-09-01 — RED 2.1.21 — checklist drawer and AI OCR workflow fixes
 
@@ -200,11 +200,11 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 
 ## Current Production State
 
-- **Production version:** 2.1.21.
+- **Production version:** 2.1.22.
 - **Release date in the application:** 2026-09-01.
-- **Latest GitHub production release:** v2.1.21, non-draft and non-prerelease.
-- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.21
-- **Release asset:** `Red-v2.1.21.zip` (93,804,549 bytes), plus `update_red.bat` (8,437 bytes).
+- **Latest GitHub production release:** v2.1.22, non-draft and non-prerelease.
+- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.22
+- **Release asset:** `Red-v2.1.22.zip` (93,804,528 bytes), plus `update_red.bat` (8,437 bytes).
 - **Production executable/install:** `Red.exe` in `C:\Red`.
 - **Production user data:** `%LOCALAPPDATA%\RED` via `AppIdentity.LocalAppDataPath`.
 - **Runtime:** .NET 8 WPF, target `net8.0-windows10.0.19041.0`, self-contained win-x64 production publish.
@@ -215,7 +215,7 @@ Use code and live GitHub state before older prose documentation:
 
 | Concern | Authoritative source |
 |---|---|
-| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.21). Do not hard-code a second version elsewhere. |
+| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.22). Do not hard-code a second version elsewhere. |
 | Release date | `<ReleaseDate>` in `InspectionEditor.csproj`; emitted as assembly metadata (currently 2026-09-01). |
 | Runtime identity/UI display | `AppIdentity.cs`: `Version`, `VersionDisplay`, `ReleaseDate`, `PublishedDateText`, `VersionWithPublishedDate`, window titles, and app-data folder selection. |
 | Startup app update | `App.xaml.cs`, `OnStartup()` calling `AppUpdateService.CheckAndInstallIfAvailableAsync()`. |
@@ -226,7 +226,7 @@ Use code and live GitHub state before older prose documentation:
 | Numberpad integration/UI | `MainWindow.xaml.cs`: `ApplyNumberpadDefaultMigration()`, `CreateCollapsedInlineNumberpadSlider()`, `CreateInlineNumberpadTouchSlider()`, `SynchronizeInlineNumberpadSliders()`, and drawer preference helpers. |
 | Build project/package inputs | `InspectionEditor.csproj`; `build-standalone.bat` is a convenience wrapper. |
 | Manual field updater | `scripts/update_red.bat`; it backs up existing installation/user state, downloads GitHub's latest ZIP, installs to `C:\Red`, restores allowed local files, repairs the shortcut, and relaunches. |
-| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.21 checklist drawer and AI OCR workflow fixes. |
+| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.22 complete checklist drawer and AI OCR isolation hardening. |
 
 `README.md`, `BUILD.md`, `docs/ARCHITECTURE.md`, and `docs/RED-2.0-DEPLOYMENT.md` contain useful background but are partially stale. Examples: several still identify 2.0.0 as current, `BUILD.md` expects `InspectionEditor.exe`/a separately copied `RedHelp.pdf`/packaged `settings.txt`, and old deployment instructions expect `version.txt`. Current code produces `Red.exe`, embeds `RedHelp.pdf`, and deliberately excludes `settings.txt`.
 
