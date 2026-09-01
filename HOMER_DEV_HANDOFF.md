@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.21 — checklist drawer and AI OCR workflow fixes
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.
+- **Interaction fix:** Photo Required remains a camera shortcut but no longer expands inline tools. First press selects and loads the fixed right pane; deliberate double-click toggles the row drawer; selecting another row closes the old drawer.
+- **OCR fix:** Both classic and inline AI OCR result taps use one application path, immediately refresh the left checklist, extract the current row's matching value, and distribute matching paired fields such as U-Factor and SHGC using persisted inspection order rather than filtered visibility.
+- **Verification/deployment:** 96 Python regression tests pass and the Release win-x64 build succeeds with 0 errors and the same 16 existing warnings. Production publish/release details follow after deployment.
+
 ### 2026-09-01 — RED 2.1.20 — restore 24-hour update interval
 
 - **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/AppUpdateService.cs`, startup/release metadata tests, release notes, and this handoff.

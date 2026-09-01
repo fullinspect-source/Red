@@ -1,5 +1,14 @@
 # RED 2.0 Release Notes
 
+## 2.1.21 — Checklist drawer and AI OCR workflow fixes
+
+- The Photo Required badge now selects the checklist row, loads its fixed right-side editor, and launches the camera without opening the inline tool drawer.
+- Checklist rows select on the first press without replacing the tapped row, so double-click reliably opens or collapses that row's drawer.
+- Selecting any different checklist item automatically collapses the previously open inline drawer.
+- Tapping an AI OCR result now updates the right-side value editor and immediately rebuilds the left checklist value/status surface.
+- Paired OCR values now put U-Factor on the matching row and SHGC on the next matching checklist row when present, even when filters or collapsed sections hide that row.
+- OCR pair parsing now accepts slash, pipe, semicolon, newline, labeled comma, and omitted-separator forms such as `U-Factor: 0.30 SHGC: 0.25`.
+
 ## 2.1.20 — Restore the preferred 24-hour update interval
 
 - Restores RED's once-per-24-hours automatic GitHub update check at Trent's direction.

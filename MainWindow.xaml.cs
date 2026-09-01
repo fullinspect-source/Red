@@ -4687,7 +4687,12 @@ namespace InspectionEditor
                 Cursor = Cursors.Hand,
                 ToolTip = "Click to select; double-click to open inline tools"
             };
-            row.MouseLeftButtonUp += InlineItemRow_MouseLeftButtonUp;
+            // Select on preview-down so focus changes cannot swallow the first tap. Keeping
+            // the tapped row alive also preserves WPF's click count for a reliable double-click.
+            row.AddHandler(
+                UIElement.PreviewMouseLeftButtonDownEvent,
+                new MouseButtonEventHandler(InlineItemRow_PreviewMouseLeftButtonDown),
+                true);
             StretchInlineWidth(row);
             _inlineItemRows[item] = (section, row);
             return row;
@@ -7428,13 +7433,16 @@ namespace InspectionEditor
             if (sender is not Button { Tag: Item item })
                 return;
 
-            SetInlineItemExpanded(item, true);
+            // The badge is a camera shortcut, not a drawer shortcut. Selection loads the
+            // fixed right pane; only a deliberate row double-click may open inline tools.
             LoadItemEditor(item);
+            SelectItemInTreeView(item);
+            UpdateInlineItemSelectionVisual(item);
             CameraButton_Click(sender, e);
             e.Handled = true;
         }
 
-        private void InlineItemRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void InlineItemRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_scrollStarted) return;
 
@@ -7460,14 +7468,39 @@ namespace InspectionEditor
                 ToggleInlineItem(item);
             else
             {
-                // A full checklist rebuild is visibly expensive on Builder Confirmation.
-                // Only the old and new rows need new selection/comment visuals.
-                RefreshInlineItemRow(previouslySelectedItem);
+                // Do not replace the tapped row on the first click. Replacing it breaks the
+                // second click's target and makes WPF lose the double-click sequence.
                 if (!ReferenceEquals(previouslySelectedItem, item))
-                    RefreshInlineItemRow(item);
+                    RefreshInlineItemRow(previouslySelectedItem);
+                UpdateInlineItemSelectionVisual(item);
                 KeepInlineItemHeaderVisible(item);
             }
             e.Handled = true;
+        }
+
+        private void UpdateInlineItemSelectionVisual(Item item)
+        {
+            if (!_inlineItemRows.TryGetValue(item, out var entry))
+                return;
+
+            entry.Row.Background = new SolidColorBrush(SelectedItemHighlightColor);
+            entry.Row.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 153));
+            entry.Row.BorderThickness = new Thickness(2);
+            if (entry.Row.Child is StackPanel panel && panel.Children.Count > 0 && panel.Children[0] is Grid header)
+                header.Background = new SolidColorBrush(SelectedItemHighlightColor);
+        }
+
+        private void CollapseInlineDrawerForDifferentSelection(Item selectedItem)
+        {
+            Item? expandedItem = _expandedInlineItemInstance;
+            if (expandedItem == null || ReferenceEquals(expandedItem, selectedItem))
+                return;
+
+            _expandedInlineItemKey = null;
+            _expandedInlineItemInstance = null;
+            _inlineQuickCommentsDismissedItem = null;
+            _inlineDrawerClosingItems.Remove(expandedItem);
+            RefreshInlineItemRow(expandedItem);
         }
 
         private void ToggleInlineItem(Item item)
@@ -9212,9 +9245,8 @@ namespace InspectionEditor
 
             if (action.Mode == InlineAiMode.Transcribe)
             {
-                action.Item.Value = action.Suggestion;
-                RecordInlineValueUsage(action.Item, action.Suggestion);
-                TryAutoFillAdjacentItems(action.Suggestion);
+                string appliedValue = ApplyTranscriptionSuggestion(action.Item, action.Suggestion);
+                RecordInlineValueUsage(action.Item, appliedValue);
                 try { Clipboard.SetText(action.Suggestion); } catch { }
             }
             else
@@ -10753,6 +10785,7 @@ namespace InspectionEditor
 
         private void LoadItemEditor(Item item)
         {
+            CollapseInlineDrawerForDifferentSelection(item);
             _isLoadingEditor = true; // Suppress prefix/suffix button handlers during load
             try
             {
@@ -10807,6 +10840,7 @@ namespace InspectionEditor
             SuggestionsStack.Children.Clear();
             SuggestionsStack.Children.Add(NoSuggestionsText);
             NoSuggestionsText.Visibility = Visibility.Visible;
+            UpdateInlineItemSelectionVisual(item);
             }
             finally
             {
@@ -12777,11 +12811,13 @@ namespace InspectionEditor
                 // Transcribe mode - put value in the Value field + copy to clipboard
                 if (_currentItem != null)
                 {
-                    _currentItem.Value = suggestion;
+                    ApplyTranscriptionSuggestion(_currentItem, suggestion);
                     LoadStatusControls(_currentItem); // Refresh to show new value
                     MarkUnsaved();
                     try { Clipboard.SetText(suggestion); } catch { }
-                    TryAutoFillAdjacentItems(suggestion);
+                    RefreshEngDataPanel();
+                    RefreshEcDataPanel();
+                    PopulateTreeView(SearchFilterBox.Text);
                 }
                 return;
             }
@@ -12807,7 +12843,7 @@ namespace InspectionEditor
         // When a transcription has multiple key=value pairs (e.g. "Model: X / Serial: Y"
         // or "U-Value = 0.30 / SHGC = 0.25"), automatically fill the next 1-2 items
         // whose names match a key in the transcription — for the cost of 1 API call.
-        private void TryAutoFillAdjacentItems(string transcription)
+        private string ApplyTranscriptionSuggestion(Item anchor, string transcription)
         {
             // Use the most verbose transcription option — it has the most key-value pairs.
             // This handles the case where the user tapped the simple option (e.g. just "2.3")
@@ -12822,12 +12858,26 @@ namespace InspectionEditor
             }
 
             var pairs = ParseTranscriptionPairs(bestTranscription);
-            if (pairs.Count < 2) return; // Only 1 pair — nothing extra to distribute
+            string anchorValue = transcription;
+            var matchingAnchorPair = pairs.FirstOrDefault(pair =>
+                !string.IsNullOrWhiteSpace(pair.val) && TranscriptionKeyMatchesItem(pair.key, anchor));
+            if (!string.IsNullOrWhiteSpace(matchingAnchorPair.val))
+                anchorValue = matchingAnchorPair.val;
 
-            var items = GetVisibleItems();
-            var anchor = _editorLoadedItem ?? _currentItem;
-            int idx = anchor != null ? items.IndexOf(anchor) : -1;
-            if (idx < 0) return;
+            anchor.Value = anchorValue;
+            MarkUnsaved();
+
+            if (pairs.Count < 2)
+                return anchorValue;
+
+            // Use the inspection's actual persisted order, not the filtered/visible list.
+            // Required partner fields still need values when a filter or collapsed section hides them.
+            var items = _currentInspection?.Sections?
+                .SelectMany(section => section.Items)
+                .ToList() ?? new List<Item>();
+            int idx = items.IndexOf(anchor);
+            if (idx < 0)
+                return anchorValue;
 
             var autoFilled = new List<string>();
 
@@ -12839,7 +12889,6 @@ namespace InspectionEditor
                     if (!string.IsNullOrWhiteSpace(val) && TranscriptionKeyMatchesItem(key, candidate))
                     {
                         candidate.Value = val;
-                        MarkUnsaved();
                         autoFilled.Add(candidate.DisplayLabel ?? candidate.Name ?? "next item");
                         break;
                     }
@@ -12859,18 +12908,39 @@ namespace InspectionEditor
                 };
                 SuggestionsStack.Children.Add(note);
             }
+
+            return anchorValue;
         }
 
         // Splits "Model: X / Serial: Y" or "U-Value = 0.30 / SHGC = 0.25" into (key, value) pairs.
         private static List<(string key, string val)> ParseTranscriptionPairs(string text)
         {
             var pairs = new List<(string, string)>();
-            foreach (var seg in Regex.Split(text.Trim(), @"\s*/\s*"))
+            foreach (var seg in Regex.Split(
+                text.Trim(),
+                @"\s*(?:/|\||;|\r?\n|,\s*(?=[A-Za-z][A-Za-z0-9 \-]{1,30}\s*[:=]))\s*"))
             {
                 var m = Regex.Match(seg.Trim(), @"^(.+?)\s*[:=]\s*(.+)$");
                 if (m.Success)
                     pairs.Add((m.Groups[1].Value.Trim(), m.Groups[2].Value.Trim()));
             }
+
+            if (pairs.Count < 2)
+            {
+                // OCR occasionally omits separators: "U-Factor: 0.30 SHGC: 0.25".
+                // Recover known paired label fields without guessing arbitrary prose boundaries.
+                var knownMatches = Regex.Matches(
+                    text.Trim(),
+                    @"(?<key>U[- ]?(?:Factor|Value)|SHGC|Model(?: Number)?|Serial(?: Number)?|VT)\s*[:=]\s*(?<val>.*?)(?=\s+(?:U[- ]?(?:Factor|Value)|SHGC|Model(?: Number)?|Serial(?: Number)?|VT)\s*[:=]|$)",
+                    RegexOptions.IgnoreCase);
+                if (knownMatches.Count >= 2)
+                {
+                    pairs.Clear();
+                    foreach (Match match in knownMatches)
+                        pairs.Add((match.Groups["key"].Value.Trim(), match.Groups["val"].Value.Trim()));
+                }
+            }
+
             return pairs;
         }
 

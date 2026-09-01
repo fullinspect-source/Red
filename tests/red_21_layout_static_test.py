@@ -39,12 +39,32 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("CreateInlineDrawerHost(item)", CODE)
 
     def test_single_click_selects_and_double_click_opens_inline_tools(self):
-        start = CODE.index("private void InlineItemRow_MouseLeftButtonUp")
+        self.assertIn("PreviewMouseLeftButtonDownEvent", CODE)
+        start = CODE.index("private void InlineItemRow_PreviewMouseLeftButtonDown")
         end = CODE.index("private void ToggleInlineItem", start)
         body = CODE[start:end]
         self.assertIn("LoadItemEditor(item);", body)
         self.assertIn("if (e.ClickCount >= 2)", body)
         self.assertIn("ToggleInlineItem(item);", body)
+        self.assertIn("UpdateInlineItemSelectionVisual(item);", body)
+        self.assertNotIn("RefreshInlineItemRow(item);", body)
+
+    def test_photo_required_selects_and_launches_camera_without_opening_drawer(self):
+        start = CODE.index("private void InlinePhotoRequiredButton_Click")
+        end = CODE.index("private void InlineItemRow_PreviewMouseLeftButtonDown", start)
+        body = CODE[start:end]
+        self.assertIn("LoadItemEditor(item);", body)
+        self.assertIn("SelectItemInTreeView(item);", body)
+        self.assertIn("CameraButton_Click(sender, e);", body)
+        self.assertNotIn("SetInlineItemExpanded", body)
+
+    def test_selecting_another_item_collapses_the_old_inline_drawer(self):
+        load = CODE[CODE.index("private void LoadItemEditor"):CODE.index("private static bool IsProperNameItem")]
+        collapse = CODE[CODE.index("private void CollapseInlineDrawerForDifferentSelection"):CODE.index("private void ToggleInlineItem")]
+        self.assertIn("CollapseInlineDrawerForDifferentSelection(item);", load)
+        self.assertIn("_expandedInlineItemKey = null;", collapse)
+        self.assertIn("_expandedInlineItemInstance = null;", collapse)
+        self.assertIn("RefreshInlineItemRow(expandedItem);", collapse)
 
     def test_duplicate_is_a_small_left_edge_action_not_right_pane_header_chrome(self):
         self.assertIn('x:Name="RightPaneNavigation" Visibility="Collapsed"', XAML)
@@ -87,11 +107,12 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("!ReferenceEquals(item, _editorLoadedItem)", CODE)
         self.assertIn("SelectedItemHighlightColor", CODE)
         self.assertIn("EditorScrollViewer.Background = new SolidColorBrush(SelectedItemHighlightColor);", CODE)
-        handler_start = CODE.index("private void InlineItemRow_MouseLeftButtonUp")
+        handler_start = CODE.index("private void InlineItemRow_PreviewMouseLeftButtonDown")
         handler_end = CODE.index("private void ToggleInlineItem", handler_start)
         handler = CODE[handler_start:handler_end]
         self.assertIn("RefreshInlineItemRow(previouslySelectedItem);", handler)
-        self.assertIn("RefreshInlineItemRow(item);", handler)
+        self.assertIn("UpdateInlineItemSelectionVisual(item);", handler)
+        self.assertNotIn("RefreshInlineItemRow(item);", handler)
 
     def test_right_workspace_scrolls_and_photo_controls_stay_beside_thumbnail(self):
         editor_start = XAML.index('x:Name="EditorScrollViewer"')
@@ -165,12 +186,25 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn('TextWrapping = TextWrapping.NoWrap', CODE)
 
     def test_single_click_refreshes_two_rows_instead_of_rebuilding_huge_checklist(self):
-        handler = CODE[CODE.index("private void InlineItemRow_MouseLeftButtonUp"):CODE.index("private void ToggleInlineItem")]
+        handler = CODE[CODE.index("private void InlineItemRow_PreviewMouseLeftButtonDown"):CODE.index("private void ToggleInlineItem")]
         self.assertIn("RefreshInlineItemRow(previouslySelectedItem);", handler)
-        self.assertIn("RefreshInlineItemRow(item);", handler)
+        self.assertIn("UpdateInlineItemSelectionVisual(item);", handler)
+        self.assertNotIn("RefreshInlineItemRow(item);", handler)
         self.assertNotIn("PopulateInlineChecklist", handler)
         self.assertIn("_inlineItemRows[item] = (section, row);", CODE)
         self.assertIn("_isRefreshingTree = true;", CODE)
+
+    def test_ocr_tap_refreshes_left_pane_and_distributes_ufactor_shgc(self):
+        classic = CODE[CODE.index("private void AISuggestionButton_Click"):CODE.index("private string ApplyTranscriptionSuggestion")]
+        inline = CODE[CODE.index("private void InlineAiSuggestionButton_Click"):CODE.index("private void SetInlineItemValue")]
+        distribution = CODE[CODE.index("private string ApplyTranscriptionSuggestion"):CODE.index("private static List<(string key, string val)> ParseTranscriptionPairs")]
+        self.assertIn("ApplyTranscriptionSuggestion(_currentItem, suggestion);", classic)
+        self.assertIn("PopulateTreeView(SearchFilterBox.Text);", classic)
+        self.assertIn("ApplyTranscriptionSuggestion(action.Item, action.Suggestion);", inline)
+        self.assertIn("TranscriptionKeyMatchesItem(pair.key, anchor)", distribution)
+        self.assertIn("SelectMany(section => section.Items)", distribution)
+        self.assertIn("candidate.Value = val;", distribution)
+        self.assertNotIn("GetVisibleItems()", distribution)
 
     def test_comment_box_click_dismisses_quick_comments_and_keeps_native_caret(self):
         self.assertIn('PreviewMouseLeftButtonDown="CommentsTextBox_PreviewMouseLeftButtonDown"', XAML)
@@ -187,7 +221,7 @@ class Red21LayoutTests(unittest.TestCase):
 
         prefix = CODE[CODE.index("private void PrefixButton_Checked"):CODE.index("private void PrefixButton_Unchecked")]
         suffix = CODE[CODE.index("private void SuffixButton_Changed"):CODE.index("private static bool IsTimestampSuffix")]
-        ai = CODE[CODE.index("private void AISuggestionButton_Click"):CODE.index("private void TryAutoFillAdjacentItems")]
+        ai = CODE[CODE.index("private void AISuggestionButton_Click"):CODE.index("private string ApplyTranscriptionSuggestion")]
         self.assertIn("FocusClassicCommentEditorAfterAutomatedComment();", prefix)
         self.assertIn("FocusClassicCommentEditorAfterAutomatedComment();", suffix)
         self.assertIn("FocusClassicCommentEditorAfterAutomatedComment();", ai)
