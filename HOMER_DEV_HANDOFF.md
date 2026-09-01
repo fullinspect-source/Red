@@ -8,7 +8,7 @@ This file is the concise cross-session source of development context for work pe
 
 - **Files changed:** `InspectionEditor.csproj`, `Models/PlanCheckModels.cs`, `PlanCheckWindow.xaml`, `PlanCheckWindow.xaml.cs`, `Services/PlanCheckService.cs`, `Services/SurgicalSaveService.cs`, `MainWindow.xaml.cs`, Plan Check/release metadata tests, release notes, and this handoff.
 - **What changed:** Added attachment-load generation guards so a stale PDF cannot overwrite a newer selection; narrowed automatic marker phrases to avoid generic `steel`/`width`/`depth`/`slab` matches; records the attachment actually reviewed; adds NI / not applicable; marker taps now select without changing conclusions; and attachment persistence is gated to a completed `RedPlanCheck` result.
-- **Verification/deployment:** All 90 Python regression tests passed; Release build succeeded with 0 errors and the same 16 existing warnings; dependency audit found no vulnerable packages. Standalone publish, package security verification, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+- **Verification/deployment:** Source commit/tag `172e34a243710457d649bb09a339a8ac46ba4354` built and published standalone win-x64 with 0 errors and the same 16 existing warnings; all 90 Python regression tests passed; dependency audit found no vulnerable packages; Gemini validation returned HTTP 200; package scans found no `settings.txt`, generated source, user license, INS data, or plaintext key. GitHub release `v2.1.18` is live at https://github.com/fullinspect-source/Red/releases/tag/v2.1.18. Downloaded stable assets match SHA-256 `2e06088d6d4181179850584ba16856a2fa7c130585f150a92a2488a89966e175` for `Red-v2.1.18.zip` and `94724c7c5dea2777e27f856e6697818f04d74fe11e265ed3e65ac95c7578f49d` for `update_red.bat`. Dropbox tracked source and `Publish-current` were synced with verified parity after a reversible 12-file backup.
 
 ### 2026-09-01 — RED 2.1.17 — CPP Plan Check Beta rescue
 
@@ -172,11 +172,11 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 
 ## Current Production State
 
-- **Production version:** 2.1.17.
+- **Production version:** 2.1.18.
 - **Release date in the application:** 2026-09-01.
-- **Latest GitHub production release:** v2.1.17, non-draft and non-prerelease.
-- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.17
-- **Release asset:** `Red-v2.1.17.zip` (93,804,809 bytes), plus `update_red.bat` (8,437 bytes).
+- **Latest GitHub production release:** v2.1.18, non-draft and non-prerelease.
+- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.18
+- **Release asset:** `Red-v2.1.18.zip` (93,804,944 bytes), plus `update_red.bat` (8,437 bytes).
 - **Production executable/install:** `Red.exe` in `C:\Red`.
 - **Production user data:** `%LOCALAPPDATA%\RED` via `AppIdentity.LocalAppDataPath`.
 - **Runtime:** .NET 8 WPF, target `net8.0-windows10.0.19041.0`, self-contained win-x64 production publish.
@@ -187,7 +187,7 @@ Use code and live GitHub state before older prose documentation:
 
 | Concern | Authoritative source |
 |---|---|
-| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.17). Do not hard-code a second version elsewhere. |
+| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.18). Do not hard-code a second version elsewhere. |
 | Release date | `<ReleaseDate>` in `InspectionEditor.csproj`; emitted as assembly metadata (currently 2026-09-01). |
 | Runtime identity/UI display | `AppIdentity.cs`: `Version`, `VersionDisplay`, `ReleaseDate`, `PublishedDateText`, `VersionWithPublishedDate`, window titles, and app-data folder selection. |
 | Startup app update | `App.xaml.cs`, `OnStartup()` calling `AppUpdateService.CheckAndInstallIfAvailableAsync()`. |
@@ -198,7 +198,7 @@ Use code and live GitHub state before older prose documentation:
 | Numberpad integration/UI | `MainWindow.xaml.cs`: `ApplyNumberpadDefaultMigration()`, `CreateCollapsedInlineNumberpadSlider()`, `CreateInlineNumberpadTouchSlider()`, `SynchronizeInlineNumberpadSliders()`, and drawer preference helpers. |
 | Build project/package inputs | `InspectionEditor.csproj`; `build-standalone.bat` is a convenience wrapper. |
 | Manual field updater | `scripts/update_red.bat`; it backs up existing installation/user state, downloads GitHub's latest ZIP, installs to `C:\Red`, restores allowed local files, repairs the shortcut, and relaunches. |
-| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.17 CPP Plan Check Beta release. |
+| Release history | Git commits/tags plus GitHub Releases. `docs/RED-2.0-RELEASE-NOTES.md` includes the 2.1.18 Plan Check safety release. |
 
 `README.md`, `BUILD.md`, `docs/ARCHITECTURE.md`, and `docs/RED-2.0-DEPLOYMENT.md` contain useful background but are partially stale. Examples: several still identify 2.0.0 as current, `BUILD.md` expects `InspectionEditor.exe`/a separately copied `RedHelp.pdf`/packaged `settings.txt`, and old deployment instructions expect `version.txt`. Current code produces `Red.exe`, embeds `RedHelp.pdf`, and deliberately excludes `settings.txt`.
 
