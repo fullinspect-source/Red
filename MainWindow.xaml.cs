@@ -10778,6 +10778,7 @@ namespace InspectionEditor
 
         private void LoadItemEditor(Item item)
         {
+            Item? previouslySelectedItem = _editorLoadedItem;
             CollapseInlineDrawerForDifferentSelection(item);
             _isLoadingEditor = true; // Suppress prefix/suffix button handlers during load
             try
@@ -10833,6 +10834,8 @@ namespace InspectionEditor
             SuggestionsStack.Children.Clear();
             SuggestionsStack.Children.Add(NoSuggestionsText);
             NoSuggestionsText.Visibility = Visibility.Visible;
+            if (!ReferenceEquals(previouslySelectedItem, item))
+                RefreshInlineItemRow(previouslySelectedItem);
             UpdateInlineItemSelectionVisual(item);
             }
             finally

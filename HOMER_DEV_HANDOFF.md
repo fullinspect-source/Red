@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.23 — enforce one selected checklist row
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.
+- **Cause:** Badge-driven selection painted the new row but did not always rebuild the previously selected row, allowing two cyan selection highlights while an unrelated drawer remained visible.
+- **Fix:** `LoadItemEditor` now owns the full highlight handoff for every selection path: capture old item, collapse an old drawer, refresh the old row, then paint only the new row.
+- **Verification/deployment:** Verification and production deployment pending.
+
 ### 2026-09-01 — RED 2.1.22 — complete single-tap and OCR isolation hardening
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.

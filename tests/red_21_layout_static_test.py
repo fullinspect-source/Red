@@ -128,6 +128,11 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("UpdateInlineItemSelectionVisual(item);", handler)
         self.assertNotIn("RefreshInlineItemRow(item);", handler)
 
+        load = CODE[CODE.index("private void LoadItemEditor"):CODE.index("private static bool IsProperNameItem")]
+        self.assertIn("Item? previouslySelectedItem = _editorLoadedItem;", load)
+        self.assertIn("RefreshInlineItemRow(previouslySelectedItem);", load)
+        self.assertIn("UpdateInlineItemSelectionVisual(item);", load)
+
     def test_right_workspace_scrolls_and_photo_controls_stay_beside_thumbnail(self):
         editor_start = XAML.index('x:Name="EditorScrollViewer"')
         self.assertIn('VerticalScrollBarVisibility="Auto"', XAML[editor_start:editor_start + 400])

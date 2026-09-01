@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.1.23 — Enforce one selected checklist row
+
+- Every item-selection path now clears the previous left-pane highlight before painting the newly selected row.
+- This covers row taps, Photo Required, Fail/status badges, value-choice controls, classic tree selection, and previous/next navigation.
+- Selecting another item still synchronously closes any drawer owned by the previous item.
+
 ## 2.1.22 — Complete single-tap and OCR isolation hardening
 
 - Fail/status badges and value-choice affordances now select/load their row without opening inline tools.
