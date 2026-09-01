@@ -13,6 +13,7 @@ namespace InspectionEditor.Services
     {
         public string CurrentVersion { get; init; } = AppIdentity.Version;
         public string LatestVersion { get; init; } = "";
+        public bool SkippedByThrottle { get; init; }
         public bool UpdateAvailable { get; init; }
         public bool InstallerStarted { get; init; }
         public bool InternetRequired { get; init; }
@@ -24,7 +25,8 @@ namespace InspectionEditor.Services
         internal const string InternetRequiredMessage = "RED is offline, so the automatic update check was skipped. The updater will try again the next time RED opens.";
         private const string UpdateCheckFailedMessage = "RED couldn't check for updates. Please try again.";
         private const string LatestReleaseApi = "https://api.github.com/repos/fullinspect-source/Red/releases/latest";
-
+        private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
+        private static readonly string LastCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
 
         public static async Task<AppUpdateResult> CheckAndInstallIfAvailableAsync(bool force = false)
         {
@@ -41,9 +43,17 @@ namespace InspectionEditor.Services
             {
                 Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
 
+                // Normal startup checks run once per day. A user triple-click always bypasses this marker.
+                if (!force && File.Exists(LastCheckFile) &&
+                    DateTime.Now - File.GetLastWriteTime(LastCheckFile) < CheckInterval)
+                {
+                    return new AppUpdateResult { SkippedByThrottle = true };
+                }
+
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                 http.DefaultRequestHeaders.Add("User-Agent", "RED-AppUpdater");
                 string apiJson = await http.GetStringAsync(LatestReleaseApi);
+                File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
 
                 string remoteVersion = ReadJsonString(apiJson, "tag_name").TrimStart('v', 'V');
                 string zipUrl = Regex.Match(apiJson, "\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.zip)\"").Groups[1].Value;

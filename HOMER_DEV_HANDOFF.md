@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.20 — restore 24-hour update interval
+
+- **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/AppUpdateService.cs`, startup/release metadata tests, release notes, and this handoff.
+- **Decision:** Trent prefers the once-per-24-hours automatic app-update check. The fact that a same-day release requires triple-click or waiting for the interval is expected behavior, not a defect.
+- **What changed:** Reverted 2.1.19's every-startup GitHub check and restored the 24-hour marker, while retaining triple-click as the immediate manual bypass and keeping network failures nonblocking.
+- **Verification/deployment:** All 93 Python regression tests passed; Release build succeeded with 0 errors and the same 16 existing warnings; dependency audit found no vulnerable packages. Standalone publish, package security verification, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+
 ### 2026-09-01 — RED 2.1.19 — automatic startup update check
 
 - **Files changed:** `InspectionEditor.csproj`, `App.xaml.cs`, `Services/AppUpdateService.cs`, new `tests/startup_update_check_static_test.py`, release metadata tests, release notes, and this handoff.

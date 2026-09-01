@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.1.20 — Restore the preferred 24-hour update interval
+
+- Restores RED's once-per-24-hours automatic GitHub update check at Trent's direction.
+- Keeps triple-click as an immediate manual check that bypasses the daily marker.
+- Retains nonblocking behavior when the internet is unavailable or slow.
+
 ## 2.1.19 — Check for app updates on every startup
 
 - Removes the old 24-hour app-update throttle that could suppress a newly published RED release when the app had already checked earlier that day.
