@@ -9,7 +9,7 @@ This file is the concise cross-session source of development context for work pe
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.
 - **Cause:** Badge-driven selection painted the new row but did not always rebuild the previously selected row, allowing two cyan selection highlights while an unrelated drawer remained visible.
 - **Fix:** `LoadItemEditor` now owns the full highlight handoff for every selection path: capture old item, collapse an old drawer, refresh the old row, then paint only the new row.
-- **Verification/deployment:** Verification and production deployment pending.
+- **Verification/deployment:** Source commit/tag `95db7a6f169652aea04d10b698898ab2bf840772` passed all 97 Python regression tests and built/published standalone win-x64 with 0 errors and the same 16 existing warnings. NuGet found no vulnerable packages. GitHub release `v2.1.23` is live at https://github.com/fullinspect-source/Red/releases/tag/v2.1.23. Downloaded ZIP SHA-256 is `f41232074214b5b3950b1ef93a5042c961ffc415b9d9dde5b05b70348fc90bc3`; updater SHA-256 remains `94724c7c5dea2777e27f856e6697818f04d74fe11e265ed3e65ac95c7578f49d`. Dropbox source and `Publish-current` were synced with verified parity after a reversible 9-file backup.
 
 ### 2026-09-01 — RED 2.1.22 — complete single-tap and OCR isolation hardening
 
@@ -207,11 +207,11 @@ The dirty checkout was compared read-only with `d862d32`. Preserve it until the 
 
 ## Current Production State
 
-- **Production version:** 2.1.22.
+- **Production version:** 2.1.23.
 - **Release date in the application:** 2026-09-01.
-- **Latest GitHub production release:** v2.1.22, non-draft and non-prerelease.
-- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.22
-- **Release asset:** `Red-v2.1.22.zip` (93,804,528 bytes), plus `update_red.bat` (8,437 bytes).
+- **Latest GitHub production release:** v2.1.23, non-draft and non-prerelease.
+- **Release URL:** https://github.com/fullinspect-source/Red/releases/tag/v2.1.23
+- **Release asset:** `Red-v2.1.23.zip` (93,804,538 bytes), plus `update_red.bat` (8,437 bytes).
 - **Production executable/install:** `Red.exe` in `C:\Red`.
 - **Production user data:** `%LOCALAPPDATA%\RED` via `AppIdentity.LocalAppDataPath`.
 - **Runtime:** .NET 8 WPF, target `net8.0-windows10.0.19041.0`, self-contained win-x64 production publish.
@@ -222,7 +222,7 @@ Use code and live GitHub state before older prose documentation:
 
 | Concern | Authoritative source |
 |---|---|
-| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.22). Do not hard-code a second version elsewhere. |
+| Application version | `<Version>` in `InspectionEditor.csproj` (currently 2.1.23). Do not hard-code a second version elsewhere. |
 | Release date | `<ReleaseDate>` in `InspectionEditor.csproj`; emitted as assembly metadata (currently 2026-09-01). |
 | Runtime identity/UI display | `AppIdentity.cs`: `Version`, `VersionDisplay`, `ReleaseDate`, `PublishedDateText`, `VersionWithPublishedDate`, window titles, and app-data folder selection. |
 | Startup app update | `App.xaml.cs`, `OnStartup()` calling `AppUpdateService.CheckAndInstallIfAvailableAsync()`. |
