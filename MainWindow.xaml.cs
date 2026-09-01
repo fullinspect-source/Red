@@ -2,6 +2,7 @@ using InspectionEditor.Models;
 using InspectionEditor.Services;
 using Microsoft.Win32;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
@@ -2503,6 +2504,7 @@ namespace InspectionEditor
             TranscribeButton.Visibility = Visibility.Visible;
             
             UpdateSeeDocsButton(filePath);
+            UpdatePlanCheckButton();
             SaveTemplateButton.IsEnabled = true;
             ApplyTemplateButton.IsEnabled =
                 _templateService.HasTemplatesForForm(_currentInspection.FormId) ||
@@ -3341,6 +3343,116 @@ namespace InspectionEditor
 
             var docsWindow = new DocsViewerWindow(_currentFilePath) { Owner = this };
             docsWindow.ShowDialog();
+        }
+
+        private void UpdatePlanCheckButton()
+        {
+            string code = _currentInspectionCode ?? _currentInspection?.InspectionCode ?? "";
+            string name = _currentInspection?.InspectionName ?? "";
+            bool isCppPrepour = code.Equals("CPP", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("prepour", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("pre-pour", StringComparison.OrdinalIgnoreCase);
+            PlanCheckButton.Visibility = isCppPrepour ? Visibility.Visible : Visibility.Collapsed;
+            if (!isCppPrepour || _currentInspection == null)
+            {
+                PlanCheckButton.IsEnabled = false;
+                return;
+            }
+
+            try
+            {
+                int count = PlanCheckService.GetEmbeddedPdfAttachments(_currentInspection).Count;
+                PlanCheckButton.IsEnabled = count > 0;
+                PlanCheckButton.Content = count > 1 ? $"Plan Check β ({count})" : "Plan Check β";
+                PlanCheckButton.ToolTip = count > 0
+                    ? "Review embedded CPP plan attachments against five mandatory checks"
+                    : "No embedded PDF FileData found in this INS inspection";
+            }
+            catch (Exception ex)
+            {
+                PlanCheckButton.IsEnabled = false;
+                PlanCheckButton.ToolTip = $"Embedded plan could not be read: {ex.Message}";
+            }
+        }
+
+        private void PlanCheckButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentInspection == null) return;
+            try
+            {
+                var attachments = PlanCheckService.GetEmbeddedPdfAttachments(_currentInspection);
+                if (attachments.Count == 0)
+                {
+                    MessageBox.Show("No valid embedded PDF was found in the INS Attachments FileData fields.\n\n" +
+                        "Plan Check Beta intentionally does not substitute a PDF from the Jobs folder.",
+                        "Plan Check Beta", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                Item? targetItem = _currentItem;
+                var window = new PlanCheckWindow(attachments, targetItem != null) { Owner = this };
+                if (window.ShowDialog() != true || window.Result == null) return;
+
+                int addedPictures = 0;
+                if (targetItem != null)
+                {
+                    foreach (var screenshot in window.Result.Screenshots.Where(s => s.AddToCurrentItem))
+                    {
+                        int sortOrder = targetItem.Pictures.Count;
+                        targetItem.Pictures.Add(new Picture
+                        {
+                            PictureId = Guid.NewGuid().ToString(),
+                            Title = screenshot.Caption,
+                            Comment = screenshot.Caption,
+                            Filename = screenshot.Filename,
+                            Data = Convert.ToBase64String(screenshot.PngBytes),
+                            SortOrder = sortOrder
+                        });
+                        addedPictures++;
+                    }
+                }
+
+                bool addedAttachment = window.Result.AnnotatedAttachment != null;
+                if (window.Result.AnnotatedAttachment != null)
+                {
+                    _currentInspection.Attachments ??= new List<object>();
+                    _currentInspection.Attachments.Add(window.Result.AnnotatedAttachment);
+                }
+
+                _currentInspection.ExtensionData ??= new Dictionary<string, object>();
+                _currentInspection.ExtensionData["RedPlanCheck"] = new JObject
+                {
+                    ["CompletedUtc"] = DateTime.UtcNow.ToString("o"),
+                    ["SourceAttachment"] = attachments.First().Filename,
+                    ["Checks"] = new JArray(window.Result.Findings.Select(f => new JObject
+                    {
+                        ["Id"] = f.Id,
+                        ["Label"] = f.Label,
+                        ["State"] = f.State.ToString(),
+                        ["Page"] = f.PageIndex + 1,
+                        ["X"] = f.X,
+                        ["Y"] = f.Y
+                    }))
+                };
+
+                if (window.Result.Findings.Count == 5)
+                {
+                    _hasUnsavedChanges = true;
+                    _hasBeenEditedThisSession = true;
+                    SaveFileButton.IsEnabled = true;
+                    PopulateTreeView(SearchFilterBox.Text);
+                    UpdatePlanCheckButton();
+                }
+
+                string summary = $"Plan Check completed.\n\nScreenshots added to selected item: {addedPictures}\n" +
+                    $"Annotated PDF added to INS: {(addedAttachment ? "Yes" : "No")}";
+                MessageBox.Show(summary, "Plan Check Beta", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Plan Check Beta could not start. The inspection was not changed.\n\n{ex.Message}",
+                    "Plan Check Beta", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void SlabEngButton_Click(object sender, RoutedEventArgs e)

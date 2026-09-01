@@ -12,8 +12,8 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.1.16</Version>
-    <ReleaseDate>2026-08-17</ReleaseDate>
+    <Version>2.1.17</Version>
+    <ReleaseDate>2026-09-01</ReleaseDate>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
     <Product>RED $(Version)</Product>
@@ -33,6 +33,7 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="Docnet.Core" Version="2.6.0" />
+    <PackageReference Include="PDFsharp" Version="6.2.0" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 

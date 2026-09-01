@@ -1,5 +1,12 @@
 # RED 2.0 Release Notes
 
+## 2.1.17 — CPP Plan Check Beta
+
+- Adds a CPP-only **Plan Check Beta** that opens valid PDF attachments embedded in the INS file and keeps the original plan unchanged.
+- Requires the inspector to confirm or flag five mandatory checks: steel/rebar callouts, beam design, slab thickness, hold-downs/straps, and cable counts.
+- Lets the inspector reposition every suggested marker on the plan, creates marked deficiency crops for the selected checklist item, and can optionally add a flattened annotated PDF back to the INS file.
+- Saves completion metadata even when optional exports are declined, while preserving existing attachment JSON and keeping all RED 2.1 split-pane, AI, OCR, camera, and updater behavior.
+
 ## 2.0.21 — Gemini 3.7 Flash upgrade
 
 - Upgrades **Get 3**, photo transcription, and fact-checking to Gemini 3.7 Flash after a 20-call paired RED benchmark showed better quality and faster average/P90 responses than Gemini 3.6 Flash.

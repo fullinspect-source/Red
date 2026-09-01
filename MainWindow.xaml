@@ -519,6 +519,8 @@
                         <ColumnDefinition Width="3*"/>
                         <ColumnDefinition Width="8"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Button x:Name="PriorReportButton"
                             Grid.Column="0"
@@ -573,6 +575,20 @@
                             IsEnabled="False"
                             ToolTip="Open slab/foundation engineering PDF for this job"
                             TabIndex="91"/>
+                    <Button x:Name="PlanCheckButton"
+                            Grid.Column="8"
+                            Content="Plan Check &#x3B2;"
+                            Click="PlanCheckButton_Click"
+                            Background="#6A1B9A"
+                            Foreground="White"
+                            FontSize="13"
+                            FontWeight="SemiBold"
+                            Padding="10,8"
+                            BorderThickness="0"
+                            IsEnabled="False"
+                            Visibility="Collapsed"
+                            ToolTip="Review the embedded CPP plan against five mandatory checks"
+                            TabIndex="92"/>
                 </Grid>
             </StackPanel>
             </Grid>

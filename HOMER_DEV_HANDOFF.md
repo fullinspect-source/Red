@@ -4,6 +4,13 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-09-01 — RED 2.1.17 — CPP Plan Check Beta rescue
+
+- **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml`, `MainWindow.xaml.cs`, `Services/SurgicalSaveService.cs`, new `PlanCheckWindow.xaml`, new `PlanCheckWindow.xaml.cs`, new `Models/PlanCheckModels.cs`, new `Services/PlanCheckService.cs`, new `tests/plan_check_static_test.py`, release metadata tests, release notes, and this handoff.
+- **What changed:** Selectively transplanted the useful CPP Plan Check Beta from Trent's newer Dropbox work onto live GitHub RED 2.1.16 rather than publishing the stale 2.0.22 tree. CPP reports with embedded PDF attachments now expose five inspector-owned plan checks, movable plan markers, optional deficiency crops, optional flattened annotated-PDF attachment, and durable completion metadata. Existing attachment tokens are preserved and only newly created attachments are appended during surgical save.
+- **Deliberately excluded:** The Dropbox tree's stale 2.0.22 version line and broad replacements to RED 2.1 split-pane UI, AI routing, OCR support, updater, datasets, energy logic, and quick comments were not copied because they would regress newer production behavior.
+- **Verification/deployment:** Release build succeeded with 0 errors and the same 16 existing warnings; all 89 Python regression tests passed; dependency audit found no vulnerable packages. Standalone publish, package security scan, GitHub release, stable URL verification, and Dropbox sync are pending until the source commit is finalized.
+
 ### 2026-08-14 — RED 2.0.21 — Gemini 3.7 Flash low/medium routing
 
 - **Files changed:** `InspectionEditor.csproj`, `Services/GrokApiClient.cs`, new `tests/gemini_37_routing_static_test.py`, `tests/camera_crash_safety_static_test.py`, `docs/RED-2.0-RELEASE-NOTES.md`, and this handoff.

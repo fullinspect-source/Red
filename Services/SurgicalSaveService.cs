@@ -98,6 +98,8 @@ namespace InspectionEditor.Services
 
             // Patch only the fields we modify
             PatchInspection(inspection);
+            PatchAddedAttachments(inspection);
+            PatchPlanCheckMetadata(inspection);
 
             // Write with minimal formatting to match original style
             string json = _originalJson.ToString(Formatting.None);
@@ -108,6 +110,42 @@ namespace InspectionEditor.Services
             {
                 _filePath = saveAsPath;
             }
+        }
+
+        /// <summary>
+        /// Append only attachments created during this RED session. Existing attachment JSON
+        /// remains represented by the original parsed tokens.
+        /// </summary>
+        private void PatchAddedAttachments(InspectionFile inspection)
+        {
+            if (_originalJson == null || inspection.Attachments == null) return;
+
+            var originalAttachments = _originalJson["Attachments"] as JArray;
+            if (originalAttachments == null)
+            {
+                if (inspection.Attachments.Count > 0)
+                    _originalJson["Attachments"] = JArray.FromObject(inspection.Attachments);
+                return;
+            }
+
+            for (int i = originalAttachments.Count; i < inspection.Attachments.Count; i++)
+            {
+                object attachment = inspection.Attachments[i];
+                originalAttachments.Add(attachment is JToken token
+                    ? token.DeepClone()
+                    : JToken.FromObject(attachment));
+            }
+        }
+
+        private void PatchPlanCheckMetadata(InspectionFile inspection)
+        {
+            if (_originalJson == null || inspection.ExtensionData == null ||
+                !inspection.ExtensionData.TryGetValue("RedPlanCheck", out object? metadata) || metadata == null)
+                return;
+
+            _originalJson["RedPlanCheck"] = metadata is JToken token
+                ? token.DeepClone()
+                : JToken.FromObject(metadata);
         }
 
         /// <summary>
