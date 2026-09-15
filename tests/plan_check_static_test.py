@@ -44,8 +44,8 @@ class PlanCheckStaticTests(unittest.TestCase):
 
     def test_release_dependency_and_version(self):
         self.assertIn('PackageReference Include="PDFsharp" Version="6.2.0"', PROJECT)
-        self.assertIn("<Version>2.1.23</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-09-01</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.1.24</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-09-15</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

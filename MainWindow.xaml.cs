@@ -207,6 +207,8 @@ namespace InspectionEditor
             Title = GetDefaultWindowTitle();
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
+            AddHandler(Keyboard.LostKeyboardFocusEvent,
+                new KeyboardFocusChangedEventHandler(Editor_LostKeyboardFocus), true);
             this.Activated += MainWindow_Activated;
             this.Deactivated += MainWindow_Deactivated;
             
@@ -232,6 +234,7 @@ namespace InspectionEditor
         /// </summary>
         private void MainWindow_Deactivated(object? sender, EventArgs e)
         {
+            PersistEditorChanges();
             if (_cameraService.IsActive)
             {
                 // Check if camera app is running — if so, we're switching to OUR camera, don't stop
@@ -478,6 +481,7 @@ namespace InspectionEditor
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
+            SyncCurrentItemFromUI();
             // Before close, offer the same trade-summary generation that the Save button provides.
             if (_hasUnsavedChanges && _currentInspection != null && ShouldPromptForTradeSummaryOnClose())
             {
@@ -506,7 +510,11 @@ namespace InspectionEditor
             // Save first so result/status data is current before deciding whether to prompt.
             if (_hasUnsavedChanges && _currentInspection != null)
             {
-                SaveCurrentInspectionInPlace();
+                if (!TrySaveCurrentInspection())
+                {
+                    e.Cancel = true;
+                    return;
+                }
             }
 
             // Show result picker if this session had edits and result is not yet set
@@ -647,7 +655,7 @@ namespace InspectionEditor
                 var choice = picker.SelectedResult;
                 _saveService.SetResult(choice.StatusId, choice.NextActionId, choice.NextActionText);
                 _hasUnsavedChanges = true;
-                SaveCurrentInspectionInPlace();
+                if (!TrySaveCurrentInspection()) return false;
             }
 
             // User chose "Keep Open" — cancel the close, stay in the app.
@@ -1197,12 +1205,23 @@ namespace InspectionEditor
 
                         string batPath = Path.Combine(Path.GetTempPath(), "red_update.bat");
                         File.WriteAllText(batPath, bat.ToString());
+                        // Shutdown cannot be cancelled reliably once the updater is running.
+                        // Flush every editor before launching it, then prevent countdown edits.
+                        var editorWindows = Application.Current.Windows.OfType<MainWindow>().ToList();
+                        foreach (var editor in editorWindows)
+                        {
+                            editor.SyncCurrentItemFromUI();
+                            if (editor._hasUnsavedChanges && !editor.TrySaveCurrentInspection())
+                                throw new InvalidOperationException("Update postponed because inspection changes could not be saved.");
+                        }
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = "cmd.exe",
                             Arguments = $"/c \"{batPath}\"",
                             UseShellExecute = true
                         });
+                        foreach (var editor in editorWindows)
+                            editor.IsEnabled = false;
                         // Do NOT delete tempDir — batch script needs the extracted files
                         redUpdated = true;
                     }
@@ -1846,6 +1865,7 @@ namespace InspectionEditor
 
         private void MarkUnsaved()
         {
+            if (_isLoadingEditor || _readOnlyMode) return;
             _hasUnsavedChanges = true;
             _hasBeenEditedThisSession = true;
             if (!Title.EndsWith("*"))
@@ -2286,8 +2306,12 @@ namespace InspectionEditor
                 openInNewWindow = (choice == MessageBoxResult.Yes);
             }
             
-            if (!openInNewWindow && _hasUnsavedChanges)
+            if (!openInNewWindow && _currentInspection != null)
+            {
                 SaveFileButton_Click(this, new RoutedEventArgs());
+                // Cancelled summary/result picker or failed save: keep this report open.
+                if (_currentInspection != null) return;
+            }
 
             // Pick the file first, then decide what to do with it
             string? selectedFile = null;
@@ -5211,6 +5235,8 @@ namespace InspectionEditor
                 valueCombo.SetValue(InlineValueDisplayProperty, true);
                 valueCombo.GotKeyboardFocus += InlineValueCombo_GotKeyboardFocus;
                 valueCombo.SelectionChanged += InlineValueCombo_SelectionChanged;
+                valueCombo.AddHandler(TextBox.TextChangedEvent,
+                    new TextChangedEventHandler(InlineValueCombo_TextChanged));
                 valueCombo.LostFocus += InlineValueCombo_LostFocus;
                 valueCombo.PreviewKeyDown += InlineValueCombo_PreviewKeyDown;
                 panel.Children.Add(valueCombo);
@@ -5267,7 +5293,8 @@ namespace InspectionEditor
                 };
                 valueBox.SetValue(InlineValueDisplayProperty, true);
                 valueBox.GotKeyboardFocus += InlineValueBox_GotKeyboardFocus;
-                valueBox.LostFocus += InlineValueBox_LostFocus;
+                valueBox.TextChanged += InlineValueBox_TextChanged;
+            valueBox.LostFocus += InlineValueBox_LostFocus;
                 valueBox.MouseLeftButtonUp += (_, e) => e.Handled = true;
                 panel.Children.Add(valueBox);
             }
@@ -5926,6 +5953,7 @@ namespace InspectionEditor
                 ToolTip = "Type a value for this item"
             };
             valueBox.GotKeyboardFocus += InlineValueBox_GotKeyboardFocus;
+            valueBox.TextChanged += InlineValueBox_TextChanged;
             valueBox.LostFocus += InlineValueBox_LostFocus;
             panel.Children.Add(valueBox);
             return CreateInlineHorizontalScroller(panel, 220);
@@ -7753,26 +7781,7 @@ namespace InspectionEditor
 
         private string SyncInlineCommentTextFromOpenRow(Item item)
         {
-            var inlineBox = FindVisualChildren<TextBox>(InlineChecklistPanel)
-                .FirstOrDefault(box => ReferenceEquals(box.Tag, item) && box.AcceptsReturn);
-            if (inlineBox == null)
-                return item.Comments ?? "";
-
-            string typed = inlineBox.Text ?? "";
-            string existing = item.Comments ?? "";
-            string typedPrefix = UserDataService.ExtractPrefix(typed);
-            string prefix = string.IsNullOrWhiteSpace(typedPrefix)
-                ? UserDataService.ExtractPrefix(existing)
-                : typedPrefix;
-            var typedSuffixes = UserDataService.ExtractSuffixes(typed);
-            var suffixes = typedSuffixes.Count > 0
-                ? typedSuffixes
-                : UserDataService.ExtractSuffixes(existing);
-            string core = UserDataService.StripPrefixAndSuffix(typed);
-            string normalized = UserDataService.BuildComment(prefix, core, suffixes);
-            if (!string.Equals(existing, normalized, StringComparison.Ordinal))
-                MarkUnsaved();
-            item.Comments = string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+            // The model already contains the latest edit from either surface.
             return item.Comments ?? "";
         }
 
@@ -7947,7 +7956,8 @@ namespace InspectionEditor
             if (sender is not TextBox { Tag: Item item } box)
                 return;
 
-            MarkUnsaved();
+            if (_isLoadingEditor || _readOnlyMode) return;
+            CaptureCommentEdit(item, box.Text);
             AutoSetFailForItemWithComment(item, box.Text, refreshClassicStatus: false);
             UpdateInlineSpecialistFlagButtonState(item, box.Text);
         }
@@ -8048,8 +8058,8 @@ namespace InspectionEditor
 
         private void InlineValueCombo_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is ComboBox combo && combo.Tag is Item item)
-                CommitInlineEditableValue(item, combo.Text ?? "");
+            // TextChanged captured the owning item before selection/rebuild.
+            // The shared LostKeyboardFocus handler persists once (including editable ComboBox children).
         }
 
         private void InlineValueCombo_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -8064,6 +8074,7 @@ namespace InspectionEditor
 
         private void CommitInlineEditableValue(Item item, string value)
         {
+            if (_isLoadingEditor || _readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
             value = value.Trim();
             string oldValue = item.Value?.ToString() ?? "";
             if (string.Equals(oldValue, value, StringComparison.Ordinal))
@@ -8087,50 +8098,14 @@ namespace InspectionEditor
 
         private void InlineValueBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is TextBox box && box.Tag is Item item)
-            {
-                string oldValue = item.Value?.ToString() ?? "";
-                if (!string.Equals(oldValue, box.Text, StringComparison.Ordinal))
-                {
-                    item.Value = box.Text;
-                    RecordInlineValueUsage(item, box.Text);
-                    MarkUnsaved();
-                    LoadItemEditor(item);
-                    PopulateTreeView(SearchFilterBox.Text);
-                }
-            }
+            // TextChanged captured the owning item before selection/rebuild.
+            // The shared LostKeyboardFocus handler persists once (including editable ComboBox children).
         }
 
         private void InlineCommentsBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is TextBox box && box.Tag is Item item)
-            {
-                string existing = item.Comments ?? "";
-                string typed = box.Text ?? "";
-                string typedPrefix = UserDataService.ExtractPrefix(typed);
-                string prefix = string.IsNullOrWhiteSpace(typedPrefix)
-                    ? UserDataService.ExtractPrefix(existing)
-                    : typedPrefix;
-                var typedSuffixes = UserDataService.ExtractSuffixes(typed);
-                var suffixes = typedSuffixes.Count > 0
-                    ? typedSuffixes
-                    : UserDataService.ExtractSuffixes(existing);
-                string core = UserDataService.StripPrefixAndSuffix(typed);
-                string newComment = UserDataService.BuildComment(prefix, core, suffixes);
-
-                if (!string.Equals(existing, newComment, StringComparison.Ordinal))
-                {
-                    if (!string.IsNullOrWhiteSpace(core) &&
-                        ReferenceEquals(_inlineQuickCommentsDismissedItem, item))
-                    {
-                        _inlineQuickCommentsDismissedItem = null;
-                    }
-                    item.Comments = newComment;
-                    MarkUnsaved();
-                    LoadItemEditor(item);
-                    PopulateTreeView(SearchFilterBox.Text);
-                }
-            }
+            // TextChanged captured the owning item before selection/rebuild.
+            // The shared LostKeyboardFocus handler persists once (including editable ComboBox children).
         }
 
         private void InlinePrefixSuffixButton_Click(object sender, RoutedEventArgs e)
@@ -10842,6 +10817,7 @@ namespace InspectionEditor
             {
                 _isLoadingEditor = false; // Re-enable prefix/suffix button handlers
             }
+            PersistEditorChanges();
         }
 
         /// <summary>
@@ -12021,7 +11997,7 @@ namespace InspectionEditor
             if (_editorLoadedItem == null) return;
             SyncCurrentItemFromUI();
             UpdateCurrentItemBadgeColor();
-            MarkUnsaved();
+            PersistEditorChanges();
         }
         
         /// <summary>
@@ -12106,13 +12082,13 @@ namespace InspectionEditor
 
         private void StatusTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (_currentItem != null && StatusTextBox.Visibility == Visibility.Visible)
+            if (_isLoadingEditor || _readOnlyMode) return;
+            if (_editorLoadedItem != null && StatusTextBox.Visibility == Visibility.Visible)
             {
-                _currentItem.Value = StatusTextBox.Text;
-                MarkUnsaved();
+                CaptureValueEdit(_editorLoadedItem, StatusTextBox.Text);
 
                 // Update required field highlighting (right-side editor)
-                UpdateRequiredFieldHighlighting(_currentItem);
+                UpdateRequiredFieldHighlighting(_editorLoadedItem);
 
                 // In lookup mode, filter and highlight buttons based on typed text
                 if (_isLookupMode)
@@ -13312,8 +13288,8 @@ namespace InspectionEditor
 
         private void CommentsTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (_currentItem != null)
-                MarkUnsaved();
+            if (_isLoadingEditor || _readOnlyMode || _editorLoadedItem == null) return;
+            CaptureCommentEdit(_editorLoadedItem, CommentsTextBox.Text);
 
             AutoSetFailIfApplicable();
             UpdateClassicSpecialistFlagButtonState();
@@ -13754,7 +13730,7 @@ namespace InspectionEditor
             
             try
             {
-                SaveCurrentInspectionInPlace();
+                if (!TrySaveCurrentInspection()) return;
 
                 bool shouldShowResultPicker = !_skipResultCheck && ShouldShowResultPicker();
                 if (shouldShowResultPicker && !ShowResultPicker(closeAfterPicker: false))
@@ -13805,7 +13781,11 @@ namespace InspectionEditor
 
         private void SaveCurrentInspectionInPlace()
         {
-            if (_currentInspection == null || !_saveService.HasFile) return;
+            if (_currentInspection == null || !_saveService.HasFile)
+                throw new InvalidOperationException("No active report save target.");
+            if (_readOnlyMode) throw new InvalidOperationException("This report is read-only.");
+
+            SyncCurrentItemFromUI();
 
             // Sweep items with PassFail controls: any with [trade] prefix comment should be Fail
             // BUT respect explicit NI values - don't override inspector's choice
@@ -13832,48 +13812,111 @@ namespace InspectionEditor
             MarkSaved();
         }
 
+        private bool _savingEditorChanges;
+
+        private void CaptureCommentEdit(Item item, string text)
+        {
+            if (!EditorEditService.SetComment(_currentInspection, item, text)) return;
+            MarkUnsaved();
+            // Preserve the existing photo-caption behavior without replaying stale UI on save.
+            if (ReferenceEquals(item, _editorLoadedItem) && _currentPhotoIndex >= 0 && _currentPhotoIndex < item.Pictures.Count)
+                item.Pictures[_currentPhotoIndex].Comment = text;
+            MirrorInlineEdit(item, text, isComment: true);
+            if (ReferenceEquals(item, _editorLoadedItem) && CommentsTextBox.Text != text)
+            {
+                bool loading = _isLoadingEditor;
+                _isLoadingEditor = true;
+                try { CommentsTextBox.Text = text; }
+                finally { _isLoadingEditor = loading; }
+            }
+        }
+
+        private void CaptureValueEdit(Item item, string text)
+        {
+            if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
+            MarkUnsaved();
+            MirrorInlineEdit(item, text, isComment: false);
+            if (ReferenceEquals(item, _editorLoadedItem) && StatusTextBox.Text != text)
+            {
+                bool loading = _isLoadingEditor;
+                _isLoadingEditor = true;
+                try { StatusTextBox.Text = text; }
+                finally { _isLoadingEditor = loading; }
+            }
+        }
+
+        private void MirrorInlineEdit(Item item, string text, bool isComment)
+        {
+            if (!_inlineItemRows.TryGetValue(item, out var entry)) return;
+            bool loading = _isLoadingEditor;
+            _isLoadingEditor = true;
+            try
+            {
+                foreach (var box in FindVisualChildren<TextBox>(entry.Row))
+                    if (ReferenceEquals(box.Tag, item) && box.AcceptsReturn == isComment && box.Text != text)
+                        box.Text = text;
+                if (!isComment)
+                    foreach (var combo in FindVisualChildren<ComboBox>(entry.Row))
+                        if (ReferenceEquals(combo.Tag, item) && combo.Text != text)
+                            combo.Text = text;
+            }
+            finally { _isLoadingEditor = loading; }
+        }
+
+        private void InlineValueBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_isLoadingEditor && !_readOnlyMode && sender is TextBox { Tag: Item item } box)
+                CaptureValueEdit(item, box.Text);
+        }
+
+        private void InlineValueCombo_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_isLoadingEditor && !_readOnlyMode && sender is ComboBox { Tag: Item item } &&
+                e.OriginalSource is TextBox box)
+                CaptureValueEdit(item, box.Text);
+        }
+
+        private void Editor_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (e.OriginalSource is TextBox || e.OriginalSource is ComboBox)
+                PersistEditorChanges();
+        }
+
+        private void PersistEditorChanges()
+        {
+            if (_isLoadingEditor || _isLoadingFile || _readOnlyMode || !_hasUnsavedChanges || _currentInspection == null)
+                return;
+            TrySaveCurrentInspection();
+        }
+
+        private bool TrySaveCurrentInspection()
+        {
+            if (_savingEditorChanges) return false;
+            _savingEditorChanges = true;
+            try
+            {
+                SaveCurrentInspectionInPlace();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Keep both the model and dirty state available for retry. Never reset/close on failure.
+                MarkUnsaved();
+                MessageBox.Show($"Your changes could not be saved. The report is still open with your edits.\n\n{ex.Message}",
+                    "Report not saved", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            finally { _savingEditorChanges = false; }
+        }
+
         private void SyncCurrentItemFromUI()
         {
-            // Use _editorLoadedItem - this is the item that's actually shown in the editor
-            // and won't drift due to touch/scroll events
-            if (_editorLoadedItem == null) return;
-            
-            // Always sync comment text (even if empty, to allow clearing)
-            _editorLoadedItem.Comments = string.IsNullOrWhiteSpace(CommentsTextBox.Text) ? null : CommentsTextBox.Text;
-            
-            // Sync value from StatusTextBox if it's visible (for text-input type controls)
-            if (StatusTextBox.Visibility == Visibility.Visible && !StatusTextBox.IsReadOnly)
-            {
-                _editorLoadedItem.Value = StatusTextBox.Text;
-            }
-            
-            // Determine if this should be marked as Fail:
-            // - Has a trade prefix selected, OR
-            // - Comment text starts with [
-            bool hasTrade = !string.IsNullOrEmpty(_selectedPrefix) || 
-                           (CommentsTextBox.Text?.TrimStart().StartsWith("[") ?? false);
-            
-            // Photos are now added immediately when captured/selected, no need to add here
-            // Just update the comment on the current photo if there is one
-            if (_editorLoadedItem.Pictures.Count > 0 && _currentPhotoIndex >= 0 && _currentPhotoIndex < _editorLoadedItem.Pictures.Count)
-            {
-                _editorLoadedItem.Pictures[_currentPhotoIndex].Comment = CommentsTextBox.Text ?? "";
-            }
-            
-            // Mark as Fail if trade prefix is selected/present AND (has comment OR has photo)
-            // BUT only for PassFail controls - not for YesNo or Text inputs
-            // AND respect explicit NI values - don't override inspector's choice
-            bool hasContent = !string.IsNullOrWhiteSpace(CommentsTextBox.Text) || _currentPhotoData != null || _editorLoadedItem.Pictures.Count > 0;
-            string controlName = _editorLoadedItem.ControlName?.ToLower() ?? "";
-            bool isPassFailType = controlName.Contains("passfail"); // not yesno
-            string currentValue = _editorLoadedItem.Value?.ToString()?.ToLower() ?? "";
-            bool isExplicitlyNI = currentValue == "ni" || currentValue == "na" || currentValue == "n/a";
-            
-            // Only auto-set to Fail if not explicitly NI
-            if (hasTrade && hasContent && isPassFailType && !isExplicitlyNI)
-            {
-                _editorLoadedItem.Value = "Fail";
-            }
+            // TextChanged captures comments and values synchronously (including empty text).
+            // Never sweep every textbox: an old inline/right-pane view can contain stale text.
+            if (_isLoadingEditor || _readOnlyMode || _editorLoadedItem == null) return;
+            var item = _editorLoadedItem;
+            if (!EditorEditService.Owns(_currentInspection, item)) return;
+            // All field capture has already completed on this UI thread, even if focus never moved.
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)

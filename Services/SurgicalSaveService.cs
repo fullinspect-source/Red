@@ -16,6 +16,7 @@ namespace InspectionEditor.Services
     {
         private JObject? _originalJson;
         private string? _filePath;
+        private byte[]? _lastSavedBytes;
 
         /// <summary>
         /// Loads an .INS file, storing the original JSON for surgical patching.
@@ -23,11 +24,11 @@ namespace InspectionEditor.Services
         /// </summary>
         public InspectionFile Load(string filePath)
         {
-            string jsonText = File.ReadAllText(filePath);
-
-            // Store original JSON structure for surgical saves
-            _originalJson = JObject.Parse(jsonText);
-            _filePath = filePath;
+            byte[] loadedBytes = File.ReadAllBytes(filePath);
+            string jsonText;
+            using (var reader = new StreamReader(new MemoryStream(loadedBytes), detectEncodingFromByteOrderMarks: true))
+                jsonText = reader.ReadToEnd();
+            var originalJson = JObject.Parse(jsonText);
 
             // Deserialize to model for UI
             var inspection = JsonConvert.DeserializeObject<InspectionFile>(jsonText);
@@ -38,6 +39,9 @@ namespace InspectionEditor.Services
 
             // Map the actual INS picture fields to our model properties
             MapPictureFieldsFromIns(inspection);
+            _originalJson = originalJson;
+            _filePath = filePath;
+            _lastSavedBytes = loadedBytes;
 
             return inspection;
         }
@@ -90,25 +94,27 @@ namespace InspectionEditor.Services
             string targetPath = saveAsPath ?? _filePath
                 ?? throw new InvalidOperationException("No file path specified.");
 
-            // Ensure required top-level fields exist (Strand/INSPECT2022 compatibility)
-            EnsureRequiredTopLevelFields(targetPath);
-
-            // Ensure every item has an ItemResultId (required by INSPECT2022)
-            EnsureItemResultIds();
-
-            // Patch only the fields we modify
-            PatchInspection(inspection);
-            PatchAddedAttachments(inspection);
-            PatchPlanCheckMetadata(inspection);
-
-            // Write with minimal formatting to match original style
-            string json = _originalJson.ToString(Formatting.None);
-            File.WriteAllText(targetPath, json);
-
-            // If saved to a new path, update our reference
-            if (saveAsPath != null)
+            // Patch a candidate, not the last successfully saved JSON. Failed writes are retryable.
+            JObject previousJson = _originalJson;
+            _originalJson = (JObject)previousJson.DeepClone();
+            try
             {
-                _filePath = saveAsPath;
+                EnsureRequiredTopLevelFields(targetPath);
+                EnsureItemResultIds();
+                PatchInspection(inspection);
+                PatchAddedAttachments(inspection);
+                PatchPlanCheckMetadata(inspection);
+                string json = _originalJson.ToString(Formatting.None);
+                bool sameTarget = string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(_filePath!),
+                    StringComparison.OrdinalIgnoreCase);
+                byte[] savedBytes = AtomicInspectionWriter.Write(targetPath, json, sameTarget ? _lastSavedBytes : null);
+                _lastSavedBytes = savedBytes;
+                _filePath = targetPath;
+            }
+            catch
+            {
+                _originalJson = previousJson;
+                throw;
             }
         }
 
@@ -313,10 +319,8 @@ namespace InspectionEditor.Services
         /// </summary>
         private void PatchValue(Item item, JObject itemJson)
         {
-            if (item.Value != null)
-            {
-                itemJson["Value"] = JToken.FromObject(item.Value);
-            }
+            // Explicit clearing must not leave the original value behind.
+            itemJson["Value"] = item.Value != null ? JToken.FromObject(item.Value) : JValue.CreateNull();
         }
 
         /// <summary>
