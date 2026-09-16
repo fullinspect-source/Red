@@ -3,7 +3,6 @@ using InspectionEditor.Services;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -2194,70 +2193,80 @@ namespace InspectionEditor
             PopulateTreeView(SearchFilterBox.Text);
         }
         
-        // Max photo dimensions for INSPECT2022 compatibility
-        // INSPECT2022 tablets save at 1632x918 or 1984x1116 — match the higher standard
-        private const int MaxPhotoWidth = 1984;
-        private const int MaxPhotoHeight = 1116;
-        
         private byte[] ApplyAutoEnhancement(byte[] photoData)
         {
             try
             {
-                using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(photoData);
-                
-                image.Mutate(ctx =>
-                {
-                    // Resize to INSPECT2022-compatible dimensions if larger
-                    // Maintains aspect ratio, only downscales (never upscales)
-                    if (image.Width > MaxPhotoWidth || image.Height > MaxPhotoHeight)
-                    {
-                        ctx.Resize(new SixLabors.ImageSharp.Processing.ResizeOptions
-                        {
-                            Size = new SixLabors.ImageSharp.Size(MaxPhotoWidth, MaxPhotoHeight),
-                            Mode = SixLabors.ImageSharp.Processing.ResizeMode.Max
-                        });
-                    }
-                    
-                    // 25% lift (brightness boost)
-                    ctx.Brightness(1.25f);
-                    // Sharpen removed for faster processing
-                });
-                
-                using var ms = new MemoryStream();
-                // Use quality 85 for good balance of size and clarity
-                image.Save(ms, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder 
-                { 
-                    Quality = 85 
-                });
-                return ms.ToArray();
+                return PhotoProcessingService.Process(photoData, ResizePhotoWithWpf);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Auto-enhancement failed: {ex.Message}");
-                
-                // Try to at least resize even without enhancement
-                try
+                throw new InvalidOperationException(
+                    "Photo could not be processed. The data may be corrupt or an image component unavailable. " +
+                    "If the photo is in your Camera Roll, try adding it manually with the 📎 button.", ex);
+            }
+        }
+
+        // Independent of ImageSharp: still decode/validate, constrain size, and store real JPEG.
+        // Enhancement is optional; invalid image data is never returned as a successful photo.
+        private static byte[] ResizePhotoWithWpf(byte[] photoData)
+        {
+            using var input = new MemoryStream(photoData, writable: false);
+            var decoder = BitmapDecoder.Create(input, BitmapCreateOptions.PreservePixelFormat,
+                BitmapCacheOption.OnLoad);
+            var frame = decoder.Frames[0];
+            BitmapSource bitmap = frame;
+            ushort orientation = 1;
+            if (frame.Metadata is BitmapMetadata metadata)
+            {
+                // JPEG and TIFF metadata expose orientation under different query paths.
+                foreach (string query in new[] { "/app1/ifd/{ushort=274}", "/ifd/{ushort=274}" })
                 {
-                    using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(photoData);
-                    if (image.Width > MaxPhotoWidth || image.Height > MaxPhotoHeight)
+                    try
                     {
-                        image.Mutate(ctx => ctx.Resize(new SixLabors.ImageSharp.Processing.ResizeOptions
+                        if (metadata.GetQuery(query) is ushort value)
                         {
-                            Size = new SixLabors.ImageSharp.Size(MaxPhotoWidth, MaxPhotoHeight),
-                            Mode = SixLabors.ImageSharp.Processing.ResizeMode.Max
-                        }));
+                            orientation = value;
+                            break;
+                        }
                     }
-                    using var ms = new MemoryStream();
-                    image.Save(ms, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality = 85 });
-                    return ms.ToArray();
-                }
-                catch
-                {
-                    throw new InvalidOperationException(
-                        "Photo data appears to be corrupt and cannot be processed. " +
-                        "The photo is in your Camera Roll — try adding it manually with the 📎 button.", ex);
+                    catch (NotSupportedException) { }
                 }
             }
+
+            var transform = new TransformGroup();
+            switch (orientation)
+            {
+                case 2: transform.Children.Add(new ScaleTransform(-1, 1)); break;
+                case 3: transform.Children.Add(new RotateTransform(180)); break;
+                case 4: transform.Children.Add(new ScaleTransform(1, -1)); break;
+                case 5:
+                    transform.Children.Add(new ScaleTransform(-1, 1));
+                    transform.Children.Add(new RotateTransform(270));
+                    break;
+                case 6: transform.Children.Add(new RotateTransform(90)); break;
+                case 7:
+                    transform.Children.Add(new ScaleTransform(-1, 1));
+                    transform.Children.Add(new RotateTransform(90));
+                    break;
+                case 8: transform.Children.Add(new RotateTransform(270)); break;
+            }
+            if (transform.Children.Count > 0)
+                bitmap = new TransformedBitmap(bitmap, transform);
+
+            double scale = Math.Min(1.0, Math.Min(
+                (double)PhotoProcessingService.MaxPhotoWidth / bitmap.PixelWidth,
+                (double)PhotoProcessingService.MaxPhotoHeight / bitmap.PixelHeight));
+            if (scale < 1.0)
+                bitmap = new TransformedBitmap(bitmap, new ScaleTransform(scale, scale));
+
+            // Do not copy source metadata: pixels are already oriented, so copying the old
+            // orientation tag would rotate them again in downstream viewers.
+            var encoder = new JpegBitmapEncoder { QualityLevel = 85 };
+            encoder.Frames.Add(BitmapFrame.Create(bitmap, null, null, null));
+            using var output = new MemoryStream();
+            encoder.Save(output);
+            return output.ToArray();
         }
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)

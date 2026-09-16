@@ -85,6 +85,7 @@ mkdir "%EXTRACT_DIR%" >>"%LOG_FILE%" 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Expand-Archive -Path '%DOWNLOAD_ZIP%' -DestinationPath '%EXTRACT_DIR%' -Force" >>"%LOG_FILE%" 2>&1
 if errorlevel 1 goto :extract_failed
 if not exist "%EXTRACT_DIR%\Red.exe" goto :verify_failed
+if not exist "%EXTRACT_DIR%\SixLabors.ImageSharp.dll" goto :verify_failed
 if not exist "%EXTRACT_DIR%\version.txt" call :log "WARNING: version.txt missing from release ZIP"
 if not exist "%EXTRACT_DIR%\quick_comments.json" call :log "WARNING: quick_comments.json missing from release ZIP"
 if not exist "%EXTRACT_DIR%\inspector_stats.json" call :log "WARNING: inspector_stats.json missing from release ZIP"
@@ -164,9 +165,9 @@ echo  ERROR: The download could not be extracted. Nothing was installed.
 goto :fail
 
 :verify_failed
-call :log "ERROR: Red.exe missing after extract"
+call :log "ERROR: Red.exe or SixLabors.ImageSharp.dll missing after extract"
 echo.
-echo  ERROR: The downloaded release did not contain Red.exe. Nothing was installed.
+echo  ERROR: The download is missing RED or its photo processor. Nothing was installed.
 goto :fail
 
 :install_failed

@@ -57,7 +57,9 @@ echo "🔨 Building Red..."
 cd "$PROJECT_DIR"
 dotnet clean -c Release -r win-x64 > /dev/null 2>&1
 rm -rf "$PUBLISH_OUTPUT"
-dotnet publish -c Release -r win-x64 --self-contained true -o "$PUBLISH_OUTPUT" 2>&1 | grep -E "error|warning|Error|Warning|Build succeeded|Build FAILED" | grep -v "NU1903\|NU1902" | tail -10
+# Do not hide dotnet's exit code behind a log-filter pipeline. Publish guards
+# must stop the release even when Red.exe was already emitted before failure.
+dotnet publish -c Release -r win-x64 --self-contained true -o "$PUBLISH_OUTPUT"
 
 if [ ! -f "$PUBLISH_OUTPUT/Red.exe" ]; then
     echo "❌ Build failed - Red.exe not found in $PUBLISH_OUTPUT"

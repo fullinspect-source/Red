@@ -131,6 +131,8 @@ namespace InspectionEditor.Services
             ZipFile.ExtractToDirectory(zipPath, extractDir);
             if (!File.Exists(Path.Combine(extractDir, "Red.exe")))
                 throw new FileNotFoundException("Downloaded RED release did not contain Red.exe.");
+            if (!File.Exists(Path.Combine(extractDir, "SixLabors.ImageSharp.dll")))
+                throw new FileNotFoundException("Downloaded RED release is missing its photo processor. Nothing was installed; please download the update again.");
 
             string appExe = Process.GetCurrentProcess().MainModule?.FileName
                 ?? Path.Combine(AppContext.BaseDirectory, "Red.exe");

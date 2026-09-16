@@ -22,8 +22,8 @@ class StartupUpdateCheckStaticTests(unittest.TestCase):
         self.assertIn("CheckAndInstallIfAvailableAsync(force: true)", (ROOT / "InspectionPickerWindow.xaml.cs").read_text(encoding="utf-8"))
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.1.24</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-09-15</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.1.25</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-09-16</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

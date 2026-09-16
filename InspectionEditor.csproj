@@ -12,8 +12,8 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.1.24</Version>
-    <ReleaseDate>2026-09-15</ReleaseDate>
+    <Version>2.1.25</Version>
+    <ReleaseDate>2026-09-16</ReleaseDate>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
     <Product>RED $(Version)</Product>
@@ -41,6 +41,7 @@
     <Compile Remove="tests\FramingDesignParserHarness\**\*.cs" />
     <Compile Remove="tests\EquipmentAirflowHarness\**\*.cs" />
     <Compile Remove="tests\SaveLossHarness\**\*.cs" />
+    <Compile Remove="tests\PhotoProcessingHarness\**\*.cs" />
     <Compile Remove="red-release-pre-sync-backups\**\*.cs" />
     <Page Remove="red-release-pre-sync-backups\**\*.xaml" />
     <EmbeddedResource Remove="red-release-pre-sync-backups\**\*" />
@@ -109,4 +110,9 @@
            Text="Release builds require the gitignored EmbeddedApiKeyProvider.Generated.cs so RED AI tools remain available." />
   </Target>
 
+  <!-- Photo capture must never ship without its managed image dependency. -->
+  <Target Name="VerifyPhotoDependencyPublish" AfterTargets="Publish">
+    <Error Condition="!Exists('$(PublishDir)SixLabors.ImageSharp.dll')"
+           Text="Published RED is missing SixLabors.ImageSharp.dll; refusing an incomplete photo-capable release." />
+  </Target>
 </Project>
