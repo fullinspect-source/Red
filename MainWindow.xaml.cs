@@ -5292,14 +5292,21 @@ namespace InspectionEditor
 
             if (options == null)
             {
-                AddInlineNiValueButtonIfNeeded(panel, item);
                 AddInlineClearValueButton(panel, item, alwaysShow: true);
+                // Share the previous text-box footprint instead of widening the row for NI.
+                var valueEditor = new Grid
+                {
+                    MinWidth = 150,
+                    MaxWidth = 220,
+                    MinHeight = 34,
+                    Margin = new Thickness(0, 0, 5, 0)
+                };
+                valueEditor.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                valueEditor.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 var valueBox = new TextBox
                 {
                     Text = item.Value?.ToString() ?? "",
                     Tag = item,
-                    MinWidth = 150,
-                    MaxWidth = 220,
                     MinHeight = 34,
                     Padding = new Thickness(9, 5, 9, 5),
                     Margin = new Thickness(0, 0, 5, 0),
@@ -5315,9 +5322,14 @@ namespace InspectionEditor
                 valueBox.SetValue(InlineValueDisplayProperty, true);
                 valueBox.GotKeyboardFocus += InlineValueBox_GotKeyboardFocus;
                 valueBox.TextChanged += InlineValueBox_TextChanged;
-            valueBox.LostFocus += InlineValueBox_LostFocus;
+                valueBox.LostFocus += InlineValueBox_LostFocus;
                 valueBox.MouseLeftButtonUp += (_, e) => e.Handled = true;
-                panel.Children.Add(valueBox);
+                valueEditor.Children.Add(valueBox);
+                AddInlineNiValueButtonIfNeeded(valueEditor, item, alwaysShow: true);
+                var niButton = (Button)valueEditor.Children[1];
+                niButton.Margin = new Thickness(0);
+                Grid.SetColumn(niButton, 1);
+                panel.Children.Add(valueEditor);
             }
 
             if (options != null)
@@ -5348,9 +5360,9 @@ namespace InspectionEditor
             return scroller;
         }
 
-        private void AddInlineNiValueButtonIfNeeded(Panel panel, Item item)
+        private void AddInlineNiValueButtonIfNeeded(Panel panel, Item item, bool alwaysShow = false)
         {
-            if (!ShouldOfferInlineNiValueButton(item))
+            if (!alwaysShow && !ShouldOfferInlineNiValueButton(item))
                 return;
 
             string current = item.Value?.ToString() ?? "";
