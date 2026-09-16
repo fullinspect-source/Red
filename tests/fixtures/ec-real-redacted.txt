@@ -1,0 +1,568 @@
+Home Energy Rating Certificate
+
+Projected Report
+Based on Plans
+
+HERS® Index Score:
+
+Your home’s HERS score is a relative
+
+Rating Date: 2026-02-27
+Registry ID:
+Ekotrope ID: [REDACTED]
+
+Home:
+
+[REDACTED]
+[REDACTED]
+
+Builder:
+[REDACTED]
+
+Annual Savings
+
+$1,340
+
+*Relative to an average U.S. home
+
+performance score. The lower the number,
+the more energy efficient the home. To
+learn more, visit www.hersindex.com
+
+Your Home's Estimated Energy Use:
+
+This home meets or exceeds the
+criteria of the following:
+
+Use [MBtu] Annual Cost
+Heating 14 $21 ENERGY STAR v3.1
+Cooling 5.0 $220
+Hot Water 7.3 $99
+Lights/Appliances 16.8 $641
+Service Charges $240
+Generation (e.g. Solar) 0.0 so
+Total: 30.6 $1,221
+
+HERS’ Index
+
+4 ekotrope
+
+Energ
+
+Home Feature Summary:
+
+Primary Water Heating:
+House Tightness:
+Ventilation:
+
+savings calculated without modifications to the energ
+
+Residential Water Heater + Natural Gas + 0.81 UEF
+4.5 ACH50
+145 CFM + 38 Watts « Supply Only
+
+Rating Completed by:
+
+~ oS More Energy HomeType: _ Single family detached
+Model: T30Av2JR Energy Rater: [REDACTED]
+
+150 -
+
+Existing 140 Community: [REDACTED] RESNET ID: [REDACTED]
+
+Homes so Conditioned Floor Area: 1,156 ft? Rating Company: [REDACTED]
+120 Number of Bedrooms: 3 [REDACTED]
+
+Reference na Primary Heating System: — Furnace « Natural Gas » 96 AFUE [REDACTED]
+Home 90 Primary Cooling System: Air Conditioner « Electric + 17.2 SEER2
+
+Rating Provider: [REDACTED]
+[REDACTED]
+[REDACTED]
+
+Duct Leakage to Outside: 46 CFM @ 25Pa (3.98 / 100 ft”) /3/*
+40 This Home Above Grade Walls: R-15 (* \ Ga
+° Ceiling: Vented Attic, R-38 tush. < “
+= WindowType: —_U-Value: 0.34, SHGC: 0.22 ace
+Zero Energy 0 Foundation Walls: N/A —
+Sey Framed Floor: N/A [REDACTED], Certified Energy Rater
+©2015 RESNET Digitally signed: 4/29/26 at 1:56 PM
+
+Ekotrope RATER - Version:5.2.2.3852
+
+The Energy Rating Disclosure for this home is available from the Approved Rating Provider.
+This report does not constitute any warranty or guarantee.
+
+model. (As Modeled)
+
+
+---PAGE_BREAK---
+RESNET HOME ENERGY RATING
+Standard Disclosure
+
+For home(s) located at: [REDACTED], [REDACTED]
+
+Check the applicable disclosure(s):
+
+Withe Rater or the Rater's employer is receiving a fee for providing the rating on this home.
+[Jin addition to the rating, the Rater or the Rater's employer has also provided the following consulting services for this
+home:
+
+La. Mechanical system design
+
+(ie. Moisture control or indoor air quality consulting
+
+Lc. Performance testing and/or commissioning other than required for the rating itself
+
+Ip. Training for sales or construction personnel
+
+(le. Other(specify)
+
+[_ |The Rater or the Rater's employer is:
+
+[_[A.The seller of this home or their agent
+
+[_[B. The mortgagor for some portion of the financed payments on this home
+
+Ic. An employee, contractor, or consultant of the electric and/or natural gas utility serving this home
+[_ |The Rater or Rater's employer is a supplier or installer of products, which may include:
+
+Products Installed in this home by OR is in the business of
+
+HVAC systems [_ [Rater [_]Employer [_|Rater [_ [Employer
+Thermal insulation systems [_|Rater [_ [employer [_ [Rater [_]employer
+Air sealing of envelope or duct systems [_ [Rater [_]employer [_|Rater [_]employer
+Energy efficient appliances [_]Rater [_Jemployer [_]Rater [_]employer
+Construction (builder, developer, construction contractor, etc) [_]Rater [_]employer [_|Rater [_]employer
+Other (specify): | | [_]Rater [_]employer [_|Rater [_]employer
+
+[_|this home has been verified under the provisions of Chapter 6, Section 603 "Technical Requirements for Sampling" of
+the Mortgage Industry National Home Energy Rating Standard as set forth by the Residential Energy Services Network
+(RESNET). Rater Certification #: [REDACTED]
+
+Name: [REDACTED] Signature: —misAc,
+
+Organization: [REDACTED] Digitally signed: 4/29/26 at 1:56 PM
+
+| attest that the above information is true and correct to the best of my knowledge. As a Rater or Rating Provider |
+abide by the rating quality control provisions of the Mortgage Industry NationalHome Energy Rating Standard as set
+forth by the Residential Energy Services Network(RESNET). The national rating quality control provisions of the rating
+standard are contained in Chapter One 102.1.4.6 of the standard and are posted at
+https://standards.resnet.us
+
+The Home Energy Rating Standard Disclosure for this home is available from the rating provider.
+RESNET Form 03001-2 - Amended March 20, 2017
+
+---PAGE_BREAK---
+ENERGY STAR V3.1 Home Report
+
+Property Organization Inspection Status
+[REDACTED] [REDACTED] Results are projected
+[REDACTED] [REDACTED]
+
+Model: T30A v2 JR [REDACTED]
+
+Community: [REDACTED]
+
+Builder
+[REDACTED] (JOB-REDACTEDR2) — [REDACTED]
+T30A J v2 - Gas - (Full Siding) - ES 3.1-TC- South
+
+Mandatory Requirements ERI (HERS) Index Target
+“ Duct leakage at post construc han t a 58
+requirements. S diust F 1.00
+MV Total building thermal envelope UA meets or exceeds applicable SAF Adjusted ERI (HERS) Target —s3_
+
+requirements.
+
+Envelope insulation achieves RESNET Grade | installation, or uses exceptions
+
+in footnote 5. As Designed Home ERI (HERS) 50
+
+“Total window thermal properties meet or exceed the applicable As Designed Home ERI (HERS) w/o PV 50
+
+requirements
+“ Duct insulation meets the EPA minimum requirements of R-6.
+Mechanical ventilation system is installed in the home.
+Measured air leakage rate meets or exceeds applicable requirements.
+ENERGY STAR Checklists fully verified and complete.
+
+Normalized, Modified End-Use Loads
+
+(MBtu / year)
+ENERGY STAR As Designed
+Heating 1.0 0.9
+Cooling 5.9 6.4
+Water Heating 6.3 2.6
+Lights and Appliances 17.6 16.9
+Total 30.9 26.8
+
+, Z> This home MEETS or EXCEEDS the energy efficiency requirements for designation as an EPA ENERGY STAR Qualified Home under
+et (/ Version 3.1
+
+ENERGY STAR
+
+Pollution Prevented Energy Cost Savings S/yr
+Type of Emissions Reduction Heating -1
+Carbon Dioxide (CO2) - tons/yr 0.5 Cooling -11
+Water Heating 81
+Lights & Appliances 31
+Generation Savings 0
+Total 100
+
+The energy savings and pollution prevented are calculated by comparing the Rated Home to the ENERGY STAR Version 3.1 Reference Home as defined
+in the ENERGY STAR Qualified Homes ERI (HERS) Target Procedure for National Program Requirements, Version 3.1 promulgated by the Environmental
+
+Protection Agency (EPA). In accordance with the ANSI/RESNET/ICC 301 Standard, building inputs affecting setpoints infiltration rates, window shading
+and the existence of mechanical systems may have been changed prior to calculating loads
+
+Ekotrope RATER - Version 5.2.2.3852
+All results are based on data entered by Ekotrope users. Ekotrope disclaims all liability for the information shown on this report.
+
+---PAGE_BREAK---
+Building Summary
+
+Property
+[REDACTED]
+
+Organization
+
+[REDACTED] [REDACTED]
+Model: T30A v2 JR [REDACTED]
+Community: [REDACTED]
+
+Builder
+
+[REDACTED] (JOB-REDACTEDR2)
+T30A J v2 - Gas - (Full Siding) - ES 3.1 - TC -96AFUE
+
+[REDACTED]
+
+Inspection Status
+
+[REDACTED]
+
+Results are projected
+
+General Building Information
+
+Number Of Bedrooms: 3
+
+Conditioned Floor Area [sq. ft.|: 1,156
+Unconditioned, attached garage? Yes
+
+Total Units in Building: 1
+
+Number of Floors in Building: N/A
+
+Model: T30A v2 JR
+
+RESNET/IECC 2006-2018 Climate Zone: 2A
+
+Number Of Floors: 1
+
+Has Electric Vehicle Ready Space: No
+Conditioned Volume [cu. ft]: 9,248
+Residence Type: Single family detached
+
+Floor Number: N/A
+Community: [REDACTED]
+IECC 2021 Climate Zone: 2A
+
+Envelope Components
+
+Slab
+Name Library Type Perimeter Floor Grade Carpet R Exposed Masonry Surface Area Location Enclosing
+rea
+Slab Uninsulated slab 138 On Grade 1.23 (0) 1,156.0 ft? Exposed Exterior Conditioned Space
+Slab Library List
+Name Wall Construction Slab Completely Undersiab Perimeter Perimeter Perimeter Thermal Break Effective R-value
+Type Insulated? Insulation Width Insulation Depth Insulation R Value Insulation Is
+ft] ft Exterior
+Uninsulated slab Wood Frame / No 0 0 0 Yes No 0.00
+Other
+Wall
+Name Library Type Surface Area Location Effective R-value
+Front/Garage DRH Houston R-15 Garage 147.0 fi? Unconditioned, attached garage 12.598
+Front/Siding 2x4 DRH Houston R-15 Siding 86.0 ft? Exposed Exterior 12.974
+Left/Siding 2x4 DRH Houston R-15 Siding 319.0 fi? Exposed Exterior 12.974
+Rear/Siding 2x4 DRH Houston R-15 Siding 233.0 fi? Exposed Exterior 12.974
+Right/Siding 2x4 DRH Houston R-15 Siding 319.0 fi? Exposed Exterior 12.974
+Glazing
+Name Library Type Wall Foundation Is Operable Overhang Overhang Ft To Overhang Ft To Orientation Surface Area
+Assignment Wall Dept Top ttom
+Assignment
+Glass Door DRHH ESTAR Rear/Siding 2x4 Yes 2 0.3 7 Northwest 18.0 ft?
+3.1 Glass Door
+34/22 (P)
+Left DRHHESTAR  Left/Siding 2x4 Yes 13 0.3 5.3 Southwest 15.0 ft?
+3.1 Windows
+34/22 (P)
+Rear DRHHESTAR Rear/Siding 2x4 Yes 1.3 03 5.3 Northwest 15.0 ft?
+3.1 Windows
+34/22 (P)
+Right DRHHESTAR Right/Siding 2x4 Yes 1.3 03 5.3 Northeast 45.0 ft?
+3.1 Windows
+34/22 (P)
+
+
+---PAGE_BREAK---
+Building Summary
+
+Property Project & Plan Organization Inspection Status
+[REDACTED] [REDACTED] (JOB-REDACTEDR2) [REDACTED] Results are projected
+[REDACTED] T30A J v2 - Gas - (Full Siding)-ES3.1-TC-96AFUE [REDACTED] Builder
+
+Model: T30A v2 JR [REDACTED] [REDACTED]
+Community: [REDACTED]
+Glazing Library List
+Name Shge U-factor
+DRH H ESTAR 3.1 0.22 0.340
+Glass Door 34/22 (P)
+DRH H ESTAR 3.1 0.22 0.340
+Windows 34/22 (P)
+Opaque Door
+Name Library Type Wall Foundation Emittance Solar SurfaceColor Surface Area Location Effective R-
+Assignment Wall Absorptance value
+Assignment
+Front Door DRHHESTAR Front/Siding 2x4 09 0.75 Medium 20.0 ft? Exposed Exterior 5.80
+3.1 Exterior Door
+R58
+Garage Door DRHHESTAR _ Front/Garage 09 0.75 Medium 18.0 ft? Unconditioned, 5.80
+3.1 Exterior Door attached garage
+R58
+Roof Insulation
+Name Library Type Attic Exterior Clay or Does the Roof Effective R- Surface Color Solar Surface Area Location
+Area [ft?] ConcreteRoof have Eaves? Value after Absorptance
+Tiles eaves
+Attic Access Attic Access (No- 98 No No - Medium 0.75 9.8 fi? Vented Attic
+RB) 16"SC
+Flat R-38 FLAT 1,046.24 No No = Medium 0.75 1,046.2 ft Vented Attic
+CEILING No RB
+(16"SC)
+HVAC: R-21 HVAC 100 No No - Medium 0.75 100.0 fi? Vented Attic
+DECK (No-RB)
+16"SC.
+Roof Insulation Library List Whole House Infiltration
+Name Has Radiant Barrier Effective R-value Infiltration Measurement Type Shelter Class
+Attic Access (No-RB) No 12.175 4.5ACH at50Pa — Blower-door tested 4
+16"SC Lf
+R-21 HVAC DECK (No- No 17.635
+RB) 16"SC
+R-38 FLAT CEILING No No 36.229
+RB (16"SC)
+Mechanical Ventilation
+Ventilation Type Ventilation Rate [ft?/ Operational hours Fan Watts Runs once every Energy Recovery Model Number Manufacture!
+Minute] per day three hours Percent
+Supply Only 145 CFM 6.9 38 Watts Yes 0
+Lighting
+% Interior Fluorescent % Interior LED Lighting % Exterior Fluorescent  % Exterior LED Lighting % Garage Fluorescent  % Garage LED Lighting
+Lighting Lighting Lighting
+0 100 0 100 0 100
+
+
+---PAGE_BREAK---
+Building Summary
+
+Property
+[REDACTED]
+[REDACTED]
+
+Project & Plan
+[REDACTED] (JOB-REDACTEDR2)
+
+T30A J v2 - Gas - (Full Siding) - ES 3.1 - TC -96AFUE
+
+Organization
+[REDACTED]
+[REDACTED]
+
+Inspection Status
+Results are projected
+Builder
+
+Model: T30A v2 J R [REDACTED] [REDACTED]
+Community: [REDACTED]
+Conditioning Equipment
+Name Library Type SerialNumber Heating PercentLoad Cooling Percent Load Hot Water Percent Location
+0a
+Air conditioner (2) 47.2 SEER2 AIC (24.4K) 0% 100% 0% Attic
+Fuel-fired air 27-96 AFUE Gas 100% 0% 0% Attic
+distribution Furnace 42K-230EAE
+Water Heating (3) Tankless WH .81UEF 0% 0% 100% Unconditioned Garage
+
+GAS
+
+Equipment Type: 17.2 SEER2 A/C (24.4K)
+
+| Equipment Type: 2T-96 AFUE Gas Furnace 42K-230EAE
+
+Equipment Type Air Conditioner Equipment Type Furnace
+Fuel Type Electric Fuel Type Natural Gas
+Distribution Type Forced Air Distribution Type Forced Air
+Motor Type ECM (Variable Speed) Motor Type ECM (Variable Speed)
+Heat Pump System Type Unspecified Heating Efficiency 96 AFUE
+Cooling Efficiency 17.2 SEER2 Heating Capacity [kBtu/h] 42
+Cooling Capacity [kBtu/h] 24.4 Use default EAE No
+. EAE [kWh] 230
+Equipment Type: Tankless WH .81UEF GAS Distribution System
+Equipment Type Residential Water Heater Distribution Type Forced Air
+Fuel Type Natural Gas Heating Equipment Fuel-fired air distribution
+Distribution Type Hydronic Delivery (Radiant) Cooling Equipment Air conditioner (2)
+Hot Water Efficiency 0.81 UEF Sq. Feet Served 1,156
+Tankless? Yes # Return Grilles 2
+. Supply Duct R Value 6
+Return Duct R Value 6
+Supply Duct Area [ft?] 312.12
+Return Duct Area [ft?] 115.6
+Leakage to Outdoors 46 CFM @ 25Pa (3.98 / 100 ft?)
+Total Leakage 46 CFM25
+Total Leakage Duct Test Conditions Post-Construction
+Use Default Flow Rate No
+Heating Flow Rate Cfm 720
+Cooling Flow Rate Cfm 720
+Duct 1
+Duct Location Attic (well vented, radiant barrier)
+Percent Supply Area 100
+Percent Return Area 100
+Ceiling Fan Water Distribution
+Has Ceiling Fan Yes Water Fixture Type Standard
+Watts 30 Use Default Hot Water Pipe Length No
+Hot Water Pipe Length [ft] 51
+At Least R3 Pipe Insulation? Yes
+Hot Water Recirculation System? No
+Drain Water Heat Recovery? No
+
+Appliances & Notes
+
+---PAGE_BREAK---
+Building Summary
+
+Property
+
+[REDACTED]
+[REDACTED]
+
+Model: T30A v2 JR
+Community: [REDACTED]
+
+Clothes Dryer Available
+
+Dishwasher Defaults Type
+Dishwasher Size
+
+Dishwasher Efficiency
+
+Annual Gas Cost
+
+Electric Rate
+
+Gas Rate
+
+Is Outside Conditioned Space
+Dishwasher Available
+
+JOB-REDACTED - Original
+JOB-REDACTEDR1 - Revise to gas.
+
+JOB-REDACTEDR2 - Revise to plan T30A
+
+Project & Plan
+[REDACTED] (JOB-REDACTEDR2)
+T30A J v2 - Gas - (Full Siding) - ES 3.1 - TC -96AFUE
+
+No; HERS Reference clothes dryer
+
+modeled
+
+ENERGY STAR Standard
+Standard
+
+270 kWh
+
+$22.23
+
+$0.12/kWh
+
+$1.09/Therm
+
+No
+
+Yes
+
+Organization
+
+[REDACTED]
+[REDACTED]
+[REDACTED]
+
+Inspection Status
+Results are projected
+
+Builder
+
+[REDACTED]
+
+Clothes Washer Available
+
+Programmable thermostat?
+Range/Oven Fuel
+
+Convection Oven?
+
+Induction Range?
+
+Range/Oven Outside Conditioned
+Space?
+
+Refrigerator Consumption
+Space?
+
+No; HERS Reference clothes washer
+modeled
+
+Yes
+Natural Gas
+No
+No
+No
+
+647 kWh/Year
+No
+
+Components Not Found: Foundation Wall, Foundation Wall Library List, Framed Floor, Rim Joist, Skylight, Onsite Generation, Solar Generation, Dehumidifier, Whole House Fan,
+Whole House Fan Library List, HVAC Grading (Not Conducted)
+
+---PAGE_BREAK---
+Builder Affidavit
+
+Property Organization Inspection Status
+[REDACTED] [REDACTED] Results are projected
+[REDACTED] [REDACTED]
+
+Model: T30A v2 JR [REDACTED]
+
+Community: [REDACTED]
+
+Builder
+[REDACTED] (JOB-REDACTEDR2) [REDACTED]
+T30A J v2 - Gas - (Full Siding) - ES 3.1-TC- South
+
+Important Notice to Builder
+
+Builder affirms in this affidavit that all building characteristics described in the Building Summary Report accurately reflect this New
+Home. Builder agrees to allow the Home Energy Rating System (HERS) Provider and/or Rater to verify building characteristics of this
+New Home fully at the HERS Rater/Provider's discretion. The HERS Provider and Rater do not create or imply any duty or obligations to
+Builder or any subsequent owner. Builder is responsible for taking any actions necessary to protect Builder's interest. There is no
+
+guarantee or warranty whatsoever expressed or implied from the HERS Provider or Rater.
+
+HERS® Index Score:50
+
+Builder Name: [REDACTED] Builder Signature:
+Name: [REDACTED] Signature: IS ne
+Organization: [REDACTED] Digitally signed: 4/29/26 at 1:56 PM
+
+Ekotrope RATER - Version 5.2.2.3852
+
+All results are based on data entered by Ekotrope users. Ekotrope disclaims all liability for the information shown on this report.

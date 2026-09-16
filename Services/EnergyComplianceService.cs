@@ -61,6 +61,7 @@ namespace InspectionEditor.Services
 
         // HVAC
         public string? HvacCoolingSeer  { get; set; }    // "15.2 SEER2"
+        public string? HvacCoolingCapacityKbtu { get; set; } // Explicit capacity, not nominal tonnage
         public string? HvacTonnage      { get; set; }    // "3"
         public string? DesignAirflowCfm { get; set; }   // unit 1; EC tonnage × 360 unless an equipment matchup overrides it
         public string? DesignAirflowCfm2 { get; set; }
@@ -83,6 +84,20 @@ namespace InspectionEditor.Services
         // Program
         public string? EnergyStarProgram { get; set; }
         public string? IECCVersion       { get; set; }  // "IECC 2015" / "IECC 2021"
+
+        // Count available parsed/calculated fields, excluding code-default targets and metadata. This is not
+        // an applicability/completeness score and does not broaden application eligibility.
+        public int ExtractedFieldCount => new string?[] {
+            HersIndex, ConditionedFloorArea, ConditionedVolume, NumberOfBedrooms,
+            BlowerDoorMaxCfm, DuctLeakageMaxCfm, NumberOfReturns, SupplyDuctR, ReturnDuctR,
+            WindowUFactor, WindowSHGC, SlopedCeilingR, AtticCeilingR, WallR, AtticWallR,
+            AtticRoofR, HotWaterPipeR, WaterHeaterFuel, WaterHeaterCapacity,
+            HvacCoolingSeer, HvacCoolingCapacityKbtu, HvacTonnage, DesignAirflowCfm, DesignAirflowCfm2,
+            TargetFreshAirCfm, TargetRunTime, VentFanWatts
+        }.Count(v => !string.IsNullOrWhiteSpace(v));
+        public string ExtractionStatus => ExtractedFieldCount > 0
+            ? $"EC report: {ExtractedFieldCount} fields available (parsed/calculated). Review available values; unrecognized or inapplicable fields remain blank."
+            : "EC report found but no supported data fields could be extracted.";
 
         public bool IsLoaded =>
             HersIndex != null || ConditionedFloorArea != null || BlowerDoorMaxCfm != null ||
@@ -426,7 +441,7 @@ namespace InspectionEditor.Services
             try
             {
                 ExtractFromPdf(ecPath, info);
-                info.StatusText = info.IsLoaded ? "OK" : "EC report found but could not extract data.";
+                info.StatusText = info.ExtractionStatus;
             }
             catch (Exception ex)
             {
@@ -996,96 +1011,128 @@ namespace InspectionEditor.Services
 
         private static void ExtractFromPdf(string pdfPath, EnergyComplianceInfo info)
         {
-            // 1. Try PdfPig text extraction (fast, works on computer-generated PDFs)
-            var sb = new StringBuilder();
             using var doc = PdfDocument.Open(pdfPath);
-            foreach (var page in doc.GetPages())
-                sb.AppendLine(page.Text);
-            string raw = sb.ToString();
-
-            // 2. If PdfPig returned nothing meaningful, fall back to Tesseract OCR
-            if (raw.Trim().Length < 50)
+            var pages = doc.GetPages().Select(p => p.Text).ToArray();
+            string raw = string.Join("\n---PAGE_BREAK---\n", pages);
+            // A text-bearing cover must not suppress OCR of scanned interior pages.
+            if (pages.Any(p => p.Trim().Length < 50))
             {
                 string? tessData = GetTessDataPath();
                 if (tessData == null)
                     throw new InvalidOperationException("OCR language data is unavailable. Repair or update RED and try again.");
                 raw = OcrAllPages(pdfPath, tessData);
-                if (raw.Trim().Length < 50)
+                if (raw.Replace("---PAGE_BREAK---", "").Trim().Length < 50)
                     throw new InvalidDataException("OCR ran but could not read this image-only EC report.");
             }
-
             try { File.WriteAllText(DebugTextPath, $"PDF: {pdfPath}\n\n{raw}"); } catch { }
             ParseText(raw, info);
         }
 
         private static string OcrAllPages(string pdfPath, string tessDataPath)
         {
-            var sb = new StringBuilder();
+            using var pdf = PdfDocument.Open(pdfPath);
+            var pages = pdf.GetPages().ToArray();
+            var texts = pages.Select(p => p.Text ?? "").ToArray();
+            var rendered = new bool[pages.Length];
+            var budget = Stopwatch.StartNew();
+            // Cooperative budget: finish the current native OCR call, then stop scheduling work.
+            bool HasTime() => budget.Elapsed < TimeSpan.FromSeconds(180);
             try
             {
                 using var engine = new TesseractEngine(tessDataPath, "eng", EngineMode.Default);
-
-                // Image-only EC reports usually contain one full-page image per PDF page.
-                // OCR those image streams directly first. This avoids depending on PDFium's
-                // native renderer, which can fail immediately on an otherwise readable report.
-                using (var pdf = PdfDocument.Open(pdfPath))
+                // Render first: PDF composition applies soft masks, placement and rotation.
+                // Extracted image streams are NOT necessarily complete page images.
+                try
                 {
-                    foreach (var page in pdf.GetPages())
+                    using var reader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(3.0));
+                    for (int i = 0; i < texts.Length && HasTime(); i++)
                     {
-                        string bestPageText = "";
-                        foreach (var image in page.GetImages()
-                            .Where(i => i.WidthInSamples >= 500 && i.HeightInSamples >= 500)
-                            .OrderByDescending(i => (long)i.WidthInSamples * i.HeightInSamples))
+                        if (texts[i].Trim().Length >= 50) continue;
+                        try
                         {
-                            if (!image.TryGetPng(out byte[] pngBytes)) continue;
-                            string candidate = OcrPngEc(pngBytes, engine);
-                            if (candidate.Trim().Length > bestPageText.Trim().Length)
-                                bestPageText = candidate;
+                            using var page = reader.GetPageReader(i);
+                            string candidate = OcrBytesEc(page.GetImage(), page.GetPageWidth(), page.GetPageHeight(), engine, HasTime);
+                            if (EcOcrQuality(candidate) > EcOcrQuality(texts[i])) texts[i] = candidate;
+                            rendered[i] = LooksLikeUsefulEcOcrText(candidate);
                         }
-                        sb.AppendLine(bestPageText);
-                        sb.AppendLine("---PAGE_BREAK---");
+                        catch (Exception ex) { Debug.WriteLine($"EC render page {i + 1}: {ex.Message}"); }
                     }
                 }
+                catch (Exception ex) { Debug.WriteLine($"EC renderer unavailable: {ex.Message}"); }
 
-                if (LooksLikeUsefulEcOcrText(sb.ToString()))
-                    return sb.ToString();
-
-                // Last-resort renderer for PDFs whose image streams cannot be decoded directly.
-                sb.Clear();
-                using var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(3.0));
-                int pageCount = docReader.GetPageCount();
-                for (int i = 0; i < pageCount; i++)
+                // Recover each unreadable page independently, never globally accept two labels.
+                for (int i = 0; i < pages.Length && HasTime(); i++)
                 {
-                    using var pageReader = docReader.GetPageReader(i);
-                    byte[] rawBytes = pageReader.GetImage();
-                    int w = pageReader.GetPageWidth();
-                    int h = pageReader.GetPageHeight();
-                    sb.AppendLine(OcrBytesEc(rawBytes, w, h, engine));
-                    sb.AppendLine("---PAGE_BREAK---");
+                    if (rendered[i] || pages[i].Text.Trim().Length >= 50) continue;
+                    var parts = new List<string>();
+                    try
+                    {
+                        foreach (var image in pages[i].GetImages()
+                            .Where(im => im.WidthInSamples >= 100 && im.HeightInSamples >= 100)
+                            .OrderByDescending(im => (long)im.WidthInSamples * im.HeightInSamples).Take(16))
+                        {
+                            if (!HasTime()) break;
+                            try
+                            {
+                                if (!image.TryGetPng(out byte[] png)) continue;
+                                string candidate = OcrPngEc(png, engine, HasTime);
+                                if (!string.IsNullOrWhiteSpace(candidate) && !parts.Contains(candidate)) parts.Add(candidate);
+                            }
+                            catch (Exception ex) { Debug.WriteLine($"EC image page {i + 1}: {ex.Message}"); }
+                        }
+                    }
+                    catch (Exception ex) { Debug.WriteLine($"EC images page {i + 1}: {ex.Message}"); }
+                    // Color, soft-mask and rendered variants can represent the SAME page.
+                    // Concatenating them duplicates equipment/flow rows and invents extra units.
+                    // The renderer handles tiled composition; direct-image recovery conservatively
+                    // keeps the strongest readable alternative instead of merging unplaced regions.
+                    texts[i] = BestEcPageText(texts[i], parts);
                 }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"EC OCR failed: {ex.Message}");
-            }
-            return sb.ToString();
+            catch (Exception ex) { Debug.WriteLine($"EC OCR failed: {ex.Message}"); }
+            var unreadable = Enumerable.Range(0, texts.Length)
+                .Where(i => !LooksLikeUsefulEcOcrText(texts[i])).Select(i => i + 1).ToArray();
+            Debug.WriteLine($"EC OCR: {texts.Length} pages, {unreadable.Length} low-quality pages "
+                + $"[{string.Join(",", unreadable)}], budget expired: {!HasTime()}");
+            return string.Join("\n---PAGE_BREAK---\n", texts);
         }
 
-        private static string OcrPngEc(byte[] pngBytes, TesseractEngine engine)
+        private static string OcrPngEc(byte[] pngBytes, TesseractEngine engine, Func<bool> hasTime)
         {
+            string best = "";
             try
             {
                 using var stream = new MemoryStream(pngBytes);
                 using var loaded = new Bitmap(stream);
-                using var ink = CreatePdfImageInkBitmap(loaded);
-                return OcrBitmapWithOrientationsEc(ink, engine);
+                // Ordinary black-on-white scans must never receive the soft-mask transform.
+                using var normal = new Bitmap(loaded.Width, loaded.Height, PixelFormat.Format24bppRgb);
+                using (var g = Graphics.FromImage(normal))
+                {
+                    g.Clear(Color.White);
+                    g.DrawImageUnscaled(loaded, 0, 0);
+                }
+                best = OcrBitmapWithOrientationsEc(normal, engine, hasTime);
+                int black = 0, samples = 0;
+                for (int y = 0; y < loaded.Height; y += Math.Max(1, loaded.Height / 100))
+                    for (int x = 0; x < loaded.Width; x += Math.Max(1, loaded.Width / 100))
+                    {
+                        var c = loaded.GetPixel(x, y);
+                        samples++;
+                        if (c.A >= 250 && Math.Max(c.R, Math.Max(c.G, c.B)) <= 3) black++;
+                    }
+                if (hasTime() && IsPdfSoftMaskCandidate(black, samples))
+                {
+                    using var ink = CreatePdfImageInkBitmap(loaded);
+                    string candidate = OcrBitmapWithOrientationsEc(ink, engine, hasTime);
+                    if (EcOcrQuality(candidate) > EcOcrQuality(best)) best = candidate;
+                }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"EC direct-image OCR error: {ex.Message}");
-                return "";
-            }
+            catch (Exception ex) { Debug.WriteLine($"EC direct-image OCR error: {ex.Message}"); }
+            return best;
         }
+
+        internal static bool IsPdfSoftMaskCandidate(int blackPixels, int totalPixels)
+            => totalPixels > 0 && (double)blackPixels / totalPixels > 0.55;
 
         private static Bitmap CreatePdfImageInkBitmap(Bitmap source)
         {
@@ -1132,17 +1179,33 @@ namespace InspectionEditor.Services
             return result;
         }
 
-        private static bool LooksLikeUsefulEcOcrText(string text)
+        internal static string BestEcPageText(string current, IEnumerable<string> alternatives)
         {
-            string[] labels =
-            {
-                "Conditioned Floor Area", "House Tightness", "Duct Leakage",
-                "HERS Index Score", "Ventilation", "WindowType"
-            };
-            return labels.Count(label => text.Contains(label, StringComparison.OrdinalIgnoreCase)) >= 2;
+            string best = current;
+            foreach (string candidate in alternatives)
+                if (EcOcrQuality(candidate) > EcOcrQuality(best)) best = candidate;
+            return best;
         }
 
-        private static string OcrBytesEc(byte[] bgraBytes, int width, int height, TesseractEngine engine)
+        internal static double EcOcrQuality(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return 0;
+            // Word/label evidence beats long rotated gibberish. Length alone is not quality.
+            string[] words = { "home", "energy", "rating", "conditioned", "floor", "area",
+                "heating", "cooling", "duct", "leakage", "ventilation", "window", "ceiling",
+                "wall", "insulation", "efficiency", "water", "bedrooms", "resnet", "disclosure",
+                "compliance", "builder", "address", "equipment", "system", "infiltration" };
+            var tokens = Regex.Matches(text.ToLowerInvariant(), @"[a-z]+")
+                .Cast<Match>().Select(m => m.Value).ToArray();
+            int known = tokens.Count(t => words.Contains(t));
+            int distinct = words.Count(w => tokens.Contains(w));
+            return distinct * 20 + Math.Min(known, 100) * 2
+                + Math.Min(tokens.Count(t => t.Length >= 3 && t.Length <= 20), 500) * 0.05;
+        }
+
+        private static bool LooksLikeUsefulEcOcrText(string text) => EcOcrQuality(text) >= 100;
+
+        private static string OcrBytesEc(byte[] bgraBytes, int width, int height, TesseractEngine engine, Func<bool> hasTime)
         {
             try
             {
@@ -1152,7 +1215,7 @@ namespace InspectionEditor.Services
                 Marshal.Copy(bgraBytes, 0, bmpData.Scan0, bgraBytes.Length);
                 bmp.UnlockBits(bmpData);
 
-                return OcrBitmapWithOrientationsEc(bmp, engine);
+                return OcrBitmapWithOrientationsEc(bmp, engine, hasTime);
             }
             catch (Exception ex)
             {
@@ -1161,37 +1224,25 @@ namespace InspectionEditor.Services
             }
         }
 
-        private static string OcrBitmapWithOrientationsEc(Bitmap bmp, TesseractEngine engine)
+        private static string OcrBitmapWithOrientationsEc(Bitmap bmp, TesseractEngine engine, Func<bool> hasTime)
         {
-            try
+            string bestText = "";
+            foreach (var rotation in new[] { RotateFlipType.RotateNoneFlipNone,
+                RotateFlipType.Rotate90FlipNone, RotateFlipType.Rotate180FlipNone, RotateFlipType.Rotate270FlipNone })
             {
-                // Full-page images may carry their rotation only in PDF metadata. Retry each
-                // physical orientation and keep the strongest OCR result.
-                string bestText = OcrBitmapEc(bmp, engine);
-                if (bestText.Trim().Length >= 500) return bestText;
-
-                foreach (var rotation in new[]
-                {
-                    RotateFlipType.Rotate90FlipNone,
-                    RotateFlipType.Rotate180FlipNone,
-                    RotateFlipType.Rotate270FlipNone
-                })
+                if (!hasTime()) break;
+                try
                 {
                     using var rotated = (Bitmap)bmp.Clone();
                     rotated.RotateFlip(rotation);
                     string candidate = OcrBitmapEc(rotated, engine);
-                    if (candidate.Trim().Length > bestText.Trim().Length)
-                        bestText = candidate;
-                    if (bestText.Trim().Length >= 500)
-                        return bestText;
+                    if (EcOcrQuality(candidate) > EcOcrQuality(bestText)) bestText = candidate;
+                    // Strong readable language is evidence of orientation, unlike character count.
+                    if (EcOcrQuality(bestText) >= 200) break;
                 }
-                return bestText;
+                catch (Exception ex) { Debug.WriteLine($"EC OCR orientation: {ex.Message}"); }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"EC OCR page error: {ex.Message}");
-                return "";
-            }
+            return bestText;
         }
 
         private static string OcrBitmapEc(Bitmap bmp, TesseractEngine engine)
@@ -1269,13 +1320,13 @@ namespace InspectionEditor.Services
             // HERS Index
             info.HersIndex = First(text,
                 @"As Designed Home ERI \(HERS\)[:\s]*(\d+)",
-                @"HERS(?:®)?\s*Index Score[:\s]*(\d+)",
+                @"HERS(?:[®°™])?\s*Index Score[:\s]*(\d+)",
                 @"HERS Index Score[:\s]*(\d+)",
                 @"ERI[:\s]+(\d{2,3})(?!\d)");
 
             // Conditioned Floor Area — handles both "... sq ft: 2,218" and "[sq. ft.]: 2,218" formats
             info.ConditionedFloorArea = CleanNum(First(text,
-                @"Conditioned Floor Area\s*\[sq\.?\s*ft\.?\]\s*[:\s]*([\d,]+)",
+                @"Conditioned Floor Area\s*\[sq\.?\s*ft\.?[\]|]\s*[:\s]*([\d,]+)",
                 @"Conditioned Floor Area[:\s]*([\d,]+)\s*sq",
                 @"Conditioned Floor Area[:\s]*([\d,]+)"));
             // Sanity check: a house floor area must be ≥ 500 sq ft
@@ -1288,36 +1339,15 @@ namespace InspectionEditor.Services
 
             // Conditioned Volume — value may be on same line or next line (table extraction)
             info.ConditionedVolume = CleanNum(First(text,
-                @"Conditioned Volume\s*\[cu\.?\s*ft\.?\][^\d\r\n]*\r?\n?\s*([\d,]+)",
-                @"Conditioned Volume[^\d\r\n]*\r?\n?\s*([\d,]+)\s*cu",
-                @"Conditioned Volume[^\d\r\n]*\r?\n?\s*([\d,]+)"));
+                @"Conditioned Volume[ \t]*\[cu\.?[ \t]*ft\.?\][ \t:]*\n?[ \t]*([\d,]+)",
+                @"Conditioned Volume[ \t]*(?:\[cu\.?[ \t]*ft\.?[\]|])?[ \t:]*\n?[ \t]*([\d,]+)\s*cu",
+                @"Conditioned Volume[ \t]*(?:\[cu\.?[ \t]*ft\.?[\]|])?[ \t:]*\n?[ \t]*([\d,]+)"));
 
             // Number of Bedrooms — labeled or bare number above square footage
             info.NumberOfBedrooms = First(text,
                 @"Number of Bedrooms[:\s]*(\d+)",
                 @"Bedrooms?[:\s]+(\d+)",
                 @"(\d+)\s*Bedrooms?");
-
-            // Positional fallback: EC column-format reports show a lone 1-9 digit
-            // on the line immediately above the floor area value.
-            if (info.NumberOfBedrooms == null && info.ConditionedFloorArea != null)
-            {
-                // Find the floor area in the raw text, then scan backwards for a lone small integer
-                var faMatch = Regex.Match(text, Regex.Escape(info.ConditionedFloorArea));
-                if (!faMatch.Success)
-                    faMatch = Regex.Match(text, Regex.Escape(info.ConditionedFloorArea.Replace(",", "")));
-                if (faMatch.Success)
-                {
-                    int lookback = Math.Min(faMatch.Index, 300);
-                    string before = text.Substring(faMatch.Index - lookback, lookback);
-                    // Last lone digit 1-9 in that window (not part of a larger number)
-                    var bdMatch = Regex.Match(before, @"(?<![.\d])([1-9])(?![.\d])\s*$");
-                    if (!bdMatch.Success)
-                        bdMatch = Regex.Match(before, @"(?<![.\d])([1-9])(?![.\d])\s*\n\s*$");
-                    if (bdMatch.Success)
-                        info.NumberOfBedrooms = bdMatch.Groups[1].Value;
-                }
-            }
 
             // Blower Door CFM @ 50 Pa
             // Handles "CFM @ 50 Pa", "CFM at 50 Pa" (Ekotrope detail reports), "CFM50" (IECC label).
@@ -1379,44 +1409,27 @@ namespace InspectionEditor.Services
                 @"#\s*Return Grilles[^\d\r\n]*\r?\n\s*([1-9]\d?)\b",
                 @"Return Grilles[^\d\r\n]*\r?\n\s*([1-9]\d?)\b",
                 // Reversed: value on the line just before "Supply Duct R Value" label
-                @"([1-9]\d?)\s*\r?\n\s*Supply Duct R[\s-]?Value");
-                // NOTE: The former "wide" fuzzy pattern was removed — it caused false matches on
-                // "1" from nearby text in column-by-column PDFs. The multi-capture fallback below
-                // handles the Ekotrope column-by-column layout reliably.
+                @"(?m)^[ \t]*([1-9]\d?)[ \t]*\r?\n[ \t]*Supply Duct R[\s-]?Value");
+                // Unlabeled numeric-block guesses are deliberately excluded: they can
+                // silently borrow unrelated equipment or page numbers.
 
             // Duct R-values — same four strategies.
             // [\s-]? between R and Value handles "R Value" (space), "R-Value" (hyphen), R\u00A0Value (NBSP).
             string? supR = First(text,
-                @"Supply Duct R[\s-]?Value[^\n]*?(\d+)",                  // (a) same line
-                @"Supply Duct R[\s-]?Value[^\d\r\n]*\r?\n\s*(\d+)",       // (b) next line
-                @"(\d+)\s*\r?\n\s*Return Duct R[\s-]?Value",              // (c) reversed
+                @"Supply Duct R[\s-]?Value[ \t:]*R?-?(\d+)",                  // (a) same line
+                @"Supply Duct R[\s-]?Value[ \t:]*\r?\n[ \t]*(\d+)",       // (b) next line
+                @"(?m)^[ \t]*(\d+)[ \t]*\r?\n[ \t]*Return Duct R[\s-]?Value",              // (c) reversed
                 @"Duct Insulation[^\n]*Supply[:\s]*R-?(\d+)",              // IECC label format
                 @"Supply[:\s]+R-?(\d+)");                                  // fallback
             if (supR != null) info.SupplyDuctR = $"R{supR}";
 
             string? retR = First(text,
-                @"Return Duct R[\s-]?Value[^\n]*?(\d+)",                  // (a) same line
-                @"Return Duct R[\s-]?Value[^\d\r\n]*\r?\n\s*(\d+)",       // (b) next line
-                @"(\d+)\s*\r?\n\s*Supply Duct Area",                       // (c) reversed
+                @"Return Duct R[\s-]?Value[ \t:]*R?-?(\d+)",                  // (a) same line
+                @"Return Duct R[\s-]?Value[ \t:]*\r?\n[ \t]*(\d+)",       // (b) next line
+                @"(?m)^[ \t]*(\d+)[ \t]*\r?\n[ \t]*Supply Duct Area",                       // (c) reversed
                 @"Duct Insulation[^\n]*Return[:\s]*R-?(\d+)",              // IECC label format
                 @"Return[:\s]+R-?(\d+)");                                  // fallback
             if (retR != null) info.ReturnDuctR = $"R{retR}";
-
-            // Ekotrope column-by-column fallback: PdfPig extracts labels block then values block.
-            // Values appear in sequence: [floor area (4+ chars with comma)] → [return grilles (1-9)]
-            // → [supply duct R (1-2 digits)] → [return duct R (1-2 digits)] → [duct area (digit…)]
-            if (info.NumberOfReturns == null || info.SupplyDuctR == null || info.ReturnDuctR == null)
-            {
-                var dm = Regex.Match(text,
-                    @"([\d,]{4,})\s*\n+\s*([1-9]\d?)(?!\d)\s*\n+\s*(\d{1,2})(?!\d|\.)\s*\n+\s*(\d{1,2})(?!\d|\.)\s*\n+\s*\d",
-                    RegexOptions.None);
-                if (dm.Success)
-                {
-                    if (info.NumberOfReturns == null) info.NumberOfReturns = dm.Groups[2].Value;
-                    if (info.SupplyDuctR == null)     info.SupplyDuctR = $"R{dm.Groups[3].Value}";
-                    if (info.ReturnDuctR == null)     info.ReturnDuctR = $"R{dm.Groups[4].Value}";
-                }
-            }
 
             // Window U-factor — most common value across all glazing
             // IECC label uses "U-Value: 0.34" rather than "U-factor"
@@ -1429,7 +1442,7 @@ namespace InspectionEditor.Services
             info.WindowUFactor = uVals.FirstOrDefault();
 
             // Window SHGC — most common
-            var shVals = Regex.Matches(text, @"SHGC\s*([\d.]+)", RegexOptions.IgnoreCase)
+            var shVals = Regex.Matches(text, @"SHGC[:\s]*([\d.]+)", RegexOptions.IgnoreCase)
                 .Cast<Match>()
                 .Select(m => m.Groups[1].Value)
                 .Where(v => double.TryParse(v, out double d) && d > 0.01 && d < 1.0)
@@ -1493,11 +1506,6 @@ namespace InspectionEditor.Services
                 string? sThk = InchThickness(text, "Slope");
                 info.SlopedCeilingR = sThk != null ? $"R{slopeNum} {sThk} FOAM" : $"R{slopeNum}";
             }
-            else if (arNum != null)
-            {
-                // All-foam attic — roof deck R covers sloped portion
-                info.SlopedCeilingR = info.AtticRoofR;
-            }
 
             // Vented-attic ceiling (flat, blown/batt) → IEF 8.2
             string? flatNum = First(text,
@@ -1510,8 +1518,6 @@ namespace InspectionEditor.Services
                 @"R-?(\d+)\s+batt");
             if (flatNum != null)
                 info.AtticCeilingR = $"R{flatNum}";
-            else if (info.AtticRoofR == null && slopeNum != null)
-                info.AtticCeilingR = $"R{slopeNum}";
 
             // Exterior wall R — collect ALL wall entries; majority rules for applied value.
             // Also handles IECC label: "Above Grade Walls: R-13"
@@ -1666,23 +1672,42 @@ namespace InspectionEditor.Services
             if (seerValues.Count > 0)
                 info.HvacCoolingSeer = string.Join(" / ", seerValues);
 
-            // HVAC capacity → tonnage → design airflow — multi-unit: sum all cooling capacities.
-            // Priority 1: equipment library name "(34K)" — e.g. "15.2 SEER2 A/C (34K)"
-            // Priority 2: "Cooling Capacity [kBtu/h]  34" — same line or immediately next line
-            var kbtuMatches = Regex.Matches(text, @"\bA/C\s*\((\d+)K\)", RegexOptions.IgnoreCase);
+            // Prefer labeled detail over repeated library/summary equipment names.
+            // Identical unkeyed entries cannot prove additional physical systems; never
+            // sum duplicate summary/detail occurrences into an inflated house total.
+            var kbtuMatches = Regex.Matches(text,
+                @"Cooling Capacity[ \t]*(?:\[kBtu/?h[\]|])?[ \t:]*\n?[ \t]*(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
             if (kbtuMatches.Count == 0)
-                kbtuMatches = Regex.Matches(text, @"Cooling Capacity[^\r\n\d]*\r?\n?\s{0,10}([\d.]+)", RegexOptions.IgnoreCase);
-            double totalKbtu = kbtuMatches.Cast<Match>()
-                .Select(m => double.TryParse(m.Groups[1].Value, out double v) ? v : 0)
-                .Where(v => v > 0)
-                .Sum();
-            if (totalKbtu > 0)
+                kbtuMatches = Regex.Matches(text, @"\bA[/I]C\s*\((\d+(?:\.\d+)?)K\)", RegexOptions.IgnoreCase);
+            // Multiple unkeyed rows may be duplicate pages or separate physical units.
+            // Leave capacity/estimated airflow unresolved instead of summing or collapsing them.
+            if (kbtuMatches.Count == 1 && double.TryParse(kbtuMatches[0].Groups[1].Value,
+                System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
+                out double totalKbtu) && totalKbtu > 0)
             {
+                info.HvacCoolingCapacityKbtu = totalKbtu.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
                 double tons = totalKbtu / 12.0;
-                double[] commonSizes = { 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0 };
-                double rounded = commonSizes.OrderBy(s => Math.Abs(s - tons)).First();
-                info.HvacTonnage      = rounded % 1 == 0 ? ((int)rounded).ToString() : rounded.ToString("0.0");
+                double rounded = Math.Round(tons * 2, MidpointRounding.AwayFromZero) / 2;
+                info.HvacTonnage = FormatOneDecimal(rounded);
                 info.DesignAirflowCfm = ((int)(rounded * 360)).ToString();
+                info.DesignAirflowSource = "EC nominal tonnage × 360 CFM/ton (estimate)";
+            }
+            var coolingFlows = Regex.Matches(text,
+                @"Cooling Flow Rate[ \t]*(?:\[?Cfm\]?)[ \t:]*\n?[ \t]*(\d+(?:\.\d+)?)|Cooling Flow Rate[ \t:]*\n?[ \t]*(\d+(?:\.\d+)?)[ \t]*CFM",
+                RegexOptions.IgnoreCase).Cast<Match>()
+                .Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value)
+                .Where(v => double.TryParse(v, out double f) && f > 0).ToList();
+            if (coolingFlows.Count > 0 && coolingFlows.Count <= 2)
+            {
+                info.DesignAirflowCfm = CleanNum(coolingFlows[0]);
+                info.DesignAirflowCfm2 = coolingFlows.Count == 2 ? CleanNum(coolingFlows[1]) : null;
+                info.DesignAirflowSource = "EC Cooling Flow Rate (explicit CFM)";
+            }
+            else if (coolingFlows.Count > 2)
+            {
+                // More rows than supported unit slots: no reliable unit mapping.
+                info.DesignAirflowCfm = null;
+                info.DesignAirflowSource = null;
             }
         }
 
