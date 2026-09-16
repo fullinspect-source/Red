@@ -23,6 +23,11 @@ namespace InspectionEditor.Services
         public string? DisplayName { get; set; }
         public string? StatusText  { get; set; }
 
+        // Kept separate from EC fields: never fed into code-default calculations.
+        public Dictionary<string, string> TestingTargets { get; } = new();
+        public Dictionary<string, string> TestingTargetSources { get; } = new();
+        public bool HasAvailableTargets => IsLoaded || TestingTargets.Count > 0;
+
         // Summary
         public string? HersIndex { get; set; }
 
@@ -179,9 +184,9 @@ namespace InspectionEditor.Services
             { ("HET", "2.12"),  i => i.EffectiveBlowerDoorCfm },
             { ("HET", "3.1"),   i => i.NumberOfReturns },
             { ("HET", "3.3"),   i => i.EffectiveDuctLeakageCfm },
-            { ("HET", "3.4"),   i => i.EffectiveDuctLeakageCfm },
+            { ("HET", "3.4"),   _ => null },
             { ("HET", "3.5"),   i => i.EffectiveDuctLeakageCfm },
-            { ("HET", "3.6"),   i => i.EffectiveDuctLeakageCfm },
+            { ("HET", "3.6"),   _ => null },
             { ("HET", "5.6"),   i => i.VentFanWatts },
 
             // IEF / HEF
@@ -298,18 +303,35 @@ namespace InspectionEditor.Services
         {
             if (info == null || string.IsNullOrWhiteSpace(itemNum)) return null;
             string normCode = NormalizeCode(inspCode);
+            string? primary = GetEcOnlyValueForItem(info, normCode, itemNum);
+            if (!string.IsNullOrWhiteSpace(primary)) return primary;
+            string? target = TestingTargetsService.Value(info, TestingTargetsService.ItemKey(normCode, itemNum));
+            if (target != null) return target;
             if (Mappings.TryGetValue((normCode, itemNum), out var getter))
-                return getter(info);
+                return info.IsLoaded ? getter(info) : null;
             return EquipmentAirflowDisplayMappings.TryGetValue((normCode, itemNum), out var displayGetter)
                 ? displayGetter(info)
                 : null;
         }
+
+        public static string? GetEcOnlyValueForItem(EnergyComplianceInfo info, string? code, string? number)
+        {
+            if (TestingTargetsService.ItemKey(code, number) is string key)
+                return GetValueForField(info, key);
+            return info.IsLoaded && number != null && Mappings.TryGetValue((NormalizeCode(code), number), out var get) ? get(info) : null;
+        }
+
+        public static string? GetTargetSourceForItem(EnergyComplianceInfo info, string? code, string? number)
+            => !string.IsNullOrWhiteSpace(GetEcOnlyValueForItem(info, code, number)) ? null
+                : TestingTargetsService.Source(info, TestingTargetsService.ItemKey(code, number));
 
         /// Returns a short display label for the EC field mapped to a specific item.
         public static string? GetLabelForItem(string? inspCode, string? itemNum)
         {
             if (string.IsNullOrWhiteSpace(itemNum)) return null;
             string normCode = NormalizeCode(inspCode);
+            if (normCode == "HET" && itemNum == "5.5") return "Fresh Air Target";
+            if (normCode == "HET" && itemNum == "5.7") return "Run Time Target";
             if (Labels.TryGetValue((normCode, itemNum), out var label)) return label;
             return EquipmentAirflowDisplayMappings.ContainsKey((normCode, itemNum)) ? "STRADA airflow" : null;
         }
@@ -317,6 +339,8 @@ namespace InspectionEditor.Services
         public static bool CanApplyToItem(string? inspCode, string? itemNum)
         {
             if (string.IsNullOrWhiteSpace(itemNum)) return false;
+            // These are actual test measurements, not fields to fill from a design target.
+            if (NormalizeCode(inspCode) == "HET" && itemNum is "2.12" or "3.3" or "3.4" or "3.5" or "3.6" or "5.5" or "5.7") return false;
             return Mappings.ContainsKey((NormalizeCode(inspCode), itemNum));
         }
 
@@ -406,7 +430,7 @@ namespace InspectionEditor.Services
         /// Applies the EC value for the given item only. Returns true if the value was set.
         public static bool ApplySingleItem(EnergyComplianceInfo info, Item item, string? inspCode)
         {
-            if (info == null || item == null) return false;
+            if (info == null || item == null || !CanApplyToItem(inspCode, item.Number)) return false;
             string? value = GetValueForItem(info, inspCode, item.Number);
             if (string.IsNullOrWhiteSpace(value)) return false;
             return SetItemValue(item, value);
@@ -470,7 +494,7 @@ namespace InspectionEditor.Services
             int count = 0;
             foreach (var ((code, num), getter) in Mappings)
             {
-                if (code != normCode) continue;
+                if (code != normCode || !CanApplyToItem(code, num)) continue;
                 string? ecValue = getter(info);
                 if (string.IsNullOrWhiteSpace(ecValue)) continue;
                 if (!byNum.TryGetValue(num, out var item)) continue;
@@ -1718,6 +1742,7 @@ namespace InspectionEditor.Services
         private static bool SetItemValue(Item item, string value)
         {
             string ctrl = (item.ControlName ?? "").ToLowerInvariant();
+            if (ctrl is "passfail" or "passfailnani" or "yesno" or "yesnonani") return false;
 
             if (ctrl is "text" or "textnani" or "memo" or "numberpad" or "numberpadnani")
             {

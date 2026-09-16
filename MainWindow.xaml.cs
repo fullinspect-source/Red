@@ -58,6 +58,7 @@ namespace InspectionEditor
         private string _currentClientName = "";
         private SlabEngineeringInfo? _currentSlabInfo;
         private EnergyComplianceInfo? _currentEcInfo;
+        private long _ecExtractionRequestId;
         private FramingDesignInfo? _currentFramingInfo;
         private string? _planPdfPath; // For non-CPP plan types (EC, FFP, Arch, Eng, etc.)
         private bool _designExtractionLoading;
@@ -3087,6 +3088,7 @@ namespace InspectionEditor
 
             _currentSlabInfo = null;
             _currentEcInfo = null;
+            _ecExtractionRequestId++;
             _currentFramingInfo = null;
             _framingExtractionRequestId++;
             _planPdfPath = null;
@@ -3156,6 +3158,12 @@ namespace InspectionEditor
                 if (isEnergyType)
                 {
                     string capturedFilePath = filePath;
+                    var capturedInspection = _currentInspection;
+                    long capturedEcRequestId = _ecExtractionRequestId;
+                    _currentEcInfo = new EnergyComplianceInfo { StatusText = "Loading EC report; showing current Testing Targets where available." };
+                    TestingTargetsService.Refresh(_currentEcInfo, _currentInspection);
+                    RefreshEcDataPanel();
+                    RefreshInlineChecklistForBackgroundData();
                     _designExtractionLoading = true;
                     UpdateDesignExtractionButton();
                     Task.Run(() =>
@@ -3170,7 +3178,7 @@ namespace InspectionEditor
                             {
                                 Dispatcher.Invoke(() =>
                                 {
-                                    if (_currentFilePath == capturedFilePath)
+                                    if (_currentFilePath == capturedFilePath && capturedEcRequestId == _ecExtractionRequestId && ReferenceEquals(capturedInspection, _currentInspection))
                                     {
                                         _designExtractionLoading = false;
                                         UpdateDesignExtractionButton();
@@ -3181,7 +3189,8 @@ namespace InspectionEditor
                             var info = t.Result;
                             Dispatcher.Invoke(() =>
                             {
-                                if (_currentFilePath != capturedFilePath) return;
+                                if (_currentFilePath != capturedFilePath || capturedEcRequestId != _ecExtractionRequestId || !ReferenceEquals(capturedInspection, _currentInspection)) return;
+                                TestingTargetsService.Refresh(info, _currentInspection);
                                 _currentEcInfo = info;
                                 _designExtractionLoading = false;
                                 RefreshEcDataPanel();
@@ -3854,6 +3863,7 @@ namespace InspectionEditor
         private void RefreshEcDataPanel()
         {
             var info = _currentEcInfo;
+            if (info != null) TestingTargetsService.Refresh(info, _currentInspection);
             string currentCode = _currentInspection?.InspectionCode?.ToUpperInvariant() ?? "";
             if (info != null && (currentCode is "IEF" or "HEF"))
                 EquipmentAirflowService.ApplyMatches(info, _currentFilePath, _currentInspection);
@@ -3876,7 +3886,7 @@ namespace InspectionEditor
                 ApplyEcButton.Visibility = Visibility.Collapsed;
             }
 
-            if (info.IsLoaded)
+            if (info.HasAvailableTargets)
             {
                 HideAll();
 
@@ -3893,6 +3903,8 @@ namespace InspectionEditor
                 {
                     bool hasCurrentValue = !string.IsNullOrWhiteSpace(actualValue);
                     string chipText = ecLabel != null ? $"{ecLabel}: {ecValue}" : ecValue;
+                    string? targetSource = EnergyComplianceService.GetTargetSourceForItem(info, inspCode, itemNum);
+                    if (targetSource != null) chipText += $" [Target: {targetSource}]";
                     if (state == EnergyComplianceService.BannerState.Red && hasCurrentValue)
                         chipText += $" (actual: {actualValue})";
                     EcChip_Hers.Foreground = EcDataHeaderBorder.BorderBrush; // match banner border
@@ -5484,7 +5496,7 @@ namespace InspectionEditor
                 BorderBrush = foreground,
                 FontSize = Math.Max(10, _checklistFontSize - 2),
                 FontWeight = assist.State == EnergyComplianceService.BannerState.Red ? FontWeights.Bold : FontWeights.SemiBold,
-                ToolTip = assist.CanApply ? "Tap to use this plan/report value" : assist.ToolTip
+                ToolTip = assist.CanApply ? $"{assist.ToolTip}. Tap to use this value" : assist.ToolTip
             };
             if (assist.CanApply)
                 button.Click += InlineDesignAssistButton_Click;
@@ -5585,8 +5597,20 @@ namespace InspectionEditor
                 }
             }
 
-            if (_currentEcInfo != null && _currentEcInfo.IsLoaded)
+            if (_currentEcInfo != null && _currentEcInfo.HasAvailableTargets)
             {
+                // Current HET targets are measured-value guidance only. Do not route them
+                // through generic field mappings (which may confuse unit 1 and unit 2).
+                if (EnergyComplianceService.NormalizeCode(_currentInspectionCode) == "HET" &&
+                    TestingTargetsService.ItemKey(_currentInspectionCode, item.Number) != null)
+                {
+                    string? target = EnergyComplianceService.GetValueForItem(_currentEcInfo, _currentInspectionCode, item.Number);
+                    if (string.IsNullOrWhiteSpace(target)) return null;
+                    string source = EnergyComplianceService.GetTargetSourceForItem(_currentEcInfo, _currentInspectionCode, item.Number) ?? "EC report";
+                    return new InlineDesignAssist(item, target, $"Target: {target} [{source}]",
+                        EnergyComplianceService.BannerState.Gray, CanApply: false, Source: "testing-target",
+                        ToolTip: $"{source}. Target only; enter the actual field measurement.");
+                }
                 var ecMapping = ExtractionMappingService.Resolve(
                     "EC",
                     _currentInspectionCode,
@@ -5594,7 +5618,7 @@ namespace InspectionEditor
                     section.Name,
                     promptText,
                     item.Number);
-                if (ecMapping != null)
+                if (ecMapping != null && _currentEcInfo.IsLoaded)
                 {
                     string? mappedValue = EnergyComplianceService.GetValueForField(_currentEcInfo, ecMapping.FieldKey);
                     if (!string.IsNullOrWhiteSpace(mappedValue) && ShouldShowInlineEcAssist(item, mappedValue))
@@ -5608,7 +5632,7 @@ namespace InspectionEditor
                             mappedValue,
                             FormatInlineEcAssistText(item, mappedLabel, mappedValue),
                             mappedState,
-                            CanApply: true,
+                            CanApply: !IsInlineStatusOnlyDesignTarget(item) && (EnergyComplianceService.NormalizeCode(_currentInspectionCode) != "HET" || EnergyComplianceService.CanApplyToItem(_currentInspectionCode, item.Number)),
                             Source: "ec",
                             ToolTip: "Energy compliance report value");
                     }
@@ -5624,7 +5648,7 @@ namespace InspectionEditor
                         ecValue,
                         FormatInlineEcAssistText(item, ecLabel, ecValue),
                         ecState,
-                        CanApply: true,
+                        CanApply: !IsInlineStatusOnlyDesignTarget(item) && (EnergyComplianceService.NormalizeCode(_currentInspectionCode) != "HET" || EnergyComplianceService.CanApplyToItem(_currentInspectionCode, item.Number)),
                         Source: "ec",
                         ToolTip: "Energy compliance report value");
                 }
@@ -13845,6 +13869,22 @@ namespace InspectionEditor
             if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
             MarkUnsaved();
             MirrorInlineEdit(item, text, isComment: false);
+            if (_currentEcInfo != null && EnergyComplianceService.NormalizeCode(_currentInspection?.InspectionCode) == "HET" &&
+                item.Number?.StartsWith("1.", StringComparison.Ordinal) == true)
+            {
+                // Rebuild only downstream guidance rows, never the active typing row.
+                // Snapshot reads stay on the UI thread and include unsaved edits/deletions.
+                RefreshEcDataPanel();
+                bool wasLoading = _isLoadingEditor;
+                _isLoadingEditor = true;
+                try
+                {
+                    foreach (var targetItem in _currentInspection!.Sections.SelectMany(s => s.Items)
+                        .Where(i => TestingTargetsService.ItemKey("HET", i.Number) != null).ToList())
+                        RefreshInlineItemRow(targetItem);
+                }
+                finally { _isLoadingEditor = wasLoading; }
+            }
             if (ReferenceEquals(item, _editorLoadedItem) && StatusTextBox.Text != text)
             {
                 bool loading = _isLoadingEditor;

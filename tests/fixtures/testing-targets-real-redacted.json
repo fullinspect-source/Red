@@ -1,0 +1,53 @@
+{
+  "InspectionCode": "HET",
+  "Sections": [
+    {
+      "Number": "1",
+      "Name": "Testing Targets",
+      "Items": [
+        {
+          "Number": "1.1",
+          "Name": "Total Duct Leakage Max. CFM",
+          "Value": "46",
+          "ControlName": "Text"
+        },
+        {
+          "Number": "1.2",
+          "Name": "Total Duct Leakage Max. CFM (unit 2)",
+          "Value": "",
+          "ControlName": "Text"
+        },
+        {
+          "Number": "1.3",
+          "Name": "Blower Door Max. CFM",
+          "Value": "694",
+          "ControlName": "Text"
+        },
+        {
+          "Number": "1.4",
+          "Name": "AC Square Footage",
+          "Value": "1,156",
+          "ControlName": "Text"
+        },
+        {
+          "Number": "1.5",
+          "Name": "AC Volume",
+          "Value": "9,248",
+          "ControlName": "Text"
+        },
+        {
+          "Number": "1.6",
+          "Name": "(HVAC) Target fresh air CFM",
+          "Value": "145.00",
+          "ControlName": "Text"
+        },
+        {
+          "Number": "1.7",
+          "Name": "(HVAC) Target run time",
+          "Value": "6.90",
+          "ControlName": "Text"
+        }
+      ]
+    }
+  ]
+}
