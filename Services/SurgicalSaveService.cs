@@ -17,6 +17,17 @@ namespace InspectionEditor.Services
         private JObject? _originalJson;
         private string? _filePath;
         private byte[]? _lastSavedBytes;
+        private readonly FailedSaveRecoveryService _recovery;
+        private readonly Func<string, string, byte[]?, byte[]> _write;
+
+        public SurgicalSaveService() : this(new FailedSaveRecoveryService(), AtomicInspectionWriter.Write) { }
+
+        internal SurgicalSaveService(FailedSaveRecoveryService recovery,
+            Func<string, string, byte[]?, byte[]>? write = null)
+        {
+            _recovery = recovery;
+            _write = write ?? AtomicInspectionWriter.Write;
+        }
 
         /// <summary>
         /// Loads an .INS file, storing the original JSON for surgical patching.
@@ -107,7 +118,28 @@ namespace InspectionEditor.Services
                 string json = _originalJson.ToString(Formatting.None);
                 bool sameTarget = string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(_filePath!),
                     StringComparison.OrdinalIgnoreCase);
-                byte[] savedBytes = AtomicInspectionWriter.Write(targetPath, json, sameTarget ? _lastSavedBytes : null);
+                byte[] savedBytes;
+                try
+                {
+                    savedBytes = _write(targetPath, json, sameTarget ? _lastSavedBytes : null);
+                }
+                catch (Exception saveError)
+                {
+                    string recoveryMessage;
+                    try
+                    {
+                        string recoveryPath = _recovery.Preserve(json);
+                        recoveryMessage = $"A full local recovery copy of these edits was verified at:\n{recoveryPath}\n" +
+                            "The original save still failed. Keep RED open and retry when the file conflict is resolved. " +
+                            "This recovery copy is not opened automatically.";
+                    }
+                    catch (Exception recoveryError)
+                    {
+                        recoveryMessage = "Local recovery also failed; no verified recovery copy is available. " +
+                            $"Keep RED open with your edits. Recovery error: {recoveryError.Message}";
+                    }
+                    throw new IOException($"{saveError.Message}\n\n{recoveryMessage}", saveError);
+                }
                 _lastSavedBytes = savedBytes;
                 _filePath = targetPath;
             }

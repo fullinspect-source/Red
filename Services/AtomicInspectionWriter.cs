@@ -15,6 +15,8 @@ namespace InspectionEditor.Services
             internal Func<string, byte[]> ReadAllBytes = File.ReadAllBytes;
             internal Action<string, string, string> Replace = File.Replace;
             internal Action<int> Delay = Thread.Sleep;
+            internal Action<string, string> CompleteBackup = File.Move;
+            internal Action<string> DeleteBackup = File.Delete;
         }
 
         // No truncate/copy fallback: an uncertain replacement is always a failed save.
@@ -26,6 +28,9 @@ namespace InspectionEditor.Services
             JObject.Parse(json);
             string target = Path.GetFullPath(path);
             string temp = target + ".red-" + Guid.NewGuid().ToString("N") + ".tmp";
+            // Same directory keeps Replace on one volume. Never reuse a prior save's backup,
+            // which may still be open elsewhere. Keep this name stable across retries.
+            string backup = target + ".red-save-backup-" + Guid.NewGuid().ToString("N");
             byte[] bytes = new UTF8Encoding(false).GetBytes(json);
             int attempts = 0;
             string operation = "write-temp";
@@ -63,8 +68,16 @@ namespace InspectionEditor.Services
                                 operation = "temp-changed";
                                 throw new IOException("Temporary report verification failed.");
                             }
+                            // A failed native replacement may have already produced recovery bytes.
+                            // Do not overwrite or delete that evidence, even if target/temp match.
+                            operation = "verify-backup";
+                            if (File.Exists(backup) || Directory.Exists(backup))
+                            {
+                                operation = "backup-created";
+                                throw new IOException("A backup exists from an uncertain replacement.");
+                            }
                             operation = "replace";
-                            operations.Replace(temp, target, target + ".red-save-backup");
+                            operations.Replace(temp, target, backup);
                             break;
                         }
                         catch (IOException ex)
@@ -84,6 +97,12 @@ namespace InspectionEditor.Services
                     attempts = 1;
                     File.Move(temp, target);
                 }
+                // Outside the retry loop: a consumed temp must never be replaced again.
+                operation = "verify-saved-target";
+                if (!operations.ReadAllBytes(target).SequenceEqual(bytes))
+                    throw new IOException("Saved report verification failed.");
+                if (expectedBytes != null)
+                    CompleteAndTrimBackups(target, backup, operations);
                 return bytes;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
@@ -96,6 +115,7 @@ namespace InspectionEditor.Services
                 {
                     "external-change" => "The report changed outside RED; no replacement was attempted for that version.",
                     "temp-changed" => "The pending save file changed; replacement was stopped.",
+                    "backup-created" => "A recovery backup exists from an uncertain replacement; replacement was stopped.",
                     "verify-target" => "The existing report could not be read safely; replacement was stopped.",
                     "verify-temp" => "The pending save file could not be verified; replacement was stopped.",
                     _ => "Windows could not complete the safe file operation."
@@ -110,6 +130,37 @@ namespace InspectionEditor.Services
             {
                 try { if (File.Exists(temp)) File.Delete(temp); } catch { }
             }
+        }
+
+        private static void CompleteAndTrimBackups(string target, string backup, Operations operations)
+        {
+            // Only this call's confirmed native replacement can promote its backup.
+            // Unmarked/legacy files are recovery evidence, never retention candidates.
+            try
+            {
+                string completed = backup + ".completed";
+                operations.CompleteBackup(backup, completed);
+                File.SetLastWriteTimeUtc(completed, DateTime.UtcNow);
+                string prefix = Path.GetFileName(target) + ".red-save-backup-";
+                const string suffix = ".completed";
+                var candidates = Directory.EnumerateFiles(Path.GetDirectoryName(target)!)
+                    .Where(file => {
+                        string name = Path.GetFileName(file);
+                        return name.StartsWith(prefix, StringComparison.Ordinal) &&
+                            name.EndsWith(suffix, StringComparison.Ordinal) &&
+                            name.Length == prefix.Length + 32 + suffix.Length &&
+                            Guid.TryParseExact(name.Substring(prefix.Length, 32), "N", out _);
+                    })
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .ThenByDescending(file => file == completed)
+                    .ThenBy(file => file, StringComparer.Ordinal)
+                    .Skip(3).ToArray();
+                foreach (string file in candidates)
+                {
+                    try { operations.DeleteBackup(file); } catch { }
+                }
+            }
+            catch { /* Retention is best-effort and cannot turn a verified save into failure. */ }
         }
 
         private static bool IsTransientReplacementFailure(IOException exception)

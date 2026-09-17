@@ -22,8 +22,8 @@ class StartupUpdateCheckStaticTests(unittest.TestCase):
         self.assertIn("force: true, cancellationToken: cancellation.Token", (ROOT / "InspectionPickerWindow.xaml.cs").read_text(encoding="utf-8"))
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.1.32</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-09-16</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.1.33</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-09-17</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

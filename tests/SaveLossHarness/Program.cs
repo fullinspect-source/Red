@@ -30,7 +30,7 @@ try
     Check((string?)disk["Sections"]![0]!["Items"]![0]!["Value"] == "12.5", "close/save sees still-focused value");
     Check(duplicate.Comments == "duplicate comment" && (string?)disk["Sections"]![0]!["Items"]![1]!["Value"] == "duplicate", "duplicate ID is not edit owner");
     Check((int?)disk["UnknownRoot"]!["keep"] == 42 && (string?)disk["Sections"]![0]!["Items"]![0]!["UnknownItem"] == "preserved", "unknown fields preserved");
-    Check(File.ReadAllText(path + ".red-save-backup") == original, "previous report retained in backup");
+    Check(File.ReadAllText(Directory.GetFiles(dir, "report.ins.red-save-backup-*.completed").Single()) == original, "previous report retained in backup");
     Check(!EditorEditService.SetComment(report, first, "typed without blur"), "unchanged capture stays clean");
     EditorEditService.SetComment(report, first, ""); EditorEditService.SetValue(report, first, ""); save.Save(report);
     disk = JObject.Parse(File.ReadAllText(path));
@@ -47,11 +47,15 @@ try
     Throws(() => save.Save(report), "external update blocks overwrite");
     Check(File.ReadAllText(path) == "{\"external\":true}" && first.Comments == "retain after failure", "conflict preserves disk and edits");
     File.WriteAllBytes(path, beforeFailure);
-    // A directory occupying the backup filename forces File.Replace to fail on macOS and Windows.
-    File.Delete(path + ".red-save-backup"); Directory.CreateDirectory(path + ".red-save-backup");
-    Throws(() => save.Save(report), "replacement failure surfaced");
-    Check(File.ReadAllBytes(path).SequenceEqual(beforeFailure), "failed replacement leaves old report byte-identical");
-    Check(!Directory.GetFiles(dir, "*.tmp").Any(), "failed save cleans temporary siblings");
+    // An obstruction at the legacy shared backup name must not block a fresh save.
+    Directory.CreateDirectory(path + ".red-save-backup");
+    save.Save(report);
+    Check((string?)JObject.Parse(File.ReadAllText(path))["Sections"]![0]!["Items"]![0]!["Comments"] == "retain after failure",
+        "legacy backup obstruction no longer blocks save");
+    Check(Directory.Exists(path + ".red-save-backup"), "legacy backup obstruction left untouched");
+    Check(Directory.GetFiles(dir, "report.ins.red-save-backup-*.completed").Any(file => File.ReadAllBytes(file).SequenceEqual(beforeFailure)),
+        "obstructed legacy backup still retains previous report in unique backup");
+    Check(!Directory.GetFiles(dir, "*.tmp").Any(), "successful save cleans temporary siblings");
     Directory.Delete(path + ".red-save-backup");
     save.SetResult(4, 2, "retry result"); save.Save(report);
     disk = JObject.Parse(File.ReadAllText(path));

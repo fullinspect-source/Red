@@ -28,12 +28,14 @@ internal static class AtomicRetryProbe
                 int attempts = 0;
                 var delays = new List<int>();
                 string? temporary = null;
+                var backups = new List<string>();
                 IOException? firstError = null;
                 var operations = new AtomicInspectionWriter.Operations
                 {
                     Replace = (temp, path, backup) =>
                     {
                         temporary = temp;
+                        backups.Add(backup);
                         attempts++;
                         if (attempts <= errors.Length)
                         {
@@ -60,8 +62,10 @@ internal static class AtomicRetryProbe
                 Check(delays.Sum() <= 700 && delays.Count <= 3 && delays.SequenceEqual(new[] { 100, 200, 400 }.Take(delays.Count)), name + " bounded backoff");
                 Check(missingTarget ? !File.Exists(target) : File.ReadAllText(target) == (success ? newJson : finalTarget), name + " target preserved");
                 Check(!Directory.GetFiles(dir, "*.tmp").Any(), name + " temp cleanup");
+                Check(backups.Distinct().Count() == 1 && Path.GetDirectoryName(backups[0]) == dir &&
+                    backups[0] != target + ".red-save-backup", name + " same-directory per-save backup reused only for retries");
                 if (success)
-                    Check(File.ReadAllText(target + ".red-save-backup") == oldJson, name + " original backup");
+                    Check(File.ReadAllText(backups[0] + ".completed") == oldJson, name + " original backup");
                 else
                 {
                     Check(ReferenceEquals(failure!.InnerException, firstError), name + " original exception retained");
@@ -105,12 +109,107 @@ internal static class AtomicRetryProbe
                 IOException? failure = null;
                 try { AtomicInspectionWriter.Write(path, newJson, expected, operations); }
                 catch (IOException ex) { failure = ex; }
-                Check(reads == 2 && waits == 1, "read-lock retry revalidates target");
+                Check(reads == (changed ? 2 : 3) && waits == 1, "read-lock retry revalidates target");
                 Check(replacements == (changed ? 0 : 1), "read-lock no replace before successful validation");
                 Check(File.ReadAllText(path) == (changed ? "external" : newJson), "read-lock target outcome");
                 Check(changed ? failure != null && ReferenceEquals(failure.InnerException, original) && failure.Message.Contains("changed outside RED") : failure == null,
                     "read-lock conflict explanation and original exception");
                 Check(!Directory.GetFiles(dir, "*.tmp").Any(), "read-lock temp cleanup");
+            }
+            string repeated = Path.Combine(dir, "repeated.ins");
+            File.WriteAllText(repeated, oldJson);
+            File.WriteAllText(repeated + ".red-save-backup", "legacy recovery bytes");
+            var savedBackups = new List<string>();
+            var repeatedOperations = new AtomicInspectionWriter.Operations {
+                Replace = (temp, target, backup) => {
+                    savedBackups.Add(backup);
+                    File.Replace(temp, target, backup);
+                }
+            };
+            var firstWritten = AtomicInspectionWriter.Write(repeated, newJson, expected, repeatedOperations);
+            AtomicInspectionWriter.Write(repeated, oldJson, firstWritten, repeatedOperations);
+            Check(savedBackups.Count == 2 && savedBackups.Distinct().Count() == 2, "distinct backup destinations across saves");
+            Check(File.ReadAllText(savedBackups[0] + ".completed") == oldJson && File.ReadAllText(savedBackups[1] + ".completed") == newJson,
+                "both prior versions preserved");
+            Check(File.ReadAllText(repeated + ".red-save-backup") == "legacy recovery bytes", "legacy backup untouched");
+
+            string partial = Path.Combine(dir, "partial-backup.ins");
+            File.WriteAllText(partial, oldJson);
+            int partialAttempts = 0;
+            string? partialBackup = null;
+            IOException? partialFailure = null;
+            var partialOperations = new AtomicInspectionWriter.Operations {
+                Replace = (temp, target, backup) => {
+                    partialAttempts++;
+                    partialBackup = backup;
+                    File.WriteAllText(backup, "partial recovery bytes");
+                    throw Error(1175);
+                },
+                Delay = _ => { }
+            };
+            try { AtomicInspectionWriter.Write(partial, newJson, expected, partialOperations); }
+            catch (IOException ex) { partialFailure = ex; }
+            Check(partialFailure != null && partialAttempts == 1, "partial backup stops further replacement");
+            Check(File.ReadAllText(partialBackup!) == "partial recovery bytes" && File.ReadAllText(partial) == oldJson,
+                "partial backup and target retained on failure");
+
+            // Seed exact-report uncertain evidence and near-match completed names.
+            string uncertain = repeated + ".red-save-backup-" + Guid.NewGuid().ToString("N");
+            string malformed = repeated + ".red-save-backup-not-a-guid.completed";
+            string otherReport = repeated + ".other.red-save-backup-" + Guid.NewGuid().ToString("N") + ".completed";
+            foreach (string evidence in new[] { uncertain, malformed, otherReport })
+                File.WriteAllText(evidence, "untouchable");
+            foreach (string saved in savedBackups)
+                File.SetLastWriteTimeUtc(saved + ".completed", DateTime.UtcNow.AddDays(-1));
+            byte[] current = expected;
+            for (int i = 0; i < 8; i++)
+            {
+                current = AtomicInspectionWriter.Write(repeated, "{\"revision\":" + i + "}", current, repeatedOperations);
+                // Deterministic completion ordering even on coarse timestamp filesystems.
+                File.SetLastWriteTimeUtc(savedBackups.Last() + ".completed", DateTime.UtcNow.AddMinutes(i - 20));
+            }
+            var retained = savedBackups.Where(file => File.Exists(file + ".completed")).ToArray();
+            Check(retained.Length == 3 && retained.SequenceEqual(savedBackups.TakeLast(3)), "only newest three completed backups retained");
+            Check(new[] { uncertain, malformed, otherReport }.All(file => File.ReadAllText(file) == "untouchable"), "uncertain and near-match backups untouched");
+            Check(File.ReadAllText(partialBackup!) == "partial recovery bytes" && !File.Exists(partialBackup + ".completed"), "failed replacement backup remains unmarked");
+            Check(File.ReadAllText(repeated + ".red-save-backup") == "legacy recovery bytes", "legacy survives retention");
+            int deletes = 0;
+            var cleanupFailure = new AtomicInspectionWriter.Operations {
+                DeleteBackup = _ => { deletes++; throw new IOException("cleanup blocked"); }
+            };
+            current = AtomicInspectionWriter.Write(repeated, newJson, current, cleanupFailure);
+            Check(deletes > 0 && File.ReadAllText(repeated) == newJson, "cleanup deletion failure does not fail save");
+            current = AtomicInspectionWriter.Write(repeated, oldJson, current, new AtomicInspectionWriter.Operations {
+                CompleteBackup = (_, _) => throw new IOException("rename blocked")
+            });
+            Check(current.SequenceEqual(expected) && File.ReadAllText(repeated) == oldJson, "completion rename failure does not fail save");
+            string? corruptBackup = null;
+            int corruptAttempts = 0;
+            IOException? corruptFailure = null;
+            try {
+                AtomicInspectionWriter.Write(repeated, newJson, current, new AtomicInspectionWriter.Operations {
+                    Replace = (temp, target, backup) => {
+                        corruptAttempts++; corruptBackup = backup;
+                        File.Replace(temp, target, backup);
+                        File.WriteAllText(target, "corrupted");
+                    }
+                });
+            } catch (IOException ex) { corruptFailure = ex; }
+            Check(corruptFailure != null && corruptAttempts == 1 && File.Exists(corruptBackup) && !File.Exists(corruptBackup + ".completed"),
+                "corrupt saved target fails without marking backup or retrying");
+
+            foreach (int hresult in new[] { unchecked((int)0x80040020), unchecked((int)0x80040497) })
+            {
+                int calls = 0, waits = 0;
+                IOException? failure = null;
+                var operations = new AtomicInspectionWriter.Operations {
+                    Replace = (_, _, _) => { calls++; throw new IOException("wrong facility", hresult); },
+                    Delay = _ => waits++
+                };
+                try { AtomicInspectionWriter.Write(partial, newJson, expected, operations); }
+                catch (IOException ex) { failure = ex; }
+                Check(failure != null && calls == 1 && waits == 0 && File.ReadAllText(partial) == oldJson,
+                    "unrelated HRESULT facility never retried " + hresult);
             }
             Console.WriteLine($"{checks} atomic retry checks passed");
         }
