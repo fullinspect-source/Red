@@ -5032,6 +5032,8 @@ namespace InspectionEditor
                 chips.Children.Add(pressureBalanceChip);
             foreach (var framingChip in CreateInlineFramingDesignAssistChips(item))
                 chips.Children.Add(framingChip);
+            var hetChip = CreateInlineHetMeasuredChip(item);
+            if (hetChip != null) chips.Children.Add(hetChip);
             var designChip = CreateInlineDesignAssistChip(section, item);
             if (designChip != null)
                 chips.Children.Add(designChip);
@@ -5497,6 +5499,48 @@ namespace InspectionEditor
                 button.Click += InlineDesignAssistButton_Click;
                 yield return button;
             }
+        }
+
+        private UIElement? CreateInlineHetMeasuredChip(Item item)
+        {
+            var proposal = HetMeasuredTransferService.Resolve(_currentFilePath, _currentInspection, item);
+            if (proposal == null) return null;
+            var button = new Button
+            {
+                Content = proposal.CanApply ? (proposal.Source == "Current AFI calculation" ? $"Calculate: {proposal.Value}%" : $"{(proposal.Detail.Contains("WARNING") ? "⚠ " : "")}Copy HET: {proposal.Value}") : "HET: review / refresh",
+                ToolTip = proposal.Source + "\n" + proposal.Detail,
+                Padding = new Thickness(7, 2, 7, 2), Margin = new Thickness(3, 0, 0, 3),
+                Background = new SolidColorBrush(Color.FromRgb(255, 237, 213)),
+                Foreground = Brushes.Black, FontSize = Math.Max(10, _checklistFontSize - 2)
+            };
+            button.Click += (_, e) =>
+            {
+                e.Handled = true;
+                if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
+                var fresh = HetMeasuredTransferService.Resolve(_currentFilePath, _currentInspection, item);
+                if (fresh == null || !fresh.CanApply)
+                {
+                    MessageBox.Show(fresh?.Detail ?? "Target changed.", "Local HET transfer", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    PopulateTreeView(SearchFilterBox.Text); return;
+                }
+                // The displayed source, value, and all relevant calculation inputs must still agree.
+                if (fresh != proposal)
+                {
+                    MessageBox.Show("HET or calculation inputs changed. Review the refreshed value and click again.", "Local HET transfer", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    PopulateTreeView(SearchFilterBox.Text); return;
+                }
+                string oldValue = item.Value?.ToString() ?? "";
+                if (MessageBox.Show($"Source: {fresh.Source}\n{fresh.Detail}\n\nReplace current value '{oldValue}' with '{fresh.Value}'?",
+                    "Confirm measured HET transfer", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                var confirmed = HetMeasuredTransferService.Resolve(_currentFilePath, _currentInspection, item);
+                if (confirmed != fresh || (item.Value?.ToString() ?? "") != oldValue || _readOnlyMode || !EditorEditService.Owns(_currentInspection, item))
+                {
+                    MessageBox.Show("Source or target changed during confirmation. Nothing copied. Review and retry.", "Local HET transfer");
+                    PopulateTreeView(SearchFilterBox.Text); return;
+                }
+                SetInlineItemValue(item, fresh.Value!);
+            };
+            return button;
         }
 
         private UIElement? CreateInlineDesignAssistChip(Section section, Item item)
@@ -13765,6 +13809,18 @@ namespace InspectionEditor
             if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
             MarkUnsaved();
             MirrorInlineEdit(item, text, isComment: false);
+            if (_currentInspection?.InspectionCode == "AFI" && item.Number is "1.5" or "1.6" or "1.7")
+            {
+                bool wasLoading = _isLoadingEditor;
+                _isLoadingEditor = true;
+                try
+                {
+                    foreach (var calculatedRow in _currentInspection.Sections.SelectMany(s => s.Items)
+                        .Where(i => i.Number == "1.8" && HetMeasuredTransferService.IsTarget(_currentInspection, i)).ToList())
+                        RefreshInlineItemRow(calculatedRow);
+                }
+                finally { _isLoadingEditor = wasLoading; }
+            }
             // Hide/show the reserved requirement marker without rebuilding the active editor.
             if (_inlineItemRows.TryGetValue(item, out var requiredRow))
                 foreach (var marker in FindVisualChildren<Border>(requiredRow.Row))

@@ -1,0 +1,45 @@
+using Newtonsoft.Json;
+using InspectionEditor.Models;
+using InspectionEditor.Services;
+using S = InspectionEditor.Services.HetMeasuredTransferService;
+int count=0;
+void Check(bool ok,string label) {if(!ok)throw new Exception(label);count++;}
+var t=JsonConvert.DeserializeObject<InspectionFile>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"AFI.json")))!;
+var h=JsonConvert.DeserializeObject<InspectionFile>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"HET.json")))!;
+string dir=Path.Combine(Path.GetTempPath(),"het-test-"+Guid.NewGuid());Directory.CreateDirectory(dir);
+string tp=Path.Combine(dir,"2610469-AFI-1-TF.ins"),hp=Path.Combine(dir,"2610469-HET-1-TF.ins");
+Item T(string n)=>t.Sections.SelectMany(s=>s.Items).Single(i=>i.Number==n);
+Item H(string n)=>h.Sections.SelectMany(s=>s.Items).Single(i=>i.Number==n);
+void Save()=>File.WriteAllText(hp,JsonConvert.SerializeObject(h));
+S.Proposal? P(string n)=>S.Resolve(tp,t,T(n));
+try {
+Save();var bytes=File.ReadAllBytes(hp);
+Check(P("1.6")?.Value=="88","actual composite");Check(P("1.7")?.Value=="NI","NI unit2");
+Check(P("1.8")?.Value=="7.61","current measurement / CFA");
+Check(P("1.9") is {Value:"Pass"} p && p.Detail.Contains("WARNING") && p.Detail.Contains("outside"),"conflict retains recorded pass");
+Check(bytes.SequenceEqual(File.ReadAllBytes(hp)),"read only");
+foreach(var raw in new string?[]{null,"","-1","NaN","of 46","FAIL","46 FAILS","1,2"}) Check(S.Measurement(raw)==null,"reject "+raw);
+Check(S.Measurement("0")=="0","zero");Check(S.Measurement("40 of46")=="40","composite spacing");
+var before=P("1.6");H("3.3").Value="77";Save();Check(P("1.6")!=before && P("1.6")?.Value=="77","fresh source");
+H("3.4").Value="22";Save();Check(P("1.7")?.Value=="22","unit2 independent");Check(P("1.8")?.CanApply==false,"multi system blocked");H("3.4").Value="NI";Save();
+T("1.6").Value="0";Check(P("1.8")?.Value=="0","zero percent");T("1.6").Value="-1";Check(P("1.8")?.CanApply==false,"negative cfm");T("1.6").Value="88";
+foreach(string area in new[]{"0","-4","NI","","46 of 1156"}){T("1.5").Value=area;Check(P("1.8")?.CanApply==false,"bad denominator "+area);}T("1.5").Value="1,156";
+string other=Path.Combine(dir,"2610469-HET-2-TF.ins");File.Copy(hp,other);Check(P("1.6")?.CanApply==false,"ambiguous source");File.Delete(other);
+h.InspectionNumber="9999999-HET-1-TF";Save();Check(P("1.6")?.CanApply==false,"metadata mismatch");h.InspectionNumber="2610469-HET-1-TF";Save();
+t.Address="A";h.Address="B";Save();Check(P("1.6")?.CanApply==false,"address mismatch");h.Address="A";Save();
+var pct=new Item{Number="3.9",Name="Total duct leakage percentage",Value="0%"};h.Sections.Last().Items.Add(pct);Save();Check(P("1.8")?.Value=="0","explicit percent zero");pct.Value="-3%";Save();Check(P("1.8")?.Value=="7.61","invalid explicit falls back");pct.Value=null;Save();Check(P("1.8")?.Value=="7.61","nil explicit falls back");h.Sections.Last().Items.Remove(pct);Save();
+var prior=P("1.8");T("1.6").Value="100";Check(P("1.8")!=prior,"changed calculation inputs");T("1.6").Value="88";
+T("1.7").Value="";Check(P("1.8")?.Value=="7.61","source NI confirms unit2");T("1.7").Value="NI";
+File.Delete(hp);Check(P("1.8") is {Value:"7.61",Source:"Current AFI calculation"},"calculation without HET");Check(P("1.6")?.CanApply==false,"missing source");Save();
+Check(S.Resolve(tp,t,new Item{Number="1.6",Name=T("1.6").Name})==null,"detached target rejected");
+h.Sections.Last().Name="Other";Save();Check(P("1.6")?.CanApply==false,"wrong source section");h.Sections.Last().Name="Duct System Test";Save();
+foreach(string bad in new[]{"null","{}","{\"Sections\":null}","{\"Sections\":[null]}","{\"Sections\":[{\"Items\":null}]}","{\"Sections\":[{\"Items\":[null]}]}","invalid json"}) {File.WriteAllText(hp,bad);Check(P("1.6")?.CanApply==false,"malformed source "+bad);}Save();
+string active=Path.Combine(dir,"MyList"),review=Path.Combine(dir,"Review"),archive=Path.Combine(dir,"Archive");
+Directory.CreateDirectory(active);Directory.CreateDirectory(review);Directory.CreateDirectory(archive);
+string activePath=Path.Combine(active,Path.GetFileName(tp)),reviewPath=Path.Combine(review,Path.GetFileName(hp));
+File.Copy(hp,reviewPath);Check(S.Resolve(activePath,t,T("1.6")) is {Value:"77"} rp && rp.Source.StartsWith("Review/"),"completed HET Review fallback");
+File.Copy(hp,Path.Combine(review,"2610469-HET-2-TF.ins"));Check(S.Resolve(activePath,t,T("1.6"))?.CanApply==false,"ambiguous Review blocked");File.Delete(Path.Combine(review,"2610469-HET-2-TF.ins"));
+File.Move(reviewPath,Path.Combine(archive,Path.GetFileName(hp)));Check(S.Resolve(activePath,t,T("1.6"))?.CanApply==false,"Archive not silently copied");
+T("1.6").Name="Wrong";Check(P("1.6")==null,"wrong target prompt");
+Console.WriteLine($"PASS {count} measured HET production-service assertions");
+} finally {Directory.Delete(dir,true);}

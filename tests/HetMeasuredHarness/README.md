@@ -1,0 +1,7 @@
+# Measured HET transfer verification
+Run `DOTNET_ROLL_FORWARD=Major dotnet run --project tests/HetMeasuredHarness` on this Mac (only .NET 10 runtime installed).
+Fixtures retain only report schema, identifiers and relevant values from local MyList 2610469 HET/AFI; no photos, contact data or fees.
+AFI form 215, section Evaluation of the total duct leakage, is the screenshot target. HET form 196 Duct System Test is the source.
+AFI 1.8 uses current 1.6 / current 1.5 * 100, normalized CFM25 per 100 square feet, not fan-airflow percentage. Basis: existing EnergyComplianceService.DuctLeakageDerivedCfm (area * .04), AFI adjacent CFA prompt, and ENERGY STAR HVAC Quality Installation Guidebook: https://www.energystar.gov/ia/partners/bldrs_lenders_raters/downloads/ENERGY_STAR_V3_HVAC_Quality_Installation_Guidebook.pdf . No pass/fail threshold is inferred. Multi-system calculation blocks absent allocated floor area; NI establishes single-system scope. Explicit valid HET percentage takes precedence.
+Current fixture produces 88, NI, 7.61, and recorded Pass with conflict warning. Outside result 40 of 46 may explain HET Pass; it must not be called an independently valid AFI total-leakage pass.
+UI buttons require confirmation, re-read local source both before and after confirmation, and never mutate source files. Calculation inputs refresh only downstream row 1.8 while typing. Native Windows layout/touch/dialog behavior remains unverified on macOS.

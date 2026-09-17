@@ -1,0 +1,68 @@
+{
+  "FormId": 215,
+  "InspectionCode": "AFI",
+  "InspectionNumber": "2610469-AFI-1-TF",
+  "JobNumber": "2610469",
+  "Sections": [
+    {
+      "Number": "1",
+      "Name": "Evaluation of the total duct leakage",
+      "Items": [
+        {
+          "Number": "1.1",
+          "Name": "System entirely in conditioned space volume",
+          "ControlName": "YesNo",
+          "Value": "No"
+        },
+        {
+          "Number": "1.2",
+          "Name": "Was total duct leakage test exemption taken",
+          "ControlName": "YesNo",
+          "Value": "Yes"
+        },
+        {
+          "Number": "1.3",
+          "Name": "Did test take place at final inspection",
+          "ControlName": "YesNo",
+          "Value": "Yes"
+        },
+        {
+          "Number": "1.4",
+          "Name": "Enter number of returns",
+          "ControlName": "TextNaNi",
+          "Value": "4"
+        },
+        {
+          "Number": "1.5",
+          "Name": "Enter conditioned floor area",
+          "ControlName": "Text",
+          "Value": "1,156"
+        },
+        {
+          "Number": "1.6",
+          "Name": "Enter the total duct leakage of the system (CFM) - Unit 1",
+          "ControlName": "TextNaNi",
+          "Value": "88 of 46 FAILS"
+        },
+        {
+          "Number": "1.7",
+          "Name": "Enter the total duct leakage of the system (CFM) - Unit 2",
+          "ControlName": "TextNaNi",
+          "Value": "NI"
+        },
+        {
+          "Number": "1.8",
+          "Name": "Enter the total duct leakage percentage",
+          "ControlName": "Text",
+          "Value": "fail"
+        },
+        {
+          "Number": "1.9",
+          "Name": "Total duct leakage pass/fail",
+          "ControlName": "PassFailNaNi",
+          "Value": "Fail"
+        }
+      ]
+    }
+  ]
+}
