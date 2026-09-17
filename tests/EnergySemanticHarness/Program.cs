@@ -49,4 +49,23 @@ Check(EnergySemanticMappingService.Resolve(partial,"IEF",wh,Row("Gas/Electric"))
 Check(new EnergyComplianceInfo { WindowUFactor="0.30" }.HasAvailableTargets,"partial window available");
 Check(EnergySemanticMappingService.Resolve(info,"IEF",condenser,Row("Unit: Serial Number (unit 3)"))==null,"unknown unit rejected");
 Check(EnergySemanticMappingService.Resolve(info,"IEF",new Section{Name="High Performance Fenestration"},Row("Type"))==null,"no fabricated compliance path");
+Check(!EnergySemanticMappingService.IsDesignMismatch(new("WINDOWUFACTOR", "0.30", "U", "", "EC report", true), ".3"), "leading decimal alias");
+// The linked production resolver and comparison method drive these regressions.
+var designPipe = Row("Hot water piping insulation R-value", "9.1", "LookupNANI");
+designPipe.Value = "NI";
+var pipeDesign = EnergySemanticMappingService.Resolve(info, "IER", null, designPipe);
+Check(EnergySemanticMappingService.IsDesignMismatch(pipeDesign, "NI"), "NI vs concrete R3 must be pink");
+Check(EnergySemanticMappingService.IsDesignMismatch(pipeDesign, "R2"), "R2 vs R3 must be pink");
+foreach (var equal in new[] { "R3", "R-3", " r 3 ", "R3.0", "3" })
+ Check(!EnergySemanticMappingService.IsDesignMismatch(pipeDesign, equal), "equivalent R value: " + equal);
+Check(!EnergySemanticMappingService.IsDesignMismatch(null, "NI"), "no reference stays normal");
+Check(!EnergySemanticMappingService.IsDesignMismatch(pipeDesign, ""), "blank stays normal");
+Check(!EnergySemanticMappingService.IsDesignMismatch(EnergySemanticMappingService.Resolve(new EnergyComplianceInfo(), "IER", null, designPipe), "NI"), "missing extraction stays normal");
+Check(!EnergySemanticMappingService.IsDesignMismatch(EnergySemanticMappingService.Resolve(info, "IER", null, Row("Unrelated field", "9.1")), "NI"), "position cannot imply mapping");
+Check(!EnergySemanticMappingService.IsDesignMismatch(EnergySemanticMappingService.Resolve(info, "HET", null, actual), "500"), "measured value below max is not equality mismatch");
+Check(designPipe.Value?.ToString() == "NI", "comparison never changes answer");
+Check(!EnergySemanticMappingService.IsDesignMismatch(pipeDesign! with { FieldKey="CONDITIONEDFLOORAREA", Units="ft²", Value="2,316" }, "2316"), "numeric grouping");
+Check(!EnergySemanticMappingService.IsDesignMismatch(pipeDesign! with { FieldKey="HVACCOOLINGSEER", Units="", Value="15 SEER2" }, "15.0 SEER2"), "numeric SEER precision");
+Check(EnergySemanticMappingService.IsDesignMismatch(pipeDesign! with { FieldKey="HVACCOOLINGSEER", Units="", Value="15 SEER2" }, "15 SEER"), "units must remain distinct");
+Check(!EnergySemanticMappingService.IsDesignMismatch(pipeDesign! with { Value="N/A" }, "NI"), "placeholder is not concrete design");
 Console.WriteLine($"PASS {tests} assertions; {templates.Count} real templates; {resolvedCount} resolved rows; codes {string.Join(',',templates.Select(t=>t.InspectionCode).Distinct())}");

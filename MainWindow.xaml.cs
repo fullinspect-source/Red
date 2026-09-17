@@ -3585,10 +3585,13 @@ namespace InspectionEditor
         /// Shows the 🧹 clear button when the current item has design data (slab or EC) AND a value to clear.
         private void RefreshInlineChecklistForBackgroundData()
         {
-            if (!_inlineEditorMode || _currentInspection == null)
-                return;
-
-            PopulateInlineChecklist(SearchFilterBox.Text);
+            if (_currentInspection == null) return;
+            if (_inlineEditorMode) PopulateInlineChecklist(SearchFilterBox.Text);
+            else
+            {
+                PopulateTreeView(SearchFilterBox.Text);
+                if (_currentItem != null) LoadStatusControls(_currentItem);
+            }
         }
 
         private void UpdateClearButton()
@@ -3865,12 +3868,12 @@ namespace InspectionEditor
         // EC (Energy Compliance) banner
         // ---------------------------------------------------------------
 
-        private void RefreshEcDataPanel()
+        private void RefreshEcDataPanel(bool refreshSources = true)
         {
             var info = _currentEcInfo;
-            if (info != null) TestingTargetsService.Refresh(info, _currentInspection);
+            if (refreshSources && info != null) TestingTargetsService.Refresh(info, _currentInspection);
             string currentCode = _currentInspection?.InspectionCode?.ToUpperInvariant() ?? "";
-            if (info != null && (currentCode is "IEF" or "HEF"))
+            if (refreshSources && info != null && (currentCode is "IEF" or "HEF"))
                 EquipmentAirflowService.ApplyMatches(info, _currentFilePath, _currentInspection);
 
             // Show banner whenever we have an EC info object — even if data extraction failed,
@@ -3900,8 +3903,23 @@ namespace InspectionEditor
                 string? ecValue = resolved?.Value;
                 string? ecLabel = resolved?.Label;
                 string? actualValue = _currentItem?.Value?.ToString()?.Trim();
-                var state = EnergyComplianceService.BannerState.Gray;
+                var state = EnergySemanticMappingService.IsDesignMismatch(resolved, actualValue)
+                    ? EnergyComplianceService.BannerState.Red : EnergyComplianceService.BannerState.Gray;
                 ApplyEcBannerColors(state);
+                if (_currentItem != null)
+                {
+                    UpdateCurrentItemBadgeColor();
+                    foreach (var button in FindVisualChildren<ToggleButton>(StatusBorder))
+                        if (button.Tag is string option)
+                        {
+                            var appearance = CreateStatusButton(option, actualValue ?? "");
+                            button.Background = appearance.Background;
+                            button.BorderBrush = appearance.BorderBrush;
+                            button.Foreground = appearance.Foreground;
+                        }
+                    NiValueButton.Background = state == EnergyComplianceService.BannerState.Red && actualValue?.Equals("NI", StringComparison.OrdinalIgnoreCase) == true
+                        ? EcMismatchBrush : new SolidColorBrush(Color.FromRgb(235, 235, 235));
+                }
 
                 if (ecValue != null)
                 {
@@ -3946,16 +3964,11 @@ namespace InspectionEditor
                 EnergyComplianceService.BannerState.Red   => ("#FFEBEE", "#EF5350"),
                 _                                          => ("#F5F5F5", "#BDBDBD"),
             };
-            bool flashRed = state == EnergyComplianceService.BannerState.Red
-                            && _ecBannerState != EnergyComplianceService.BannerState.Red;
             _ecBannerState = state;
-            if (flashRed)
-                FlashBannerRed(EcDataHeaderBorder, bg, border);
-            else
-            {
-                EcDataHeaderBorder.Background  = new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg));
-                EcDataHeaderBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(border));
-            }
+            EcDataHeaderBorder.Background = state == EnergyComplianceService.BannerState.Red
+                ? EcMismatchBrush : new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg));
+            EcDataHeaderBorder.BorderBrush = state == EnergyComplianceService.BannerState.Red
+                ? Brushes.White : new SolidColorBrush((Color)ColorConverter.ConvertFromString(border));
         }
 
         /// Strobes the given Border 5 times red/white then settles on red — catches attention on mismatch.
@@ -4979,6 +4992,7 @@ namespace InspectionEditor
                 hasHeaderValue ? GetStatusBrush(item) : InlineEmptyNumberBadgeBrush,
                 hasHeaderValue ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85)),
                 FontWeights.Bold);
+            numberBadge.Name = "InlineNumberBadge";
             numberBadge.Margin = new Thickness(0, 8, 8, 8);
             numberBadge.HorizontalAlignment = HorizontalAlignment.Left;
             Grid.SetColumn(numberBadge, 3);
@@ -5315,7 +5329,7 @@ namespace InspectionEditor
                         Tag = new InlineValueAction(item, option),
                         Padding = new Thickness(9, 5, 9, 5),
                         Margin = new Thickness(0, 0, 5, 0),
-                        Background = selected ? GetStatusBrushForValue(option) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                        Background = selected ? GetStatusBrush(item) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
                         Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42)),
                         BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                         FontSize = Math.Max(11, _checklistFontSize - 1),
@@ -5415,7 +5429,7 @@ namespace InspectionEditor
                 MinHeight = 34,
                 Padding = new Thickness(9, 5, 9, 5),
                 Margin = new Thickness(0, 0, 5, 0),
-                Background = selected ? GetStatusBrushForValue("NI") : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                Background = selected ? GetStatusBrush(item) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
                 Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                 FontSize = Math.Max(11, _checklistFontSize - 1),
@@ -5699,7 +5713,8 @@ namespace InspectionEditor
                 if (resolved != null)
                     return new InlineDesignAssist(item, resolved.Value,
                         $"{resolved.Label}: {resolved.Value} [{resolved.Source}]",
-                        EnergyComplianceService.BannerState.Gray, CanApply: resolved.CanApply,
+                        EnergySemanticMappingService.IsDesignMismatch(resolved, actualValue)
+                            ? EnergyComplianceService.BannerState.Red : EnergyComplianceService.BannerState.Gray, CanApply: resolved.CanApply,
                         Source: "ec", ToolTip: resolved.CanApply
                             ? $"{resolved.Source}; {resolved.Units}"
                             : $"{resolved.Source}; reference only, not an answer to copy.");
@@ -6014,7 +6029,7 @@ namespace InspectionEditor
                         Tag = new InlineValueAction(item, option),
                         Padding = new Thickness(12, 7, 12, 7),
                         Margin = new Thickness(0, 0, 6, 6),
-                        Background = selected ? GetStatusBrushForValue(option) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                        Background = selected ? GetStatusBrush(item) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
                         Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42)),
                         BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                         FontSize = _checklistFontSize,
@@ -6089,7 +6104,7 @@ namespace InspectionEditor
                     Tag = new InlineValueAction(item, option),
                     Padding = new Thickness(10, 5, 10, 5),
                     Margin = new Thickness(0, 0, 6, 0),
-                    Background = selected ? GetStatusBrushForValue(option) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                    Background = selected ? GetStatusBrush(item) : new SolidColorBrush(Color.FromRgb(241, 245, 249)),
                     Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42)),
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                     FontSize = Math.Max(11, _checklistFontSize - 1),
@@ -7480,7 +7495,52 @@ namespace InspectionEditor
             };
         }
 
-        private Brush GetStatusBrush(Item item) => GetStatusBrushForValue(item.Value?.ToString() ?? "");
+        private static readonly Brush EcMismatchBrush = new SolidColorBrush(Color.FromRgb(255, 77, 196));
+
+        // Recolor in place while typing, preserving keyboard focus and caret.
+        private void RefreshEcMismatchVisuals(Item item)
+        {
+            if (_inlineItemRows.TryGetValue(item, out var entry))
+            {
+                foreach (var badge in FindVisualChildren<Border>(entry.Row))
+                    if (badge.Name == "InlineNumberBadge")
+                    {
+                        bool hasValue = !string.IsNullOrWhiteSpace(item.Value?.ToString());
+                        badge.Background = hasValue ? GetStatusBrush(item) : InlineEmptyNumberBadgeBrush;
+                        if (badge.Child is TextBlock label)
+                            label.Foreground = hasValue ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85));
+                    }
+                foreach (var button in FindVisualChildren<Button>(entry.Row))
+                {
+                    if (button.Tag is InlineValueAction action && ReferenceEquals(action.Item, item))
+                    {
+                        bool selected = string.Equals(action.Value, item.Value?.ToString(), StringComparison.OrdinalIgnoreCase);
+                        button.Background = selected ? GetStatusBrush(item) : new SolidColorBrush(Color.FromRgb(241, 245, 249));
+                        button.Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                    }
+                    else if (button.Tag is InlineDesignAssist assist && assist.Source == "ec")
+                    {
+                        bool mismatch = HasEcDesignMismatch(item);
+                        button.Background = mismatch ? EcMismatchBrush : new SolidColorBrush(Color.FromRgb(241, 245, 249));
+                        button.Foreground = mismatch ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85));
+                        button.BorderBrush = button.Foreground;
+                        button.FontWeight = mismatch ? FontWeights.Bold : FontWeights.SemiBold;
+                    }
+                }
+            }
+            if (ReferenceEquals(item, _currentItem)) UpdateCurrentItemBadgeColor();
+        }
+
+        private bool HasEcDesignMismatch(Item item)
+        {
+            if (_currentEcInfo == null) return false;
+            var section = _currentInspection?.Sections.FirstOrDefault(s => s.Items.Contains(item));
+            var resolved = EnergySemanticMappingService.Resolve(_currentEcInfo, _currentInspectionCode, section, item);
+            return EnergySemanticMappingService.IsDesignMismatch(resolved, item.Value?.ToString());
+        }
+
+        private Brush GetStatusBrush(Item item) => HasEcDesignMismatch(item)
+            ? EcMismatchBrush : GetStatusBrushForValue(item.Value?.ToString() ?? "");
 
         private Brush GetStatusBrushForValue(string value)
         {
@@ -10081,7 +10141,12 @@ namespace InspectionEditor
                             string valueStr = item.Value.ToString()?.ToLower() ?? "";
                             bool hasValue = !string.IsNullOrWhiteSpace(valueStr);
                             
-                            if (valueStr.Contains("pass") || valueStr == "yes" || valueStr == "✓" || valueStr == "ok")
+                            if (HasEcDesignMismatch(item))
+                            {
+                                numberBorder.Background = EcMismatchBrush;
+                                numberText.Foreground = Brushes.White;
+                            }
+                            else if (valueStr.Contains("pass") || valueStr == "yes" || valueStr == "✓" || valueStr == "ok")
                             {
                                 numberBorder.Background = new SolidColorBrush(Color.FromRgb(144, 238, 144)); // Light green
                                 numberText.Foreground = new SolidColorBrush(Color.FromRgb(0, 80, 0)); // Dark green text
@@ -11639,6 +11704,12 @@ namespace InspectionEditor
                 }
             }
 
+            if (isSelected && _currentItem != null && HasEcDesignMismatch(_currentItem))
+            {
+                btn.Background = EcMismatchBrush;
+                btn.BorderBrush = EcMismatchBrush;
+                btn.Foreground = Brushes.White;
+            }
             btn.Click += StatusButton_Click;
             return btn;
         }
@@ -12015,7 +12086,12 @@ namespace InspectionEditor
                     string valueStr = _currentItem.Value?.ToString()?.ToLower() ?? "";
                     bool hasValue = !string.IsNullOrWhiteSpace(valueStr);
                     
-                    if (valueStr.Contains("pass") || valueStr == "yes" || valueStr == "✓" || valueStr == "ok")
+                    if (HasEcDesignMismatch(_currentItem))
+                    {
+                        numberBorder.Background = EcMismatchBrush;
+                        numberText.Foreground = Brushes.White;
+                    }
+                    else if (valueStr.Contains("pass") || valueStr == "yes" || valueStr == "✓" || valueStr == "ok")
                     {
                         numberBorder.Background = new SolidColorBrush(Color.FromRgb(144, 238, 144));
                         numberText.Foreground = new SolidColorBrush(Color.FromRgb(0, 80, 0));
@@ -13826,6 +13902,8 @@ namespace InspectionEditor
             if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
             MarkUnsaved();
             MirrorInlineEdit(item, text, isComment: false);
+            RefreshEcMismatchVisuals(item);
+            if (ReferenceEquals(item, _currentItem)) RefreshEcDataPanel(refreshSources: false);
             if (_currentInspection?.InspectionCode == "AFI" && item.Number is "1.5" or "1.6" or "1.7")
             {
                 bool wasLoading = _isLoadingEditor;

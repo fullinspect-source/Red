@@ -10,6 +10,35 @@ namespace InspectionEditor.Services
     public static class EnergySemanticMappingService
     {
         public sealed record ResolvedValue(string FieldKey, string Value, string Label, string Units, string Source, bool CanApply);
+        /// <summary>Design-answer disagreement only; measured/reference-only rows are not equality tests.</summary>
+        public static bool IsDesignMismatch(ResolvedValue? resolved, string? actual)
+        {
+            if (resolved?.CanApply != true || string.IsNullOrWhiteSpace(actual) ||
+                string.IsNullOrWhiteSpace(resolved.Value)) return false;
+            string expected = NormalizeAnswer(resolved.Value);
+            if (expected is "" or "NI" or "NA" or "N/A" or "UNKNOWN" or "NOT AVAILABLE") return false;
+            bool numeric = resolved.Units is "R-value" or "ft²" or "ft³" or "CFM" or "CFM25" or "CFM50" ||
+                resolved.FieldKey is "WINDOWUFACTOR" or "WINDOWSHGC" or "NUMBEROFBEDROOMS" or "NUMBEROFRETURNS" or "HVACCOOLINGSEER" or "WATERHEATERCAPACITY";
+            if (numeric)
+            {
+                var a = Regex.Match(NormalizeAnswer(actual), @"^(R)?((?:[0-9][0-9,]*(?:\.[0-9]+)?|\.[0-9]+))(.*)$");
+                var d = Regex.Match(expected, @"^(R)?((?:[0-9][0-9,]*(?:\.[0-9]+)?|\.[0-9]+))(.*)$");
+                if (a.Success && d.Success && (resolved.Units == "R-value" || a.Groups[1].Value == d.Groups[1].Value) &&
+                    a.Groups[3].Value.Trim() == d.Groups[3].Value.Trim() &&
+                    decimal.TryParse(a.Groups[2].Value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var av) &&
+                    decimal.TryParse(d.Groups[2].Value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var dv))
+                    return av != dv;
+            }
+            return NormalizeAnswer(actual) != expected;
+        }
+
+        private static string NormalizeAnswer(string value)
+        {
+            string normalized = Regex.Replace(value.Trim().ToUpperInvariant(), @"\s+", " ");
+            // Preserve units and punctuation generally; only R-value notation has this alias.
+            return Regex.Replace(normalized, @"^R\s*-?\s*(\d+(?:\.\d+)?)$", "R$1");
+        }
+
         private static string N(string? value) => Regex.Replace((value ?? "").ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
         private static bool Is(string value, params string[] aliases) => aliases.Any(a => value == N(a));
 
