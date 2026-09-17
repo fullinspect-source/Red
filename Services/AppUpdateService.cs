@@ -4,7 +4,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text;
-using System.Text.RegularExpressions;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace InspectionEditor.Services
@@ -20,113 +21,190 @@ namespace InspectionEditor.Services
         public string? Error { get; init; }
     }
 
+    internal static class UpdateNetworkService
+    {
+        // Caller should use HttpClient.Timeout = Timeout.InfiniteTimeSpan; this bounds headers AND body.
+        internal static Task<string> GetStringAsync(HttpClient http, string url, CancellationToken cancellationToken = default) =>
+            AppUpdateService.WithRetryAsync(async token =>
+            {
+                using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadAsStringAsync(token);
+            }, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1), cancellationToken);
+
+        internal static string DescribeFailure(Exception exception, string operation) =>
+            exception is OperationCanceledException
+                ? $"RED couldn't {operation}. The request timed out or was cancelled. Please try again."
+                : AppUpdateService.CreateFailureResult(exception, operation).Error!;
+    }
+
     internal static class AppUpdateService
     {
-        internal const string InternetRequiredMessage = "RED is offline, so the automatic update check was skipped. The updater will try again the next time RED opens.";
-        private const string UpdateCheckFailedMessage = "RED couldn't check for updates. Please try again.";
+        // Shared with the data updater; a failed request does not prove the PC is offline.
+        internal const string InternetRequiredMessage = "RED couldn't reach the update service. Please try again.";
         private const string LatestReleaseApi = "https://api.github.com/repos/fullinspect-source/Red/releases/latest";
         private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
-        private static readonly string LastCheckFile = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
 
-        public static async Task<AppUpdateResult> CheckAndInstallIfAvailableAsync(bool force = false)
+        internal sealed class UpdateOptions
+        {
+            public string MarkerPath { get; init; } = Path.Combine(AppIdentity.LocalAppDataPath, ".last_app_update_check");
+            public string TempDirectory { get; init; } = Path.Combine(Path.GetTempPath(), "RedUpdate", Guid.NewGuid().ToString("N"));
+            public TimeSpan CheckTimeout { get; init; } = TimeSpan.FromSeconds(30);
+            public TimeSpan DownloadTimeout { get; init; } = TimeSpan.FromMinutes(5);
+            public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(1);
+            public Action<string, string> StartInstaller { get; init; } = AppUpdateService.StartInstaller;
+        }
+
+        public static async Task<AppUpdateResult> CheckAndInstallIfAvailableAsync(bool force = false, CancellationToken cancellationToken = default)
+        {
+            using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            http.DefaultRequestHeaders.Add("User-Agent", "RED-AppUpdater");
+            return await CheckAndInstallIfAvailableAsync(http, new UpdateOptions(), force, cancellationToken);
+        }
+
+        // The production path is also exercised by the portable fake-handler harness.
+        internal static async Task<AppUpdateResult> CheckAndInstallIfAvailableAsync(
+            HttpClient http, UpdateOptions options, bool force = false, CancellationToken cancellationToken = default)
         {
             if (AppIdentity.IsDevBuild)
-            {
-                return new AppUpdateResult
-                {
-                    LatestVersion = AppIdentity.Version,
-                    Error = "Dev build skips app self-updates."
-                };
-            }
+                return new AppUpdateResult { LatestVersion = AppIdentity.Version, Error = "Dev build skips app self-updates." };
 
+            string stage = "check for updates";
+            string remoteVersion = "";
+            bool updateAvailable = false;
             try
             {
-                Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
-
-                // Normal startup checks run once per day. A user triple-click always bypasses this marker.
-                if (!force && File.Exists(LastCheckFile) &&
-                    DateTime.Now - File.GetLastWriteTime(LastCheckFile) < CheckInterval)
-                {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!force && File.Exists(options.MarkerPath) &&
+                    DateTime.UtcNow - File.GetLastWriteTimeUtc(options.MarkerPath) < CheckInterval)
                     return new AppUpdateResult { SkippedByThrottle = true };
-                }
 
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                http.DefaultRequestHeaders.Add("User-Agent", "RED-AppUpdater");
-                string apiJson = await http.GetStringAsync(LatestReleaseApi);
-                File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
+                string apiJson = await WithRetryAsync(async token =>
+                {
+                    using var response = await http.GetAsync(LatestReleaseApi, HttpCompletionOption.ResponseHeadersRead, token);
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadAsStringAsync(token);
+                }, options.CheckTimeout, options.RetryDelay, cancellationToken);
 
-                string remoteVersion = ReadJsonString(apiJson, "tag_name").TrimStart('v', 'V');
-                string zipUrl = Regex.Match(apiJson, "\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.zip)\"").Groups[1].Value;
-
-                if (string.IsNullOrWhiteSpace(remoteVersion))
-                    return new AppUpdateResult { Error = "GitHub latest version was not readable." };
+                using var release = JsonDocument.Parse(apiJson);
+                remoteVersion = release.RootElement.GetProperty("tag_name").GetString()?.TrimStart('v', 'V') ?? "";
+                if (!Version.TryParse(NormalizeVersion(remoteVersion), out _))
+                    throw new InvalidDataException("GitHub latest version was not readable.");
 
                 if (!IsRemoteNewer(remoteVersion, AppIdentity.Version))
-                    return new AppUpdateResult { LatestVersion = remoteVersion };
-
-                if (string.IsNullOrWhiteSpace(zipUrl))
                 {
-                    return new AppUpdateResult
-                    {
-                        LatestVersion = remoteVersion,
-                        UpdateAvailable = true,
-                        Error = "GitHub release has no RED zip asset."
-                    };
+                    RecordSuccessfulCheck(options.MarkerPath);
+                    return new AppUpdateResult { LatestVersion = remoteVersion };
                 }
 
-                await DownloadExtractAndStartInstallerAsync(remoteVersion, zipUrl);
-                return new AppUpdateResult
+                updateAvailable = true;
+                string zipUrl = "";
+                if (release.RootElement.TryGetProperty("assets", out var assets))
+                    foreach (var asset in assets.EnumerateArray())
+                        if (asset.TryGetProperty("browser_download_url", out var url) &&
+                            url.GetString() is string candidate && candidate.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                        { zipUrl = candidate; break; }
+                if (string.IsNullOrWhiteSpace(zipUrl))
+                    return new AppUpdateResult { LatestVersion = remoteVersion, UpdateAvailable = true, Error = "GitHub release has no RED zip asset." };
+
+                stage = "download the update";
+                string tempDir = options.TempDirectory;
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+                Directory.CreateDirectory(tempDir);
+                string zipPath = Path.Combine(tempDir, $"Red-v{remoteVersion}.zip");
+                await WithRetryAsync(async token =>
                 {
-                    LatestVersion = remoteVersion,
-                    UpdateAvailable = true,
-                    InstallerStarted = true
-                };
+                    // Every attempt truncates the previous partial file, never appends.
+                    try
+                    {
+                        using var response = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, token);
+                        response.EnsureSuccessStatusCode();
+                        await using var input = await response.Content.ReadAsStreamAsync(token);
+                        await using var output = File.Create(zipPath);
+                        await input.CopyToAsync(output, token);
+                        await output.FlushAsync(token);
+                        return true;
+                    }
+                    catch
+                    {
+                        if (File.Exists(zipPath)) File.Delete(zipPath);
+                        throw;
+                    }
+                }, options.DownloadTimeout, options.RetryDelay, cancellationToken);
+
+                stage = "prepare the update installer";
+                cancellationToken.ThrowIfCancellationRequested();
+                string extractDir = ExtractAndValidate(zipPath, tempDir);
+                cancellationToken.ThrowIfCancellationRequested();
+                options.StartInstaller(remoteVersion, extractDir);
+                RecordSuccessfulCheck(options.MarkerPath);
+                return new AppUpdateResult { LatestVersion = remoteVersion, UpdateAvailable = true, InstallerStarted = true };
             }
             catch (Exception ex)
             {
-                return CreateFailureResult(ex);
+                return CreateFailureResult(ex, stage, remoteVersion, updateAvailable, cancellationToken.IsCancellationRequested);
             }
         }
 
-        internal static AppUpdateResult CreateFailureResult(Exception exception)
+        private static void RecordSuccessfulCheck(string markerPath)
         {
-            bool internetRequired = IsConnectivityFailure(exception);
+            // A marker write failure must not hide an already-started installer.
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
+                File.WriteAllText(markerPath, DateTime.UtcNow.ToString("o"));
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        internal static AppUpdateResult CreateFailureResult(Exception exception, string stage = "check for updates",
+            string latestVersion = "", bool updateAvailable = false, bool cancelled = false)
+        {
+            string reason = exception switch
+            {
+                OperationCanceledException when cancelled => "The operation was cancelled.",
+                OperationCanceledException or TimeoutException => "The request timed out after retries.",
+                HttpRequestException http when http.StatusCode.HasValue => $"The server returned HTTP {(int)http.StatusCode.Value}.",
+                HttpRequestException => "The update service could not be reached after retries.",
+                JsonException or InvalidOperationException or System.Collections.Generic.KeyNotFoundException => "The release information was invalid.",
+                InvalidDataException or FileNotFoundException => "The release information or downloaded package was invalid or incomplete.",
+                _ => "The operation failed."
+            };
             return new AppUpdateResult
             {
-                InternetRequired = internetRequired,
-                Error = internetRequired ? InternetRequiredMessage : UpdateCheckFailedMessage
+                LatestVersion = latestVersion,
+                UpdateAvailable = updateAvailable,
+                Error = $"RED couldn't {stage}. {reason} Please try again."
             };
         }
 
-        private static bool IsConnectivityFailure(Exception exception)
+        private static bool IsTransient(Exception exception) => exception switch
         {
-            for (Exception? current = exception; current != null; current = current.InnerException)
-            {
-                if (current is HttpRequestException or TaskCanceledException or TimeoutException)
-                    return true;
-            }
+            HttpRequestException http => !http.StatusCode.HasValue || (int)http.StatusCode.Value == 429 || (int)http.StatusCode.Value >= 500,
+            OperationCanceledException or TimeoutException or IOException => true,
+            _ => false
+        };
 
-            return false;
+        internal static async Task<T> WithRetryAsync<T>(Func<CancellationToken, Task<T>> operation,
+            TimeSpan timeout, TimeSpan retryDelay, CancellationToken cancellationToken)
+        {
+            const int attempts = 3;
+            for (int attempt = 1; ; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                bounded.CancelAfter(timeout);
+                try { return await operation(bounded.Token); }
+                catch (Exception ex) when (attempt < attempts && !cancellationToken.IsCancellationRequested && IsTransient(ex))
+                {
+                    await Task.Delay(TimeSpan.FromTicks(retryDelay.Ticks * attempt), cancellationToken);
+                }
+            }
         }
 
-        private static async Task DownloadExtractAndStartInstallerAsync(string remoteVersion, string zipUrl)
+        private static string ExtractAndValidate(string zipPath, string tempDir)
         {
-            string tempDir = Path.Combine(Path.GetTempPath(), "RedUpdate");
-            if (Directory.Exists(tempDir))
-                Directory.Delete(tempDir, true);
-            Directory.CreateDirectory(tempDir);
-
-            string zipPath = Path.Combine(tempDir, $"Red-v{remoteVersion}.zip");
-            using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) })
-            {
-                http.DefaultRequestHeaders.Add("User-Agent", "RED-AppUpdater");
-                using var response = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead);
-                response.EnsureSuccessStatusCode();
-                await using var input = await response.Content.ReadAsStreamAsync();
-                await using var output = File.Create(zipPath);
-                await input.CopyToAsync(output);
-            }
-
             string extractDir = Path.Combine(tempDir, "extracted");
             ZipFile.ExtractToDirectory(zipPath, extractDir);
             if (!File.Exists(Path.Combine(extractDir, "Red.exe")))
@@ -134,6 +212,11 @@ namespace InspectionEditor.Services
             if (!File.Exists(Path.Combine(extractDir, "SixLabors.ImageSharp.dll")))
                 throw new FileNotFoundException("Downloaded RED release is missing its photo processor. Nothing was installed; please download the update again.");
 
+            return extractDir;
+        }
+
+        private static void StartInstaller(string remoteVersion, string extractDir)
+        {
             string appExe = Process.GetCurrentProcess().MainModule?.FileName
                 ?? Path.Combine(AppContext.BaseDirectory, "Red.exe");
             string destDir = Path.GetDirectoryName(appExe) ?? AppContext.BaseDirectory;
@@ -165,20 +248,14 @@ namespace InspectionEditor.Services
             bat.AppendLine("del \"%~f0\"");
             bat.AppendLine("exit");
 
-            string batPath = Path.Combine(Path.GetTempPath(), "red_update.bat");
+            string batPath = Path.Combine(Path.GetTempPath(), $"red_update_{Guid.NewGuid():N}.bat");
             File.WriteAllText(batPath, bat.ToString());
-            Process.Start(new ProcessStartInfo
+            using var installer = Process.Start(new ProcessStartInfo
             {
                 FileName = "cmd.exe",
                 Arguments = $"/c \"{batPath}\"",
                 UseShellExecute = true
-            });
-        }
-
-        private static string ReadJsonString(string json, string propertyName)
-        {
-            var match = Regex.Match(json, $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*\"([^\"]*)\"");
-            return match.Success ? match.Groups[1].Value : "";
+            }) ?? throw new IOException("RED installer did not start.");
         }
 
         private static bool IsRemoteNewer(string remote, string local)

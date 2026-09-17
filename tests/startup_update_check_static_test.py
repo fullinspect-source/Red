@@ -10,19 +10,19 @@ PROJECT = (ROOT / "InspectionEditor.csproj").read_text(encoding="utf-8")
 
 class StartupUpdateCheckStaticTests(unittest.TestCase):
     def test_normal_startup_uses_24_hour_throttle(self):
-        self.assertIn("AppUpdateService.CheckAndInstallIfAvailableAsync()", APP)
+        self.assertIn("AppUpdateService.CheckAndInstallIfAvailableAsync(cancellationToken: token)", APP)
         self.assertIn("once every 24 hours", APP)
         self.assertIn("TimeSpan.FromHours(24)", UPDATER)
-        self.assertIn("LastCheckFile", UPDATER)
+        self.assertIn("options.MarkerPath", UPDATER)
         self.assertIn("SkippedByThrottle", UPDATER)
-        self.assertIn("File.WriteAllText(LastCheckFile", UPDATER)
+        self.assertIn("RecordSuccessfulCheck(options.MarkerPath)", UPDATER)
 
     def test_force_retry_path_remains(self):
-        self.assertIn("CheckAndInstallIfAvailableAsync(bool force = false)", UPDATER)
-        self.assertIn("CheckAndInstallIfAvailableAsync(force: true)", (ROOT / "InspectionPickerWindow.xaml.cs").read_text(encoding="utf-8"))
+        self.assertIn("CheckAndInstallIfAvailableAsync(bool force = false, CancellationToken cancellationToken = default)", UPDATER)
+        self.assertIn("force: true, cancellationToken: cancellation.Token", (ROOT / "InspectionPickerWindow.xaml.cs").read_text(encoding="utf-8"))
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.1.31</Version>", PROJECT)
+        self.assertIn("<Version>2.1.32</Version>", PROJECT)
         self.assertIn("<ReleaseDate>2026-09-16</ReleaseDate>", PROJECT)
 
 

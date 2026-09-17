@@ -85,30 +85,29 @@ namespace InspectionEditor
 
             // Check for RED app + data updates. The app check is throttled to once every 24 hours.
             splash.SetStatus("Checking for updates...");
-            bool startupInternetRequired = false;
+
             try
             {
-                var appUpdateTask = AppUpdateService.CheckAndInstallIfAvailableAsync();
-                var appUpdateCompleted = await Task.WhenAny(appUpdateTask, Task.Delay(TimeSpan.FromSeconds(12)));
-                if (appUpdateCompleted == appUpdateTask)
+                var appUpdate = await UpdateUiCoordinator.RunStartupAsync(
+                    token => AppUpdateService.CheckAndInstallIfAvailableAsync(cancellationToken: token),
+                    TimeSpan.FromSeconds(12));
+                if (appUpdate.InstallerStarted)
                 {
-                    var appUpdate = await appUpdateTask;
-                    if (appUpdate.InstallerStarted)
-                    {
-                        splash.SetStatus($"Installing RED v{appUpdate.LatestVersion}...");
-                        await Task.Delay(1500);
-                        Shutdown();
-                        return;
-                    }
-
-                    startupInternetRequired = appUpdate.InternetRequired;
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("App update check timed out, continuing startup...");
+                    splash.SetStatus($"Installing RED v{appUpdate.LatestVersion}...");
+                    await Task.Delay(1500);
+                    Shutdown();
+                    return;
                 }
 
-                var dataUpdateTask = DataUpdateService.CheckForUpdatesAsync();
+                var dataUpdateTask = UpdateUiCoordinator.CaptureAsync(async () =>
+                {
+                    await DataUpdateService.CheckForUpdatesAsync();
+                    return true;
+                }, ex =>
+                {
+                    DiagnosticLogService.Log("Startup dataset update failed", ex);
+                    return false;
+                });
                 var dataUpdateCompleted = await Task.WhenAny(dataUpdateTask, Task.Delay(TimeSpan.FromSeconds(8)));
                 if (dataUpdateCompleted != dataUpdateTask)
                     System.Diagnostics.Debug.WriteLine("Data update still running, continuing startup...");
@@ -138,17 +137,7 @@ namespace InspectionEditor
             }
             splash.Close();
 
-            if (startupInternetRequired)
-            {
-                MessageBox.Show(
-                    "RED couldn't check for app updates because this device is offline.\n\n" +
-                    "RED still works normally offline. Only the automatic update check was skipped.\n\n" +
-                    "The updater will try again the next time RED opens. If you want to update, connect to the internet before opening RED.",
-                    "Update Check Skipped",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            else if (staleWarning != null)
+            if (staleWarning != null)
             {
                 MessageBox.Show(
                     staleWarning,

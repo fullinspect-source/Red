@@ -22,7 +22,7 @@ namespace InspectionEditor.Services
     {
         private static readonly HttpClient _httpClient = new HttpClient 
         { 
-            Timeout = TimeSpan.FromSeconds(15) // Allow time for Dropbox redirect + download
+            Timeout = System.Threading.Timeout.InfiniteTimeSpan // Per-attempt bounds are enforced by UpdateNetworkService.
         };
         
         // Dropbox public links (dl=1 for direct download)
@@ -123,16 +123,18 @@ namespace InspectionEditor.Services
                 }
 
                 // Update all files in parallel
-                await Task.WhenAll(
+                var refreshed = await Task.WhenAll(
                     DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath,
                         IsValidQuickCommentsPayload, preserveNewerGeneratedData: true),
-                    DownloadIfNewerAsync(INSPECTOR_STATS_URL, InspectorStatsPath),
+                    DownloadIfNewerAsync(INSPECTOR_STATS_URL, InspectorStatsPath,
+                        IsValidStatsPayload, preserveNewerGeneratedData: true),
                     DownloadIfNewerAsync(INSPECTION_TYPES_URL, InspectionTypesPath,
                         content => content.TrimStart().StartsWith("INS Type"))
                 );
 
-                // Mark check time
-                File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
+                // A failed dataset must not be hidden behind the 12-hour success throttle.
+                if (Array.TrueForAll(refreshed, succeeded => succeeded))
+                    File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
             }
             catch
             {
@@ -196,58 +198,41 @@ namespace InspectionEditor.Services
         public static async Task<StatsUpdateResult> ForceUpdateStatsAsync()
         {
             var result = new StatsUpdateResult { CurrentDate = GetLocalStatsDate() };
+            // Companion failures must not prevent stats refresh, or claim the stats server is offline.
+            var quickTask = DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath,
+                IsValidQuickCommentsPayload, preserveNewerGeneratedData: true);
+            var typesTask = DownloadIfNewerAsync(INSPECTION_TYPES_URL, InspectionTypesPath,
+                content => content.TrimStart().StartsWith("INS Type"));
+            bool statsSucceeded = false;
             try
             {
-                var response = await _httpClient.GetAsync(INSPECTOR_STATS_URL);
-                if (!response.IsSuccessStatusCode)
-                {
-                    result.Error = $"Server error {(int)response.StatusCode}";
-                    result.LatestDate = result.CurrentDate;
-                    return result;
-                }
-
-                var remote = (await response.Content.ReadAsStringAsync()).Trim();
-                if (!remote.StartsWith("{") && !remote.StartsWith("["))
-                {
-                    result.Error = "Invalid data received";
-                    result.LatestDate = result.CurrentDate;
-                    return result;
-                }
-
-                // Extract generated date from remote content
-                var m = Regex.Match(remote, "\"generated\":\\s*\"([^\"]+)\"");
-                result.LatestDate = (m.Success && DateTime.TryParse(m.Groups[1].Value, out var dt))
-                    ? dt.ToString("MMM d, yyyy") : "unknown";
-
-                // Always refresh companion datasets on a forced update, even if stats did not change.
-                // If their content is identical, DownloadIfNewerAsync touches the files so the stale warning
-                // reflects the successful refresh instead of the embedded/generated data age.
-                await DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath,
-                    IsValidQuickCommentsPayload, preserveNewerGeneratedData: true);
-                await DownloadIfNewerAsync(INSPECTION_TYPES_URL, InspectionTypesPath,
-                    content => content.TrimStart().StartsWith("INS Type"));
-
-                // Check if stats content actually changed
-                if (File.Exists(InspectorStatsPath) && File.ReadAllText(InspectorStatsPath) == remote)
-                {
-                    File.SetLastWriteTime(InspectorStatsPath, DateTime.Now);
-                    File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
-                    result.Updated = false;
-                    return result;
-                }
-
-                // Save and mark check time
-                File.WriteAllText(InspectorStatsPath, remote);
-                File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
-                result.Updated = true;
+                string remote = (await UpdateNetworkService.GetStringAsync(_httpClient, INSPECTOR_STATS_URL)).Trim();
+                if (!IsValidStatsPayload(remote)) throw new InvalidDataException("Invalid stats dataset.");
+                string? before = File.Exists(InspectorStatsPath) ? File.ReadAllText(InspectorStatsPath) : null;
+                StoreValidatedData(InspectorStatsPath, remote, preserveNewerGeneratedData: true);
+                result.LatestDate = GetLocalStatsDate();
+                result.Updated = before != File.ReadAllText(InspectorStatsPath);
+                statsSucceeded = true;
             }
             catch (Exception ex)
             {
-                result.Error = ex is HttpRequestException or TaskCanceledException or TimeoutException
-                    ? AppUpdateService.InternetRequiredMessage
-                    : "RED couldn't refresh this data. Please try again.";
+                result.Error = ex is InvalidDataException
+                    ? "Inspector stats refresh returned invalid data. Existing stats were kept; retry from About."
+                    : UpdateNetworkService.DescribeFailure(ex, "refresh inspector stats");
                 result.LatestDate = result.CurrentDate;
             }
+            bool[] companions = await Task.WhenAll(quickTask, typesTask);
+            if (statsSucceeded && Array.TrueForAll(companions, succeeded => succeeded))
+            {
+                try
+                {
+                    Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
+                    File.WriteAllText(LastCheckFile, DateTime.Now.ToString("o"));
+                }
+                catch { /* Check-time metadata must not disguise a successful stats refresh. */ }
+            }
+            else if (statsSucceeded)
+                result.Error = "Inspector stats refreshed. Quick Comments or Inspection Types could not refresh; retry from About. Existing data was retained.";
             return result;
         }
 
@@ -255,59 +240,66 @@ namespace InspectionEditor.Services
         /// Team averages (by builder, by project) are embedded in inspector_stats.json.</summary>
         public static string GetLocalTeamStatsDate() => GetLocalStatsDate();
 
-        private static async Task DownloadIfNewerAsync(
+        internal static async Task<bool> DownloadIfNewerAsync(
             string url,
             string localPath,
             Func<string, bool>? isValid = null,
             bool preserveNewerGeneratedData = false)
         {
-            if (url.Contains("PLACEHOLDER"))
-                return;
-
+            if (url.Contains("PLACEHOLDER")) return false;
             isValid ??= content => content.StartsWith("{") || content.StartsWith("[");
-
             try
             {
                 string separator = url.Contains('?') ? "&" : "?";
                 string requestUrl = $"{url}{separator}_={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
-                var response = await _httpClient.GetAsync(requestUrl);
-                if (!response.IsSuccessStatusCode)
-                    return;
-
-                var remoteContent = await response.Content.ReadAsStringAsync();
-                remoteContent = remoteContent.Trim();
-                if (!isValid(remoteContent))
-                    return;
-
-                if (preserveNewerGeneratedData && File.Exists(localPath))
-                {
-                    var remoteGenerated = GetGeneratedDate(remoteContent);
-                    var localGenerated = GetGeneratedDate(File.ReadAllText(localPath));
-                    if (remoteGenerated.HasValue && localGenerated.HasValue &&
-                        remoteGenerated.Value < localGenerated.Value)
-                        return;
-                }
-
-                if (File.Exists(localPath))
-                {
-                    var localContent = File.ReadAllText(localPath);
-                    if (localContent == remoteContent)
-                    {
-                        File.SetLastWriteTime(localPath, DateTime.Now);
-                        return;
-                    }
-                }
-
-                Directory.CreateDirectory(Path.GetDirectoryName(localPath) ?? AppIdentity.LocalAppDataPath);
-                string temporaryPath = localPath + ".download";
-                File.WriteAllText(temporaryPath, remoteContent);
-                File.Move(temporaryPath, localPath, true);
-                System.Diagnostics.Debug.WriteLine($"Updated {Path.GetFileName(localPath)} from cloud");
+                string remoteContent = (await UpdateNetworkService.GetStringAsync(_httpClient, requestUrl)).Trim();
+                if (!isValid(remoteContent)) return false;
+                StoreValidatedData(localPath, remoteContent, preserveNewerGeneratedData);
+                return true;
             }
             catch
             {
-                // Silently fail for individual file
+                // The caller records success only if all datasets actually refreshed.
+                return false;
             }
+        }
+
+        internal static void StoreValidatedData(string localPath, string remoteContent, bool preserveNewerGeneratedData)
+        {
+            if (File.Exists(localPath))
+            {
+                string localContent = File.ReadAllText(localPath);
+                if (preserveNewerGeneratedData)
+                {
+                    var remoteGenerated = GetGeneratedDate(remoteContent);
+                    var localGenerated = GetGeneratedDate(localContent);
+                    if (remoteGenerated.HasValue && localGenerated.HasValue && remoteGenerated.Value < localGenerated.Value)
+                        return;
+                }
+                if (localContent == remoteContent)
+                {
+                    File.SetLastWriteTime(localPath, DateTime.Now);
+                    return;
+                }
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(localPath) ?? AppIdentity.LocalAppDataPath);
+            string temporaryPath = localPath + "." + Guid.NewGuid().ToString("N") + ".download";
+            try
+            {
+                File.WriteAllText(temporaryPath, remoteContent);
+                File.Move(temporaryPath, localPath, true);
+            }
+            finally { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); }
+        }
+
+        internal static bool IsValidStatsPayload(string content)
+        {
+            try
+            {
+                var data = Newtonsoft.Json.Linq.JObject.Parse(content);
+                return GetGeneratedDate(content).HasValue && data["inspectors"] is Newtonsoft.Json.Linq.JObject;
+            }
+            catch { return false; }
         }
 
         private static bool IsValidQuickCommentsPayload(string content)
@@ -319,10 +311,15 @@ namespace InspectionEditor.Services
 
         private static DateTime? GetGeneratedDate(string content)
         {
-            var match = Regex.Match(content, "\"generated\"\\s*:\\s*\"([^\"]+)\"");
-            return match.Success && DateTime.TryParse(match.Groups[1].Value, out var generated)
-                ? generated
-                : null;
+            try
+            {
+                // Only the dataset's own timestamp counts, never a nested inspector field.
+                var token = Newtonsoft.Json.Linq.JObject.Parse(content)["generated"];
+                if (token?.Type is Newtonsoft.Json.Linq.JTokenType.String or Newtonsoft.Json.Linq.JTokenType.Date &&
+                    DateTime.TryParse(token.ToString(), out var generated)) return generated;
+            }
+            catch { }
+            return null;
         }
     }
 }

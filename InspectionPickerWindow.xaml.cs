@@ -710,7 +710,46 @@ namespace InspectionEditor
             AboutTaglineTranslate.BeginAnimation(TranslateTransform.YProperty, slideUp);
         }
 
+        private bool _aboutUpdateRunning;
+
         private async void ForceAboutUpdateAsync()
+        {
+            if (_aboutUpdateRunning) return;
+            _aboutUpdateRunning = true;
+            try { await ForceAboutUpdateCoreAsync(); }
+            finally { _aboutUpdateRunning = false; }
+        }
+
+        private async Task<AppUpdateResult> RunAboutAppUpdateAsync()
+        {
+            // Capture/save all editors before allowing the installer to run. Freeze every
+            // existing surface so neither edits nor new editors can appear during download.
+            var windows = Application.Current.Windows.Cast<Window>()
+                .Select(window => (Window: window, WasEnabled: window.IsEnabled)).ToList();
+            foreach (var editor in windows.Select(entry => entry.Window).OfType<MainWindow>())
+                if (!editor.TryPrepareForAppUpdate())
+                    return new AppUpdateResult { Error = "Update postponed because inspection changes could not be saved." };
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            EventHandler closed = (_, _) => cancellation.Cancel();
+            Closed += closed;
+            bool installerStarted = false;
+            try
+            {
+                foreach (var entry in windows) entry.Window.IsEnabled = false;
+                var result = await AppUpdateService.CheckAndInstallIfAvailableAsync(
+                    force: true, cancellationToken: cancellation.Token);
+                installerStarted = result.InstallerStarted;
+                return result;
+            }
+            finally
+            {
+                Closed -= closed;
+                if (!installerStarted)
+                    foreach (var entry in windows) entry.Window.IsEnabled = entry.WasEnabled;
+            }
+        }
+
+        private async Task ForceAboutUpdateCoreAsync()
         {
             AboutUpdatePanel.Visibility = Visibility.Visible;
             AboutUpdateResultsGrid.Visibility = Visibility.Collapsed;
@@ -724,30 +763,26 @@ namespace InspectionEditor
             AppUpdateResult? appUpdateResult = null;
             InspectionEditor.Services.StatsUpdateResult? statsResult = null;
             InspectionEditor.Services.StatsUpdateResult? teamStatsResult = null;
-            try
-            {
-                // Triple-click is deliberately unthrottled and installs immediately when a newer release exists.
-                appUpdateResult = await AppUpdateService.CheckAndInstallIfAvailableAsync(force: true);
-                statsResult = await InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
-                teamStatsResult = new InspectionEditor.Services.StatsUpdateResult
+            var statsTask = UpdateUiCoordinator.CaptureAsync(
+                () => DataUpdateService.ForceUpdateStatsAsync(), ex => new StatsUpdateResult
                 {
-                    CurrentDate = statsResult.CurrentDate,
-                    LatestDate = statsResult.LatestDate,
-                    Updated = statsResult.Updated,
-                    Error = statsResult.Error
-                };
-            }
-            catch (Exception ex)
-            {
-                statsResult = new InspectionEditor.Services.StatsUpdateResult
+                    CurrentDate = DataUpdateService.GetLocalStatsDate(),
+                    Error = UpdateNetworkService.DescribeFailure(ex, "update inspector stats")
+                });
+            appUpdateResult = await UpdateUiCoordinator.CaptureAsync(
+                RunAboutAppUpdateAsync, ex => new AppUpdateResult
                 {
-                    CurrentDate = InspectionEditor.Services.DataUpdateService.GetLocalStatsDate(),
-                    LatestDate = "",
-                    Updated = false,
-                    Error = ex.Message
-                };
-                teamStatsResult = statsResult;
+                    Error = UpdateNetworkService.DescribeFailure(ex, "check for app updates")
+                });
+            // Handle a launched installer before waiting for unrelated dataset work.
+            if (appUpdateResult.InstallerStarted)
+            {
+                AboutRedStatusText.Text = "Restarting to install update";
+                Application.Current.Shutdown();
+                return;
             }
+            statsResult = await statsTask;
+            teamStatsResult = statsResult;
 
             AboutUpdateProgressBar.IsIndeterminate = false;
             AboutUpdateProgressBar.Value = 100;

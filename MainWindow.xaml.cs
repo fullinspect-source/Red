@@ -961,12 +961,8 @@ namespace InspectionEditor
             ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
             ClearSearchButton.BorderThickness = new Thickness(3);
             
-            // Secondary safety check for editor-only launches; normal RED startup uses the same 24-hour marker.
-            if (ShouldRunStartupAppUpdateCheck())
-            {
-                Dispatcher.BeginInvoke(new Action(() => CheckForUpdatesAsync(silent: true)),
-                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            }
+            // App.OnStartup owns the automatic check for every launch route, including
+            // file arguments. Do not retry a failed startup check while the user is editing.
         }
 
         private static bool ShouldRunStartupAppUpdateCheck()
@@ -981,6 +977,12 @@ namespace InspectionEditor
             {
                 return true;
             }
+        }
+
+        internal bool TryPrepareForAppUpdate()
+        {
+            SyncCurrentItemFromUI();
+            return !_hasUnsavedChanges || TrySaveCurrentInspection();
         }
 
         private static void MarkStartupAppUpdateChecked()
@@ -1057,48 +1059,56 @@ namespace InspectionEditor
             InspectionEditor.Services.StatsUpdateResult? statsResult = null;
             InspectionEditor.Services.StatsUpdateResult? teamStatsResult = null;
 
-            try
-            {
-                using var http = new System.Net.Http.HttpClient();
-                http.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionEditor");
-                http.Timeout = TimeSpan.FromSeconds(15);
-
-                var redTask   = http.GetStringAsync(API_URL);
-                var statsTask = InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
-
-                await Task.WhenAll(redTask, statsTask);
-
-                _inspTypeService.InvalidateCache();
-                statsResult = statsTask.Result;
-                // Team averages are in the same inspector_stats.json — no separate download needed
-                teamStatsResult = new InspectionEditor.Services.StatsUpdateResult
+            using var http = new System.Net.Http.HttpClient();
+            http.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionEditor");
+            http.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+            var redTask = UpdateUiCoordinator.CaptureAsync(
+                () => UpdateNetworkService.GetStringAsync(http, API_URL), ex =>
                 {
-                    CurrentDate = statsResult.CurrentDate,
-                    LatestDate  = statsResult.LatestDate,
-                    Updated     = statsResult.Updated,
-                    Error       = statsResult.Error
-                };
-
-                var apiJson = redTask.Result;
-                var tagMatch = System.Text.RegularExpressions.Regex.Match(apiJson, "\"tag_name\":\\s*\"v?([^\"]+)\"");
-                if (tagMatch.Success) remoteRedVersion = tagMatch.Groups[1].Value;
-
-                var urlMatch = System.Text.RegularExpressions.Regex.Match(apiJson, "\"browser_download_url\":\\s*\"([^\"]+\\.zip)\"");
-                if (urlMatch.Success) redDownloadUrl = urlMatch.Groups[1].Value;
-            }
-            catch (Exception ex)
+                    redCheckError = UpdateNetworkService.DescribeFailure(ex, "check for app updates");
+                    return "";
+                });
+            var statsTask = UpdateUiCoordinator.CaptureAsync(
+                () => DataUpdateService.ForceUpdateStatsAsync(), ex => new StatsUpdateResult
+                {
+                    CurrentDate = DataUpdateService.GetLocalStatsDate(),
+                    Error = UpdateNetworkService.DescribeFailure(ex, "update inspector stats")
+                });
+            await Task.WhenAll(redTask, statsTask);
+            statsResult = await statsTask;
+            teamStatsResult = statsResult;
+            _inspTypeService.InvalidateCache();
+            if (redCheckError == null)
             {
-                redCheckError = ex.Message;
+                try
+                {
+                    using var release = System.Text.Json.JsonDocument.Parse(await redTask);
+                    remoteRedVersion = release.RootElement.GetProperty("tag_name").GetString()?.TrimStart('v', 'V') ?? "";
+                    if (!Version.TryParse(remoteRedVersion, out var remoteVersion))
+                        throw new InvalidDataException("GitHub latest version was not readable.");
+                    foreach (var asset in release.RootElement.GetProperty("assets").EnumerateArray())
+                    {
+                        var url = asset.GetProperty("browser_download_url").GetString();
+                        if (url?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true)
+                        { redDownloadUrl = url; break; }
+                    }
+                    if (remoteVersion > Version.Parse(AppVersion) && string.IsNullOrEmpty(redDownloadUrl))
+                        throw new InvalidDataException("GitHub release has no RED zip asset.");
+                }
+                catch (Exception ex)
+                {
+                    redCheckError = UpdateNetworkService.DescribeFailure(ex, "check for app updates");
+                }
             }
 
             bool appUpdateAvailable = redCheckError == null &&
                                       !string.IsNullOrEmpty(remoteRedVersion) &&
-                                      remoteRedVersion != AppVersion &&
+                                      Version.Parse(remoteRedVersion) > Version.Parse(AppVersion) &&
                                       !string.IsNullOrEmpty(redDownloadUrl);
 
             if (silent && !appUpdateAvailable)
             {
-                MarkStartupAppUpdateChecked();
+                if (redCheckError == null) MarkStartupAppUpdateChecked();
                 return;
             }
 
@@ -1116,7 +1126,7 @@ namespace InspectionEditor
             bool redUpdated = false;
             string? redInstallError = null;
 
-            if (redCheckError == null && !string.IsNullOrEmpty(remoteRedVersion) && remoteRedVersion != AppVersion)
+            if (redCheckError == null && !string.IsNullOrEmpty(remoteRedVersion) && Version.Parse(remoteRedVersion) > Version.Parse(AppVersion))
             {
                 if (!string.IsNullOrEmpty(redDownloadUrl))
                 {
@@ -1125,25 +1135,26 @@ namespace InspectionEditor
                         UpdateStatusText.Text = $"Downloading RED v{remoteRedVersion}…";
                         using var http2 = new System.Net.Http.HttpClient();
                         http2.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionEditor");
-                        http2.Timeout = TimeSpan.FromMinutes(5); // 96 MB needs time on slow connections
+                        http2.Timeout = System.Threading.Timeout.InfiniteTimeSpan; // Each retry bounds headers and body.
 
-                        string tempDir = Path.Combine(Path.GetTempPath(), "RedUpdate");
-                        if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+                        string tempDir = Path.Combine(Path.GetTempPath(), "RedUpdate", Guid.NewGuid().ToString("N"));
                         Directory.CreateDirectory(tempDir);
 
                         // Stream to disk with progress — avoids 96 MB memory spike and timeout on slow connections
                         string zipPath = Path.Combine(tempDir, $"Red-v{remoteRedVersion}.zip");
-                        using (var resp2 = await http2.GetAsync(redDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
+                        await AppUpdateService.WithRetryAsync(async token =>
+                        {
+                        using (var resp2 = await http2.GetAsync(redDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, token))
                         {
                             resp2.EnsureSuccessStatusCode();
                             long? totalBytes = resp2.Content.Headers.ContentLength;
-                            using var netStream = await resp2.Content.ReadAsStreamAsync();
+                            using var netStream = await resp2.Content.ReadAsStreamAsync(token);
                             using var fileStream = File.Create(zipPath);
                             var buf = new byte[81920];
                             long got = 0; int read2;
-                            while ((read2 = await netStream.ReadAsync(buf)) > 0)
+                            while ((read2 = await netStream.ReadAsync(buf.AsMemory(), token)) > 0)
                             {
-                                await fileStream.WriteAsync(buf.AsMemory(0, read2));
+                                await fileStream.WriteAsync(buf.AsMemory(0, read2), token);
                                 got += read2;
                                 string progress = totalBytes.HasValue
                                     ? $"{got / 1048576} / {totalBytes.Value / 1048576} MB"
@@ -1151,9 +1162,15 @@ namespace InspectionEditor
                                 UpdateStatusText.Text = $"Downloading RED v{remoteRedVersion}… {progress}";
                             }
                         }
+                        return true;
+                        }, TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(1), System.Threading.CancellationToken.None);
 
                         string extractDir = Path.Combine(tempDir, "extracted");
                         System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir);
+                        if (!IsLoaded) throw new InvalidOperationException("Update postponed because the editor was closed.");
+                        if (!File.Exists(Path.Combine(extractDir, "Red.exe")) ||
+                            !File.Exists(Path.Combine(extractDir, "SixLabors.ImageSharp.dll")))
+                            throw new InvalidDataException("Downloaded release is incomplete. Nothing was installed.");
 
                         // Red.exe can't be overwritten while running — hand off to a batch script
                         // that waits for this process to exit, copies new files, then restarts.
@@ -1333,7 +1350,7 @@ namespace InspectionEditor
                 TeamStatsStatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 125, 50));
             }
 
-            MarkStartupAppUpdateChecked();
+            if (redCheckError == null && redInstallError == null) MarkStartupAppUpdateChecked();
 
             if (redUpdated)
             {

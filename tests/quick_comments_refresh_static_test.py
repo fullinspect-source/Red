@@ -16,7 +16,8 @@ class QuickCommentsRefreshTests(unittest.TestCase):
             source,
         )
         self.assertIn("preserveNewerGeneratedData: true", source)
-        self.assertIn('string temporaryPath = localPath + ".download"', source)
+        self.assertIn('Guid.NewGuid().ToString("N") + ".download"', source)
+        self.assertIn('File.Move(temporaryPath, localPath, true)', source)
         self.assertIn("ToUnixTimeMilliseconds()", source)
 
     def test_downloaded_copy_precedes_bundled_copy_and_cache_detects_change(self):
