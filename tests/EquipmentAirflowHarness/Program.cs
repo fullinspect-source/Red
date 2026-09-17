@@ -110,4 +110,53 @@ finally
     Directory.Delete(root, recursive: true);
 }
 
-Console.WriteLine("Equipment airflow harness: PASS");
+
+// Real HEF section/prompt/number layout, stripped of all job and equipment data.
+var real = JsonConvert.DeserializeObject<InspectionFile>(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "Fixtures", "real-hef-redacted.json")))!;
+var condenser = real.Sections.Single(s => s.Name == "Condenser Unit");
+var handler = real.Sections.Single(s => s.Name == "Air Handler Unit");
+condenser.Items.Single(i => i.Number == "3.2").Value = "GZV6SA24";
+handler.Items.Single(i => i.Number == "7.3").Value = "AHVE24BP13";
+condenser.Items.Single(i => i.Number == "3.5").Value = "GZV6SA42";
+handler.Items.Single(i => i.Number == "7.6").Value = "AHVE42CP13";
+Assert(EquipmentAirflowService.FindMatches(null, real).Count == 2, "real HEF models failed");
+var provenance = new EnergyComplianceInfo { DesignAirflowCfm = "900", DesignAirflowCfm2 = "1200",
+    DesignAirflowSource = "EC Cooling Flow Rate (explicit CFM)" };
+condenser.Items.Single(i => i.Number == "3.2").Value = "UNKNOWN";
+EquipmentAirflowService.ApplyMatches(provenance, null, real);
+Assert(provenance.DesignAirflowCfm == "900" && provenance.DesignAirflowCfm2 == "1367", "unit2-only targets");
+Assert(EquipmentAirflowService.GetSourceForUnit(provenance, 1) == "EC Cooling Flow Rate (explicit CFM)" &&
+    EquipmentAirflowService.GetSourceForUnit(provenance, 2) == "STRADA equipment matchup", "unit2-only provenance");
+condenser.Items.Single(i => i.Number == "3.2").Value = "GZV6SA24";
+condenser.Items.Single(i => i.Number == "3.5").Value = "UNKNOWN";
+EquipmentAirflowService.ApplyMatches(provenance, null, real);
+Assert(provenance.DesignAirflowCfm == "773" && provenance.DesignAirflowCfm2 == "1200" &&
+    EquipmentAirflowService.GetSourceForUnit(provenance, 2) == "EC Cooling Flow Rate (explicit CFM)", "changed units leave stale state");
+condenser.Items.Single(i => i.Number == "3.2").Value = "UNKNOWN";
+EquipmentAirflowService.ApplyMatches(provenance, null, real);
+Assert(provenance.DesignAirflowSource == "EC Cooling Flow Rate (explicit CFM)" &&
+    provenance.DesignAirflowCfm == "900" && provenance.DesignAirflowSourceFile == null, "removal loses EC provenance");
+EquipmentAirflowService.ApplyMatches(provenance, null, real);
+Assert(provenance.DesignAirflowSource == "EC Cooling Flow Rate (explicit CFM)", "no-match loses EC source");
+
+foreach (string prompt in new[] { "Model", "Model (unit 12)", "Model (unit 1) (unit 2)", "Serial Model (unit 1)" })
+{
+    var ambiguous = EnergyFinal("2999999", "GZV6SA24", "AHVE24BP13");
+    ambiguous.Sections[0].Items[0].Name = prompt;
+    Assert(EquipmentAirflowService.FindMatches(null, ambiguous).Count == 0, "unsafe prompt accepted: " + prompt);
+}
+var conflict = EnergyFinal("2999999", "GZV6SA24", "AHVE24BP13");
+conflict.Sections[0].Items.Add(Model("99", "Model unit 1", "GZV6SA42"));
+Assert(EquipmentAirflowService.FindMatches(null, conflict).Count == 0, "conflicting duplicate accepted");
+var crossUnit = EnergyFinal("2999999", "GZV6SA24", "", "", "AHVE24BP13");
+Assert(EquipmentAirflowService.FindMatches(null, crossUnit).Count == 0, "cross-unit pair accepted");
+var wrongEquipment = EnergyFinal("2999999", "GZV6SA24", "AHVE24BP13");
+wrongEquipment.Sections[1].Name = "Furnace";
+Assert(EquipmentAirflowService.FindMatches(null, wrongEquipment).Count == 0, "furnace accepted as air handler");
+var sectionUnit = EnergyFinal("2999999", "GZV6SA24", "AHVE24BP13");
+sectionUnit.Sections[0].Items[0].Name = "Model";
+sectionUnit.Sections[0].Name = "Condenser Unit 1";
+Assert(EquipmentAirflowService.FindMatches(null, sectionUnit).Count == 1, "explicit section unit not recognized");
+
+Console.WriteLine("Equipment airflow harness: PASS (rules, real HEF, semantic rejection, per-unit provenance, removal)");

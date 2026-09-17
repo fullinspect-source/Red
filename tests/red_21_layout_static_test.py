@@ -221,11 +221,11 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("PopulateTreeView(SearchFilterBox.Text);", classic)
         self.assertIn("ApplyTranscriptionSuggestion(action.Item, action.Suggestion);", inline)
         self.assertIn("TranscriptionKeyMatchesItem(pair.key, anchor)", distribution)
-        self.assertIn("SelectMany(section => section.Items)", distribution)
+        self.assertIn("ownerSection?.Items?.ToList()", distribution)
         self.assertIn("candidate.Value = val;", distribution)
         self.assertNotIn("GetVisibleItems()", distribution)
-        self.assertIn("_transcriptionOptionsByItem.TryGetValue(anchor", distribution)
-        self.assertIn("OrderByDescending(s => ParseTranscriptionPairs(s).Count)", distribution)
+        self.assertNotIn("_transcriptionOptionsByItem.TryGetValue(anchor", distribution)
+        self.assertIn("TranscriptionUnit(anchor) != TranscriptionUnit(candidate)", distribution)
         matching = CODE[CODE.index("private static bool TranscriptionKeyMatchesItem"):CODE.index("// ── MegaStats")]
         self.assertIn('$"{item.DisplayLabel} {item.Name}"', matching)
 

@@ -1,0 +1,111 @@
+{
+  "InspectionCode": "HEF",
+  "InspectionNumber": "2999999-HEF-1-XX",
+  "Sections": [
+    {
+      "Name": "Condenser Unit",
+      "Items": [
+        {
+          "Number": "3.2",
+          "Name": "Unit 1: Make/Model (MRF)",
+          "Value": ""
+        },
+        {
+          "Number": "3.3",
+          "Name": "Unit 1: Serial Number (MRF)",
+          "Value": ""
+        },
+        {
+          "Number": "3.5",
+          "Name": "Unit 2: Make/Model (MRF)",
+          "Value": ""
+        },
+        {
+          "Number": "3.6",
+          "Name": "Unit 2: Serial Number (MRF)",
+          "Value": ""
+        }
+      ]
+    },
+    {
+      "Name": "Plumbing Hot Water Service",
+      "Items": [
+        {
+          "Number": "4.2",
+          "Name": "Model Number",
+          "Value": ""
+        }
+      ]
+    },
+    {
+      "Name": "Air Handler Unit",
+      "Items": [
+        {
+          "Number": "7.3",
+          "Name": "Unit 1: Model Number",
+          "Value": ""
+        },
+        {
+          "Number": "7.4",
+          "Name": "Unit 1: Serial Number (MRF)",
+          "Value": ""
+        },
+        {
+          "Number": "7.6",
+          "Name": "Unit 2: Model Number",
+          "Value": ""
+        },
+        {
+          "Number": "7.7",
+          "Name": "Unit 2: Serial Number (MRF)",
+          "Value": ""
+        }
+      ]
+    },
+    {
+      "Name": "Furnace",
+      "Items": [
+        {
+          "Number": "8.2",
+          "Name": "Unit 1: Model",
+          "Value": ""
+        },
+        {
+          "Number": "8.3",
+          "Name": "Unit 1: Serial Number (MRF)",
+          "Value": ""
+        },
+        {
+          "Number": "8.5",
+          "Name": "Unit 2: Model",
+          "Value": ""
+        },
+        {
+          "Number": "8.6",
+          "Name": "Unit 2: Serial Number (MRF)",
+          "Value": ""
+        }
+      ]
+    },
+    {
+      "Name": "Additional Items",
+      "Items": [
+        {
+          "Number": "10.3",
+          "Name": "Refrigerator Model/Serial",
+          "Value": ""
+        },
+        {
+          "Number": "10.4",
+          "Name": "Washer/Dryer Model/Serial",
+          "Value": ""
+        },
+        {
+          "Number": "10.5",
+          "Name": "Dishwasher Model/Serial",
+          "Value": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3277 @@
+[
+  {
+    "InspectionCode": "HET",
+    "Sections": [
+      {
+        "Name": "Testing Targets",
+        "Number": "1",
+        "Items": [
+          {
+            "Name": "Total Duct Leakage Max. CFM",
+            "Number": "1.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Total Duct Leakage Max. CFM (unit 2)",
+            "Number": "1.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower Door Max. CFM",
+            "Number": "1.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "AC Square Footage",
+            "Number": "1.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "AC Volume",
+            "Number": "1.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Target fresh air CFM",
+            "Number": "1.6",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Target run time",
+            "Number": "1.7",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Blower Door Test",
+        "Number": "2",
+        "Items": [
+          {
+            "Name": "Indoor/Outdoor Temp",
+            "Number": "2.1",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Altitude",
+            "Number": "2.2",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test",
+            "Number": "2.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Depressurize",
+              "Pressurize"
+            ]
+          },
+          {
+            "Name": "Pre test blower door baseline Pa",
+            "Number": "2.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (20 Pa) ring setup",
+            "Number": "2.5",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (20 Pa) CFM",
+            "Number": "2.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (30 Pa) ring setup",
+            "Number": "2.7",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (30 Pa) CFM",
+            "Number": "2.8",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (40 Pa) ring setup",
+            "Number": "2.9",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (40 Pa) CFM",
+            "Number": "2.10",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (50 Pa) ring setup",
+            "Number": "2.11",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (50 Pa) CFM",
+            "Number": "2.12",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (60 Pa) ring setup",
+            "Number": "2.13",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (60 Pa) CFM",
+            "Number": "2.14",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Post test blower door baseline Pa",
+            "Number": "2.15",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Time average (10 seconds)",
+            "Number": "2.16",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test Pass/Fail",
+            "Number": "2.17",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "2.18",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Duct System Test",
+        "Number": "3",
+        "Items": [
+          {
+            "Name": "Number of returns",
+            "Number": "3.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system test",
+            "Number": "3.2",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Depressurize",
+              "Pressurize"
+            ]
+          },
+          {
+            "Name": "Duct system #1 total leakage CFM",
+            "Number": "3.3",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system #2 total leakage CFM",
+            "Number": "3.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system #1 leakage to outside CFM",
+            "Number": "3.5",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system #2 leakage to outside CFM",
+            "Number": "3.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct blaster test Pass/Fail",
+            "Number": "3.7",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "3.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Additional Testing",
+        "Number": "4",
+        "Items": [
+          {
+            "Name": "Return side measured static pressure #1",
+            "Number": "4.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Supply side measured static pressure #1",
+            "Number": "4.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Return side measured static pressure #2",
+            "Number": "4.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Supply side measured static pressure #2",
+            "Number": "4.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 1 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 1 Pass/Fail",
+            "Number": "4.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 2 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.7",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 2 Pass/Fail",
+            "Number": "4.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 3 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.9",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 3 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.9",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 3 Pass/Fail",
+            "Number": "4.10",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 4 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.11",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 4 Pass/Fail",
+            "Number": "4.12",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 5 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.13",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 5 Pass/Fail",
+            "Number": "4.14",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 6 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.15",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 6 Pass/Fail",
+            "Number": "4.16",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bath fans measured testing >50CFM",
+            "Number": "4.17",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Kitchen fans measured testing >100CFM",
+            "Number": "4.18",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "ACCA testing has been completed",
+            "Number": "4.19",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "HVAC Weighin Testing Results are completed",
+            "Number": "4.20",
+            "ControlName": "YesNo",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Mechanical Ventilation Testing",
+        "Number": "5",
+        "Items": [
+          {
+            "Name": "Mechanical ventilation manuf. / model",
+            "Number": "5.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Override readily available",
+            "Number": "5.2",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Motorized damper",
+            "Number": "5.3",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Air is pulled from outside with rodent insect screen",
+            "Number": "5.4",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Measured fresh air CFM",
+            "Number": "5.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Fan watts",
+            "Number": "5.6",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Set run time (hours of run time or min. or %)",
+            "Number": "5.7",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "InspectionCode": "AFI",
+    "Sections": [
+      {
+        "Name": "Evaluation of the total duct leakage",
+        "Number": "1",
+        "Items": [
+          {
+            "Name": "System entirely in conditioned space volume",
+            "Number": "1.1",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Was total duct leakage test exemption taken",
+            "Number": "1.2",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Did test take place at final inspection",
+            "Number": "1.3",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter number of returns",
+            "Number": "1.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter conditioned floor area",
+            "Number": "1.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter the total duct leakage of the system (CFM) - Unit 1",
+            "Number": "1.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter the total duct leakage of the system (CFM) - Unit 2",
+            "Number": "1.7",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter the total duct leakage percentage",
+            "Number": "1.8",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Total duct leakage pass/fail",
+            "Number": "1.9",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Evaluation of the Blower Fan CFM (FLOW GRID) OR",
+        "Number": "2",
+        "Items": [
+          {
+            "Name": "Design airflow",
+            "Number": "2.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Observed airflow CFM(1)",
+            "Number": "2.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Picture of TruFlow App(1)",
+            "Number": "2.3",
+            "ControlName": "YesNoNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Observed airflow +/-25% of design Flow(1)",
+            "Number": "2.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Design airflow - (tonnage x 360CFM)(2)",
+            "Number": "2.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Observed airflow CFM(2)",
+            "Number": "2.6",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Picture of TruFlow App(2)",
+            "Number": "2.7",
+            "ControlName": "YesNoNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Observed airflow +/-25% of design Flow(2)",
+            "Number": "2.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Evaluation of the Blower Fan CFM (STATIC PRESS. TABLE)",
+        "Number": "3",
+        "Items": [
+          {
+            "Name": "Design airflow - (tonnage x 360CFM)(1)",
+            "Number": "3.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter observed fan-speed setting (cooling tap wire)(1)",
+            "Number": "3.2",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter Psop - Return-side(1)",
+            "Number": "3.3",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter Psop - Supply-side(1)",
+            "Number": "3.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Total external static pressure(1)",
+            "Number": "3.5",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Elevation above sea level(1)",
+            "Number": "3.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter blower fan airflow from OEM Pressure Table(1)",
+            "Number": "3.7",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Observed airflow +/-25% of design Flow(1)",
+            "Number": "3.8",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Design airflow - (tonnage x 360CFM)(2)",
+            "Number": "3.9",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter observed fan-speed setting (cooling tap wire)(2)",
+            "Number": "3.10",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter Psop - Return-side(2)",
+            "Number": "3.11",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter Psop - Supply-side(2)",
+            "Number": "3.12",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Total external static pressure(2)",
+            "Number": "3.13",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Elevation above sea level(2)",
+            "Number": "3.14",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter blower fan airflow from OEM Pressure Table(2)",
+            "Number": "3.15",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Observed airflow +/-25% of design Flow(2)",
+            "Number": "3.16",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Evaluation of the Blower Fan Watt Draw",
+        "Number": "4",
+        "Items": [
+          {
+            "Name": "Enter fan Power Factor(1)",
+            "Number": "4.1",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter fan Watt Draw(1)",
+            "Number": "4.2",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Fan Watts Pass/Fail(1)",
+            "Number": "4.3",
+            "ControlName": "YesNoNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter fan Power Factor(2)",
+            "Number": "4.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Enter fan Watt Draw(2)",
+            "Number": "4.5",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Fan Watts Pass/Fail(2)",
+            "Number": "4.6",
+            "ControlName": "YesNoNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Evaluation of Refrigerant Charge",
+        "Number": "5",
+        "Items": [
+          {
+            "Name": "Picture of FIeldpiece Test Results(1)",
+            "Number": "5.1",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Total length of the liquid line(1)",
+            "Number": "5.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Outside diameter of the liquid line(1)",
+            "Number": "5.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Picture of Fieldpiece testing results(2)",
+            "Number": "5.4",
+            "ControlName": "YesNoNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Total Length of Liquid Line (2)",
+            "Number": "5.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Outside Diameter of Liquid Line(2)",
+            "Number": "5.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Energy Star Final Inspection Results",
+        "Number": "6",
+        "Items": [
+          {
+            "Name": "Energy Star Final Inspection Results",
+            "Number": "6.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Both ACCA and ESTAR Final pass together",
+            "Number": "6.2",
+            "ControlName": "YesNoNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Overall inspection comments",
+            "Number": "6.3",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "InspectionCode": "HET",
+    "Sections": [
+      {
+        "Name": "Testing Targets",
+        "Number": "1",
+        "Items": [
+          {
+            "Name": "Total Duct Leakage Max. CFM",
+            "Number": "1.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Total Duct Leakage Max. CFM (unit 2)",
+            "Number": "1.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower Door Max. CFM",
+            "Number": "1.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "AC Square Footage",
+            "Number": "1.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "AC Volume",
+            "Number": "1.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Target fresh air CFM",
+            "Number": "1.6",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Target run time",
+            "Number": "1.7",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Blower Door Test",
+        "Number": "2",
+        "Items": [
+          {
+            "Name": "Indoor/Outdoor Temp",
+            "Number": "2.1",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Altitude",
+            "Number": "2.2",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test",
+            "Number": "2.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Depressurize",
+              "Pressurize"
+            ]
+          },
+          {
+            "Name": "Pre test blower door baseline Pa",
+            "Number": "2.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (20 Pa) ring setup",
+            "Number": "2.5",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (20 Pa) CFM",
+            "Number": "2.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (30 Pa) ring setup",
+            "Number": "2.7",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (30 Pa) CFM",
+            "Number": "2.8",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (40 Pa) ring setup",
+            "Number": "2.9",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (40 Pa) CFM",
+            "Number": "2.10",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (50 Pa) ring setup",
+            "Number": "2.11",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (50 Pa) CFM",
+            "Number": "2.12",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (60 Pa) ring setup",
+            "Number": "2.13",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test #1 (60 Pa) CFM",
+            "Number": "2.14",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Post test blower door baseline Pa",
+            "Number": "2.15",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Time average (10 seconds)",
+            "Number": "2.16",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Blower door test Pass/Fail",
+            "Number": "2.17",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "2.18",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Duct System Test",
+        "Number": "3",
+        "Items": [
+          {
+            "Name": "Number of returns",
+            "Number": "3.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system test",
+            "Number": "3.2",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Depressurize",
+              "Pressurize"
+            ]
+          },
+          {
+            "Name": "Duct system #1 total leakage CFM",
+            "Number": "3.3",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system #2 total leakage CFM",
+            "Number": "3.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system #1 leakage to outside CFM",
+            "Number": "3.5",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct system #2 leakage to outside CFM",
+            "Number": "3.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Duct blaster test Pass/Fail",
+            "Number": "3.7",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "3.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Additional Testing",
+        "Number": "4",
+        "Items": [
+          {
+            "Name": "Return side measured static pressure #1",
+            "Number": "4.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Supply side measured static pressure #1",
+            "Number": "4.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Return side measured static pressure #2",
+            "Number": "4.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Supply side measured static pressure #2",
+            "Number": "4.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 1 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 1 Pass/Fail",
+            "Number": "4.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 2 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.7",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 2 Pass/Fail",
+            "Number": "4.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 3 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.9",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 3 Pass/Fail",
+            "Number": "4.10",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 4 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.11",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 4 Pass/Fail",
+            "Number": "4.12",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 5 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.13",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 5 Pass/Fail",
+            "Number": "4.14",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 6 measured pressure testing (<3 pa or <5 when designed at 150CFM)",
+            "Number": "4.15",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Bedroom 6 Pass/Fail",
+            "Number": "4.16",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bath fans measured testing >50CFM",
+            "Number": "4.17",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Kitchen fans measured testing >100CFM",
+            "Number": "4.18",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "ACCA testing has been completed",
+            "Number": "4.19",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "HVAC Weighin Testing Results are completed",
+            "Number": "4.20",
+            "ControlName": "YesNo",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Mechanical Ventilation Testing",
+        "Number": "5",
+        "Items": [
+          {
+            "Name": "Mechanical ventilation manuf. / model",
+            "Number": "5.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Override readily available",
+            "Number": "5.2",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Motorized damper",
+            "Number": "5.3",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Air is pulled from outside with rodent insect screen",
+            "Number": "5.4",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Measured fresh air CFM",
+            "Number": "5.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Fan watts",
+            "Number": "5.6",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "(HVAC) Set run time (hours of run time or min. or %)",
+            "Number": "5.7",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "InspectionCode": "IEF",
+    "Sections": [
+      {
+        "Name": "Administrative",
+        "Number": "1",
+        "Items": [
+          {
+            "Name": "Architectural plans on site",
+            "Number": "1.1",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "REMrate file",
+            "Number": "1.2",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "IECC code",
+            "Number": "1.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "2015",
+              "2018",
+              "2021",
+              "Energy Star"
+            ]
+          },
+          {
+            "Name": "Other plans on site",
+            "Number": "1.4",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Construction matches plans on site (plan #, elevation, opts, etc)",
+            "Number": "1.5",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Superintendent",
+            "Number": "1.6",
+            "ControlName": "SearchLookup",
+            "ValueList": [
+              "",
+              "[Unknown]",
+              "Aaron Whitaker",
+              "Alex Cornejo",
+              "Austin Covert",
+              "Benjamin W Lopez",
+              "Chris Torres",
+              "Clay Ransom",
+              "Clyde Hughes",
+              "Corey Laurent",
+              "Daniel Ward",
+              "Diego Garcia",
+              "Dillon Cowie",
+              "Edison Vanegas",
+              "Ethan Brannon",
+              "Gavan Miller",
+              "Greg Forkel",
+              "Irving F Pena Baldazo",
+              "James Phillip Rohan",
+              "Jared Dexter",
+              "Jesse Sanchez",
+              "Joey Shinn",
+              "John Turnbull",
+              "Jorge  Serrano ",
+              "Jorge Serrano",
+              "Jose Ramirez",
+              "Jose Valenzuela",
+              "Juan Garza",
+              "Kevin Flowers",
+              "Kristina Loggins",
+              "Luis Alas",
+              "Manuel J Castillo",
+              "Mario J Valenzuela",
+              "Mark Tarver",
+              "Mark Williamson",
+              "Michael Hood",
+              "Michael Hyland",
+              "Michael LaFoy",
+              "Mike May",
+              "Mike Schrab",
+              "Nick Brian Gaspard",
+              "Nick Brian Gaspare",
+              "Nick Stephens",
+              "Raul Rodriguez",
+              "Robert Trinchini",
+              "Robert Walter",
+              "Rudy Podrasky",
+              "Seth L Skeen",
+              "Shanon DwightThomas",
+              "Steve Eric Trapp",
+              "Taylor White",
+              "Timothy Bassett",
+              "Tyler Nannini",
+              "Tyler Rollan",
+              "Warren West",
+              "Zack Malone",
+              "Zack Parks"
+            ]
+          },
+          {
+            "Name": "Superintendent on site",
+            "Number": "1.7",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Subcontractor",
+            "Number": "1.8",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Subcontractor on site",
+            "Number": "1.9",
+            "ControlName": "YesNo",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Site Pictures",
+        "Number": "2",
+        "Items": [
+          {
+            "Name": "Front elevation Picture (Full Elevation, All Windows, Entire Profile)",
+            "Number": "2.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Front Door",
+            "Number": "2.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Left elevation  Picture (Full Elevation, All Windows, Entire Profile)",
+            "Number": "2.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Rear elevation picture (Full Elevation, All Windows, Entire Profile)",
+            "Number": "2.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Rear Door",
+            "Number": "2.5",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Rear Porch (IF Applicable)",
+            "Number": "2.6",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Right elevation picture (Full Elevation, All Windows, Entire Profile)",
+            "Number": "2.7",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Side Porch (If Applicable)",
+            "Number": "2.8",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Condenser Unit",
+        "Number": "3",
+        "Items": [
+          {
+            "Name": "Unit: Make/Model",
+            "Number": "3.1",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "24SCA518 - 1.5 ton",
+              "24SCA524 - 2 ton",
+              "24SCA530 - 2.5 ton",
+              "24SCA536 - 3 ton",
+              "24SCA542 - 3.5 ton",
+              "24SCA548 - 4 ton",
+              "24SCA560 - 5 ton",
+              "34SCA518 - 1.5 ton",
+              "34SCA524 - 2 ton",
+              "34SCA530 - 2.5 ton",
+              "34SCA536 - 3 ton",
+              "34SCA542 - 3.5 ton",
+              "34SCA548 - 4 ton",
+              "34SCA560 - 5 ton",
+              "GA5SAN418 - 1.5 ton\r\n0*",
+              "GA5SAN424 - 2 ton\r\n*",
+              "GA5SAN430 - 2.5 ton\r\n0*",
+              "GA5SAN436 - 3 ton\r\n1",
+              "GA5SAN442 - 3.5 ton",
+              "GA5SAN448 - 4 ton\r\n0*",
+              "GA5SAN460 - 5 ton\r\n0*",
+              "GH5SAN418 - 1.5 ton",
+              "GH5SAN424 - 2 ton",
+              "GH5SAN430 - 2.5 ton",
+              "GH5SAN436 - 3 ton",
+              "GH5SAN442 - 3.5 ton",
+              "GH5SAN448 - 4 ton",
+              "GH5SAN460 - 5 ton",
+              "ML17XC1-018 - 1.5 ton\r\n1*",
+              "ML17XC1-024 - 2 ton\r\n0*",
+              "ML17XC1-030 - 2.5 ton\r\n-50",
+              "ML17XC1-036 - 3 ton",
+              "ML17XC1-042 - 3.5 ton",
+              "ML17XC1-047 - 4 ton",
+              "ML17XC1-048 - 4 ton",
+              "ML17XC1-059 - 5 ton",
+              "ML17XC1-060 - 5 ton",
+              "ML17XP1-018 - 1.5 ton",
+              "ML17XP1-024 - 2 ton",
+              "ML17XP1-030 - 2.5 ton",
+              "ML17XP1-036 - 3 ton",
+              "ML17XP1-042- 3.5 ton",
+              "ML17XP1-048 - 4 ton",
+              "ML17XP1-060 - 5 ton",
+              "ML18XC2-024 - 2 ton",
+              "ML18XC2-036 - 3 ton",
+              "ML18XC2-048 - 4 ton",
+              "ML18XC2-060 - 5 ton",
+              "R4H5S18 - 1.5 ton",
+              "R4H5S24 - 2 ton",
+              "R4H5S30 - 2.5 ton",
+              "R4H5S36 - 3 ton",
+              "R4H5S42 - 3.5 ton",
+              "R4H5S60 - 5 ton",
+              "R5H5S18 - 1.5 ton",
+              "R5H5S24 - 2 ton",
+              "R5H5S30 - 2.5 ton",
+              "R5H5S36 - 3",
+              "R5H5S42 - 3.5",
+              "R5H5S48 - 4",
+              "R5H5S60 - 5",
+              "GLXS5BA18 - 1.5 ton",
+              "ML14KP1-018 - 1.5 ton",
+              "GLXS5BA24 - 2  ton",
+              "ML14KP1-024 - 2 ton",
+              "GLXS5BA30 - 2.5 ton",
+              "ML14KP1-030 - 2.5 ton",
+              "GLXS5BA36 - 3 ton",
+              "ML14KP1-036 - 3 ton",
+              "GLXS5BA42 - 3.5 ton",
+              "ML14KP1-042 - 3.5 ton",
+              "GLXS5BA48 - 4 ton",
+              "ML14KP1-048 - 4 ton",
+              "GLXS5BA60 - 5 ton",
+              "ML14KP1-060 - 5 ton",
+              "GSXH5018 - 1.5 ton",
+              "ML14KC1-018 - 1.5 ton",
+              "GSXH5024 - 2 ton",
+              "ML14KC1-024 - 2 ton",
+              "GSXH5030 - 2.5 ton",
+              "ML14KC1-030 - 2.5 ton",
+              "GSXH5036 - 3 ton",
+              "ML14KC1-036 - 3 ton",
+              "GSXH5048 - 4 ton",
+              "ML14KC1-042 - 3.5 ton",
+              "GSXH5060 - 5 ton",
+              "ML14KC1-048 - 4 ton",
+              "A4HP4036D - 3 ton",
+              "ML14KC1-060 - 5 ton",
+              "A4AH4E42A - 3.5 ton",
+              "A4HP4048D1 - 4 ton",
+              "GA5SAN518 - 1.5 ton",
+              "GA5SAN524 - 2 ton",
+              "GA5SAN530 - 2.5 ton",
+              "GA5SAN536 - 3 ton",
+              "GA5SAN542 - 3.5 ton",
+              "GA5SAN548 - 4 ton",
+              "GA5SAN560 - 5 ton",
+              "GH5SAN548 - 4 ton",
+              "GH5SAN518 - 1.5 ton",
+              "GH5SAN524 - 2 ton",
+              "GH5SAN530 - 2.5",
+              "GH5SAN560 - 5 ton",
+              "GH5SAN542 - 3.5 ton",
+              "GH5SAN536 - 3 ton",
+              "A4HP4042D - 3.5 ton",
+              "R4H5S48 - 4 ton",
+              "GSXN4042 - 3.5 ton",
+              "GSXN4030 - 2.5 ton",
+              "GSXN4036 - 3 ton",
+              "GSXN4018 - 1.5 ton",
+              "GSXN4048 - 4 ton",
+              "GSXN5042 - 3.5 ton",
+              "GSXH5024 - 2 ton"
+            ]
+          },
+          {
+            "Name": "Unit: Serial Number",
+            "Number": "3.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Unit: Make/Model (unit 2)",
+            "Number": "3.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "24SCA518 - 1.5 ton",
+              "24SCA524 - 2 ton",
+              "24SCA530 - 2.5 ton",
+              "24SCA536 - 3 ton",
+              "24SCA542 - 3.5 ton",
+              "24SCA548 - 4 ton",
+              "24SCA560 - 5 ton",
+              "34SCA518 - 1.5 ton",
+              "34SCA524 - 2 ton",
+              "34SCA530 - 2.5 ton",
+              "34SCA536 - 3 ton",
+              "34SCA542 - 3.5 ton",
+              "34SCA548 - 4 ton",
+              "34SCA560 - 5 ton",
+              "GA5SAN418 - 1.5 ton\r\n0*",
+              "GA5SAN424 - 2 ton\r\n*",
+              "GA5SAN430 - 2.5 ton\r\n0*",
+              "GA5SAN436 - 3 ton\r\n1",
+              "GA5SAN442 - 3.5 ton",
+              "GA5SAN448 - 4 ton\r\n0*",
+              "GA5SAN460 - 5 ton\r\n0*",
+              "GH5SAN418 - 1.5 ton",
+              "GH5SAN424 - 2 ton",
+              "GH5SAN430 - 2.5 ton",
+              "GH5SAN436 - 3 ton",
+              "GH5SAN442 - 3.5 ton",
+              "GH5SAN448 - 4 ton",
+              "GH5SAN460 - 5 ton",
+              "ML17XC1-018 - 1.5 ton\r\n1*",
+              "ML17XC1-024 - 2 ton\r\n0*",
+              "ML17XC1-030 - 2.5 ton\r\n-50",
+              "ML17XC1-036 - 3 ton",
+              "ML17XC1-042 - 3.5 ton",
+              "ML17XC1-047 - 4 ton",
+              "ML17XC1-048 - 4 ton",
+              "ML17XC1-059 - 5 ton",
+              "ML17XC1-060 - 5 ton",
+              "ML17XP1-018 - 1.5 ton",
+              "ML17XP1-024 - 2 ton",
+              "ML17XP1-030 - 2.5 ton",
+              "ML17XP1-036 - 3 ton",
+              "ML17XP1-042- 3.5 ton",
+              "ML17XP1-048 - 4 ton",
+              "ML17XP1-060 - 5 ton",
+              "ML18XC2-024 - 2 ton",
+              "ML18XC2-036 - 3 ton",
+              "ML18XC2-048 - 4 ton",
+              "ML18XC2-060 - 5 ton",
+              "R4H5S18 - 1.5 ton",
+              "R4H5S24 - 2 ton",
+              "R4H5S30 - 2.5 ton",
+              "R4H5S36 - 3 ton",
+              "R4H5S42 - 3.5 ton",
+              "R4H5S60 - 5 ton",
+              "R5H5S18 - 1.5 ton",
+              "R5H5S24 - 2 ton",
+              "R5H5S30 - 2.5 ton",
+              "R5H5S36 - 3",
+              "R5H5S42 - 3.5",
+              "R5H5S48 - 4",
+              "R5H5S60 - 5",
+              "GLXS5BA18 - 1.5 ton",
+              "ML14KP1-018 - 1.5 ton",
+              "GLXS5BA24 - 2  ton",
+              "ML14KP1-024 - 2 ton",
+              "GLXS5BA30 - 2.5 ton",
+              "ML14KP1-030 - 2.5 ton",
+              "GLXS5BA36 - 3 ton",
+              "ML14KP1-036 - 3 ton",
+              "GLXS5BA42 - 3.5 ton",
+              "ML14KP1-042 - 3.5 ton",
+              "GLXS5BA48 - 4 ton",
+              "ML14KP1-048 - 4 ton",
+              "GLXS5BA60 - 5 ton",
+              "ML14KP1-060 - 5 ton",
+              "GSXH5018 - 1.5 ton",
+              "ML14KC1-018 - 1.5 ton",
+              "GSXH5024 - 2 ton",
+              "ML14KC1-024 - 2 ton",
+              "GSXH5030 - 2.5 ton",
+              "ML14KC1-030 - 2.5 ton",
+              "GSXH5036 - 3 ton",
+              "ML14KC1-036 - 3 ton",
+              "GSXH5048 - 4 ton",
+              "ML14KC1-042 - 3.5 ton",
+              "GSXH5060 - 5 ton",
+              "ML14KC1-048 - 4 ton",
+              "A4HP4036D - 3 ton",
+              "ML14KC1-060 - 5 ton",
+              "A4AH4E42A - 3.5 ton",
+              "A4HP4048D1 - 4 ton",
+              "GA5SAN518 - 1.5 ton",
+              "GA5SAN524 - 2 ton",
+              "GA5SAN530 - 2.5 ton",
+              "GA5SAN536 - 3 ton",
+              "GA5SAN542 - 3.5 ton",
+              "GA5SAN548 - 4 ton",
+              "GA5SAN560 - 5 ton",
+              "GH5SAN548 - 4 ton",
+              "GH5SAN518 - 1.5 ton",
+              "GH5SAN524 - 2 ton",
+              "GH5SAN530 - 2.5",
+              "GH5SAN560 - 5 ton",
+              "GH5SAN542 - 3.5 ton",
+              "GH5SAN536 - 3 ton",
+              "A4HP4042D - 3.5 ton",
+              "R4H5S48 - 4 ton",
+              "GSXN4042 - 3.5 ton",
+              "GSXN4030 - 2.5 ton",
+              "GSXN4036 - 3 ton",
+              "GSXN4018 - 1.5 ton",
+              "GSXN4048 - 4 ton",
+              "GSXN5042 - 3.5 ton",
+              "GSXH5024 - 2 ton"
+            ]
+          },
+          {
+            "Name": "Unit: Serial Number (unit 2)",
+            "Number": "3.4",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Plumbing Hot Water Service",
+        "Number": "4",
+        "Items": [
+          {
+            "Name": "Make",
+            "Number": "4.1",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "RHEEM",
+              "RUUD",
+              "RINNAI",
+              "AO SMITH"
+            ]
+          },
+          {
+            "Name": "Model",
+            "Number": "4.2",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "GCR 40 250",
+              "PROE50 T1 RH95",
+              "PROG50-38N RH60 *",
+              "PROG50-38N RU60 *",
+              "REU-VC2025FFU-US",
+              "V65i",
+              "V75i"
+            ]
+          },
+          {
+            "Name": "Gas/Electric",
+            "Number": "4.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Gas",
+              "Electric"
+            ]
+          },
+          {
+            "Name": "Serial number",
+            "Number": "4.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Capacity",
+            "Number": "4.5",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "20 Gallon",
+              "30 Gallon",
+              "40 Gallon",
+              "50 Gallon",
+              "55 Gallon",
+              "60 Gallon",
+              "Tankless"
+            ]
+          }
+        ]
+      },
+      {
+        "Name": "HVAC Systems",
+        "Number": "5",
+        "Items": [
+          {
+            "Name": "HVAC sized in accordance with the IECC",
+            "Number": "5.1",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "HVAC SEER",
+            "Number": "5.2",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "13 SEER",
+              "14 SEER",
+              "16 SEER",
+              "18 SEER"
+            ]
+          },
+          {
+            "Name": "Mechanical ventilation system type",
+            "Number": "5.3",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "Balanced",
+              "Exhaust",
+              "Supply",
+              "Air Cycler"
+            ]
+          },
+          {
+            "Name": "Type of ventilation controls",
+            "Number": "5.4",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "Intermittent",
+              "Continuous"
+            ]
+          },
+          {
+            "Name": "Type of mechanical damper installed",
+            "Number": "5.5",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "Automatic",
+              "Gravity"
+            ]
+          },
+          {
+            "Name": "Programmable thermostat",
+            "Number": "5.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Thermostat serial number",
+            "Number": "5.7",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Outdoor TSTAT for heat pump",
+            "Number": "5.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Evaporator Coil/Air Handler Unit",
+        "Number": "6",
+        "Items": [
+          {
+            "Name": "Air Handler Location",
+            "Number": "6.1",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Conditioned Attic",
+              "Unconditioned Attic",
+              "Conditioned Closet"
+            ]
+          },
+          {
+            "Name": "Unit: Make/Model",
+            "Number": "6.2",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "CAP**3717AL*",
+              "CAP**4221AL*",
+              "CAP**4821AL*",
+              "CAP**6021AL*",
+              "CAP**6121AL*",
+              "CAP**6124AL*",
+              "CAPMP2414",
+              "CAPMP3014",
+              "CAPMP3017",
+              "CAPMP3617",
+              "CAPMP4321",
+              "CHX35-24A",
+              "CHX35-24B",
+              "CHX35-30A",
+              "CHX35-30B",
+              "CHX35-36A",
+              "CHX35-36B",
+              "CHX35-40/61",
+              "CHX35-42B",
+              "CHX35-42C",
+              "CHX35-48B",
+              "CHX35-51/61C",
+              "CNPH*3617AL*",
+              "CNPH*4221AL*",
+              "CNPH*6124AL*",
+              "CNPHP3017",
+              "CNPHP3117",
+              "CNPHP4321",
+              "CNPHP4821",
+              "CNPHP6024",
+              "CVPMA2417",
+              "A4AH4E36A",
+              "CVPMA2517",
+              "FJ5DNXC48",
+              "CVPMA3017",
+              "FJ5ANXC42",
+              "CVPMA3117",
+              "CVPMA3217",
+              "CVPMA3617",
+              "CVPMA4221",
+              "CVPMA4321",
+              "A4AH4E48B",
+              "CVPMA4421",
+              "CVPMA4821",
+              "CVPMA4921",
+              "CVPMA6021",
+              "CX35-24A",
+              "CX35-24B",
+              "CX35-30B",
+              "CX35-36A",
+              "FJ4DNXCD60",
+              "CX35-36B",
+              "FJ5ANXC48",
+              "CX35-42B",
+              "FJ5ANXD60",
+              "CX35-48B",
+              "CX35-48C",
+              "FB4CNF036",
+              "CHPTA3630",
+              "FB4CNF042",
+              "CHPTA3026",
+              "FB4CNP030L",
+              "FJMA4X30",
+              "FX4DN(B,F)031L",
+              "FJMA4X36",
+              "FX4DN(B,F)037L",
+              "FJMA4X24",
+              "FX4DN(B,F)043L",
+              "FHMA5X24",
+              "FX4DN(B,F)049L",
+              "FHMA5X36",
+              "FX4DN(B,F)061L",
+              "FHMA5X30",
+              "FX4DNF025L",
+              "FHMA5X42",
+              "LH24/37",
+              "FHMA5X48",
+              "LH29/36",
+              "FHMA5B60",
+              "LH40/61",
+              "CK40HT-24A",
+              "LH42/62",
+              "CK40HT-30B",
+              "LH49/61",
+              "CK40CT-36A",
+              "LH49/62",
+              "CK40HT-42B",
+              "CK40HT-42C",
+              "FG4ANBD60",
+              "CK40HT-48B",
+              "FG4ANXC36",
+              "CK40HT-48C",
+              "FG4DNBD60",
+              "CK40CT-60C",
+              "CX35-42C",
+              "FJ4DNXB36",
+              "CBK45UHP(T)",
+              "FJ4DNXC42",
+              "CBK45UHV(T)",
+              "FJ4DNXB24",
+              "CBK45UHE(T)",
+              "FJ4DNXB30",
+              "CK40CT-48B",
+              "FJ4DNXC48L",
+              "CK40CT-24A",
+              "CBK45UHPT-030",
+              "CK40CT-24B",
+              "CBK45UHPT-036",
+              "CK40CT-30B",
+              "CBK45UHVT-036",
+              "CK40CT-48C",
+              "CBK45UHET-036",
+              "CK40HT-51/61C",
+              "CBK45UHVT-030",
+              "CBA25UHE-024",
+              "CBK45UHVT-042",
+              "CBA25UHE-030",
+              "CBK45UHPT-042",
+              "CBA25UHE-036",
+              "CBK45UHET-048",
+              "CBA25UHE-042",
+              "CBK45UHVT-048",
+              "CBA25UH-024",
+              "A4AH6V48A",
+              "A4AH4E30A",
+              "A4AH4E42B",
+              "A4AH6V48A",
+              "CBA25UH-030",
+              "CBA25UH-036",
+              "CBA25UH-042",
+              "CBA25UH-048",
+              "CBA25UH-060",
+              "CBA25UHV-036",
+              "CBA25UHV-042",
+              "CBA25UHV-048",
+              "CBA25UHV-060",
+              "CBA27UHE-024",
+              "CBA27UHE-030",
+              "CBA27UHE-036",
+              "CBA27UHE-042",
+              "CBA27UHE-048",
+              "CBA27UH-024",
+              "CBA27UH-030",
+              "CBA27UH-036",
+              "CBA27UH-042",
+              "CBA27UH-048",
+              "CBA27UH-060",
+              "CBA27UHV-024",
+              "CBA27UHV-030",
+              "CBA27UHV-036",
+              "CBA27UHV-042",
+              "CBA27UHV-048",
+              "CBA27UHV-060",
+              "CBA27UHE-060",
+              "AMST48C",
+              "AMST42C",
+              "AMST30B",
+              "AMST36C",
+              "AMST24B",
+              "CHPT4860",
+              "CHPTA1822",
+              "CHPTA2426",
+              "DX36E34",
+              "A4AH6V42A"
+            ]
+          },
+          {
+            "Name": "Unit: Serial Number",
+            "Number": "6.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Unit: Make/Model (unit 2)",
+            "Number": "6.4",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "CAP**3717AL*",
+              "CAP**4221AL*",
+              "CAP**4821AL*",
+              "CAP**6021AL*",
+              "CAP**6121AL*",
+              "CAP**6124AL*",
+              "CAPMP2414",
+              "CAPMP3014",
+              "CAPMP3017",
+              "CAPMP3617",
+              "CAPMP4321",
+              "CHX35-24A",
+              "CHX35-24B",
+              "CHX35-30A",
+              "CHX35-30B",
+              "CHX35-36A",
+              "CHX35-36B",
+              "CHX35-40/61",
+              "CHX35-42B",
+              "CHX35-42C",
+              "CHX35-48B",
+              "CHX35-51/61C",
+              "CNPH*3617AL*",
+              "CNPH*4221AL*",
+              "CNPH*6124AL*",
+              "CNPHP3017",
+              "CNPHP3117",
+              "CNPHP4321",
+              "CNPHP4821",
+              "CNPHP6024",
+              "CVPMA2417",
+              "A4AH4E36A",
+              "CVPMA2517",
+              "FJ5DNXC48",
+              "CVPMA3017",
+              "FJ5ANXC42",
+              "CVPMA3117",
+              "CVPMA3217",
+              "CVPMA3617",
+              "CVPMA4221",
+              "CVPMA4321",
+              "A4AH4E48B",
+              "CVPMA4421",
+              "CVPMA4821",
+              "CVPMA4921",
+              "CVPMA6021",
+              "CX35-24A",
+              "CX35-24B",
+              "CX35-30B",
+              "CX35-36A",
+              "FJ4DNXCD60",
+              "CX35-36B",
+              "FJ5ANXC48",
+              "CX35-42B",
+              "FJ5ANXD60",
+              "CX35-48B",
+              "CX35-48C",
+              "FB4CNF036",
+              "CHPTA3630",
+              "FB4CNF042",
+              "CHPTA3026",
+              "FB4CNP030L",
+              "FJMA4X30",
+              "FX4DN(B,F)031L",
+              "FJMA4X36",
+              "FX4DN(B,F)037L",
+              "FJMA4X24",
+              "FX4DN(B,F)043L",
+              "FHMA5X24",
+              "FX4DN(B,F)049L",
+              "FHMA5X36",
+              "FX4DN(B,F)061L",
+              "FHMA5X30",
+              "FX4DNF025L",
+              "FHMA5X42",
+              "LH24/37",
+              "FHMA5X48",
+              "LH29/36",
+              "FHMA5B60",
+              "LH40/61",
+              "CK40HT-24A",
+              "LH42/62",
+              "CK40HT-30B",
+              "LH49/61",
+              "CK40CT-36A",
+              "LH49/62",
+              "CK40HT-42B",
+              "CK40HT-42C",
+              "FG4ANBD60",
+              "CK40HT-48B",
+              "FG4ANXC36",
+              "CK40HT-48C",
+              "FG4DNBD60",
+              "CK40CT-60C",
+              "CX35-42C",
+              "FJ4DNXB36",
+              "CBK45UHP(T)",
+              "FJ4DNXC42",
+              "CBK45UHV(T)",
+              "FJ4DNXB24",
+              "CBK45UHE(T)",
+              "FJ4DNXB30",
+              "CK40CT-48B",
+              "FJ4DNXC48L",
+              "CK40CT-24A",
+              "CBK45UHPT-030",
+              "CK40CT-24B",
+              "CBK45UHPT-036",
+              "CK40CT-30B",
+              "CBK45UHVT-036",
+              "CK40CT-48C",
+              "CBK45UHET-036",
+              "CK40HT-51/61C",
+              "CBK45UHVT-030",
+              "CBA25UHE-024",
+              "CBK45UHVT-042",
+              "CBA25UHE-030",
+              "CBK45UHPT-042",
+              "CBA25UHE-036",
+              "CBK45UHET-048",
+              "CBA25UHE-042",
+              "CBK45UHVT-048",
+              "CBA25UH-024",
+              "A4AH6V48A",
+              "A4AH4E30A",
+              "A4AH4E42B",
+              "A4AH6V48A",
+              "CBA25UH-030",
+              "CBA25UH-036",
+              "CBA25UH-042",
+              "CBA25UH-048",
+              "CBA25UH-060",
+              "CBA25UHV-036",
+              "CBA25UHV-042",
+              "CBA25UHV-048",
+              "CBA25UHV-060",
+              "CBA27UHE-024",
+              "CBA27UHE-030",
+              "CBA27UHE-036",
+              "CBA27UHE-042",
+              "CBA27UHE-048",
+              "CBA27UH-024",
+              "CBA27UH-030",
+              "CBA27UH-036",
+              "CBA27UH-042",
+              "CBA27UH-048",
+              "CBA27UH-060",
+              "CBA27UHV-024",
+              "CBA27UHV-030",
+              "CBA27UHV-036",
+              "CBA27UHV-042",
+              "CBA27UHV-048",
+              "CBA27UHV-060",
+              "CBA27UHE-060",
+              "AMST48C",
+              "AMST42C",
+              "AMST30B",
+              "AMST36C",
+              "AMST24B",
+              "CHPT4860",
+              "CHPTA1822",
+              "CHPTA2426",
+              "DX36E34",
+              "A4AH6V42A"
+            ]
+          },
+          {
+            "Name": "Unit: Serial Number (unit2)",
+            "Number": "6.5",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Furnace",
+        "Number": "7",
+        "Items": [
+          {
+            "Name": "Unit: Make/Model",
+            "Number": "7.1",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "\"\t58SB0A070E14--12\"",
+              "\"\t58SB0A070E21--16\"",
+              "\"\t58SB0A090E24--20\"",
+              "\"\t58SB0A110E21--20\"",
+              "\"\t58SB0A110E24--20\"",
+              "\"\t58SB0B045M14--12\"",
+              "\"\t58SB0B090M17--14\"",
+              "\"\t58SB0B090M24--20\"",
+              "\"\t58SB0B110M21--20\"",
+              "\"\t58SC1A070E17--12\"",
+              "\"\t58SC1A090E21--16\"",
+              "\"\t58SC1A110E21--20\"",
+              "\"\t58SP0A070V21--20\"",
+              "\"\t58SP0A090V21--20\"",
+              "\"\t58SP0A090V24--20\"",
+              "\"\t58SP0A110V24--22\"",
+              "12SD60080E21***",
+              "58PH*070---***12",
+              "58PH*070---***16",
+              "58PH*070---***18",
+              "58PH*090---***16",
+              "58PH*090---***20",
+              "58PH*110---***20",
+              "58S(B,C)*A045E14**12",
+              "58S(B,C)*A045E17**12",
+              "58S(B,C)*A070E14**12",
+              "58S(B,C)*A070E17**12",
+              "58S(B,C)*A070E17**16",
+              "58S(B,C)*A070E21**12",
+              "58S(B,C)*A070E21**16",
+              "58S(B,C)*A070E21**20",
+              "58S(B,C)*A090E21**16",
+              "58S(B,C)*A090E21**20",
+              "58S(B,C)*A090E24**20",
+              "58S(B,C)*A110E21**20",
+              "58SB0A045E14--12",
+              "58SB0A045E17--12",
+              "58SB0A070E17--12",
+              "58SB0A070E17--16",
+              "58SB0A090E17--14",
+              "58SB0A090E21--16",
+              "58SB0A090E21--20",
+              "58SB0B045M17--14",
+              "58SB0B070M14--12",
+              "58SB0B070M17--12",
+              "58SB0B070M17--16",
+              "58SB0B070M21--16",
+              "58SB0B090M21--16",
+              "58SB0B090M21--20",
+              "58SB0B110M24--20",
+              "58SC0A045E14--12",
+              "58SC0A045E17--12",
+              "58SC0A070E14--12",
+              "58SC0A070E17--12",
+              "58SC0A070E17--16",
+              "58SC0A070E21--16",
+              "58SC0A090E17--14",
+              "58SC0A090E21--16",
+              "58SC0A090E21--20",
+              "58SC0A110E21--20",
+              "58SC0B045M14--12",
+              "58SC0B045M17--14",
+              "58SC0B070M14--12",
+              "58SC0B070M17--12",
+              "58SC0B070M17--16",
+              "58SC0B070M21--16",
+              "58SC0B090M17--14",
+              "58SC0B090M21--16",
+              "58SC0B090M21--20",
+              "58SC0B110M21--20",
+              "58SC1A045E14--12",
+              "58SC1A045E17--12",
+              "58SC1A070E14--12",
+              "58SC1A070E17--16",
+              "58SC1A070E21--16",
+              "58SC1A090E17--14",
+              "58SC1A090E21--20",
+              "58SC1A090E24--20",
+              "58SP*A070V17**16",
+              "58SP0A045V14--12",
+              "58SP0A045V17--16",
+              "58SP0A070V17--16",
+              "8S(B,C)*A070E17**16",
+              "912SD36060E14***",
+              "912SD48080E17***",
+              "912SD60080E21***",
+              "912SD60100E21**",
+              "912SD66100E21***",
+              "A95UH1E090C16",
+              "ML180UH045E36A",
+              "ML180UH070E36A",
+              "ML180UH070E36B",
+              "ML180UH070V36B*",
+              "ML180UH070XE36A",
+              "ML180UH070XE36B",
+              "ML180UH090E48B",
+              "ML180UH090E60C",
+              "ML180UH090XE48B",
+              "ML180UH110E60C",
+              "ML180UH110V60C",
+              "ML180UH110XE60C",
+              "ML196UH045XE36B",
+              "ML196UH070XE36B",
+              "ML196UH070XE48B",
+              "ML196UH090XE36C",
+              "ML196UH090XE48C",
+              "ML196UH090XE60C",
+              "ML196UH110XE60C",
+              "ML296UH045XV36B",
+              "ML296UH070XV36B",
+              "ML296UH090XV48C",
+              "ML296UH110XV60C",
+              "GM9S960805",
+              "GM9S960603",
+              "GM9C800805C",
+              "GM9S961205",
+              "GM9S800804C",
+              "GMVC960403BN",
+              "GMVC960603",
+              "GMVC960804",
+              "58SB0B045M14-12",
+              "58SC0B045M14-12",
+              "ML180UH045V36A",
+              "ML180UH070V36B",
+              "ML180UH090V48B",
+              "ML180UH110V60C",
+              "ML180UH070V36A",
+              "GM9S960803B",
+              "GM9S961205",
+              "58SC1B090M21-20",
+              "58SC1B110M21-20",
+              "58SC1B070M21-16",
+              "58SC1B045M17-14",
+              "58SC1B090M21-16",
+              "58SC1B070M17-16",
+              "58SP0A070V17-16"
+            ]
+          },
+          {
+            "Name": "Unit: Serial Number",
+            "Number": "7.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Unit: Fuel Type",
+            "Number": "7.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Gas",
+              "Electric"
+            ]
+          },
+          {
+            "Name": "Unit: Make/Model (unit 2)",
+            "Number": "7.4",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "\"\t58SB0A070E14--12\"",
+              "\"\t58SB0A070E21--16\"",
+              "\"\t58SB0A090E24--20\"",
+              "\"\t58SB0A110E21--20\"",
+              "\"\t58SB0A110E24--20\"",
+              "\"\t58SB0B045M14--12\"",
+              "\"\t58SB0B090M17--14\"",
+              "\"\t58SB0B090M24--20\"",
+              "\"\t58SB0B110M21--20\"",
+              "\"\t58SC1A070E17--12\"",
+              "\"\t58SC1A090E21--16\"",
+              "\"\t58SC1A110E21--20\"",
+              "\"\t58SP0A070V21--20\"",
+              "\"\t58SP0A090V21--20\"",
+              "\"\t58SP0A090V24--20\"",
+              "\"\t58SP0A110V24--22\"",
+              "12SD60080E21***",
+              "58PH*070---***12",
+              "58PH*070---***16",
+              "58PH*070---***18",
+              "58PH*090---***16",
+              "58PH*090---***20",
+              "58PH*110---***20",
+              "58S(B,C)*A045E14**12",
+              "58S(B,C)*A045E17**12",
+              "58S(B,C)*A070E14**12",
+              "58S(B,C)*A070E17**12",
+              "58S(B,C)*A070E17**16",
+              "58S(B,C)*A070E21**12",
+              "58S(B,C)*A070E21**16",
+              "58S(B,C)*A070E21**20",
+              "58S(B,C)*A090E21**16",
+              "58S(B,C)*A090E21**20",
+              "58S(B,C)*A090E24**20",
+              "58S(B,C)*A110E21**20",
+              "58SB0A045E14--12",
+              "58SB0A045E17--12",
+              "58SB0A070E17--12",
+              "58SB0A070E17--16",
+              "58SB0A090E17--14",
+              "58SB0A090E21--16",
+              "58SB0A090E21--20",
+              "58SB0B045M17--14",
+              "58SB0B070M14--12",
+              "58SB0B070M17--12",
+              "58SB0B070M17--16",
+              "58SB0B070M21--16",
+              "58SB0B090M21--16",
+              "58SB0B090M21--20",
+              "58SB0B110M24--20",
+              "58SC0A045E14--12",
+              "58SC0A045E17--12",
+              "58SC0A070E14--12",
+              "58SC0A070E17--12",
+              "58SC0A070E17--16",
+              "58SC0A070E21--16",
+              "58SC0A090E17--14",
+              "58SC0A090E21--16",
+              "58SC0A090E21--20",
+              "58SC0A110E21--20",
+              "58SC0B045M14--12",
+              "58SC0B045M17--14",
+              "58SC0B070M14--12",
+              "58SC0B070M17--12",
+              "58SC0B070M17--16",
+              "58SC0B070M21--16",
+              "58SC0B090M17--14",
+              "58SC0B090M21--16",
+              "58SC0B090M21--20",
+              "58SC0B110M21--20",
+              "58SC1A045E14--12",
+              "58SC1A045E17--12",
+              "58SC1A070E14--12",
+              "58SC1A070E17--16",
+              "58SC1A070E21--16",
+              "58SC1A090E17--14",
+              "58SC1A090E21--20",
+              "58SC1A090E24--20",
+              "58SP*A070V17**16",
+              "58SP0A045V14--12",
+              "58SP0A045V17--16",
+              "58SP0A070V17--16",
+              "8S(B,C)*A070E17**16",
+              "912SD36060E14***",
+              "912SD48080E17***",
+              "912SD60080E21***",
+              "912SD60100E21**",
+              "912SD66100E21***",
+              "A95UH1E090C16",
+              "ML180UH045E36A",
+              "ML180UH070E36A",
+              "ML180UH070E36B",
+              "ML180UH070V36B*",
+              "ML180UH070XE36A",
+              "ML180UH070XE36B",
+              "ML180UH090E48B",
+              "ML180UH090E60C",
+              "ML180UH090XE48B",
+              "ML180UH110E60C",
+              "ML180UH110V60C",
+              "ML180UH110XE60C",
+              "ML196UH045XE36B",
+              "ML196UH070XE36B",
+              "ML196UH070XE48B",
+              "ML196UH090XE36C",
+              "ML196UH090XE48C",
+              "ML196UH090XE60C",
+              "ML196UH110XE60C",
+              "ML296UH045XV36B",
+              "ML296UH070XV36B",
+              "ML296UH090XV48C",
+              "ML296UH110XV60C",
+              "GM9S960805",
+              "GM9S960603",
+              "GM9C800805C",
+              "GM9S961205",
+              "GM9S800804C",
+              "GMVC960403BN",
+              "GMVC960603",
+              "GMVC960804",
+              "58SB0B045M14-12",
+              "58SC0B045M14-12",
+              "ML180UH045V36A",
+              "ML180UH070V36B",
+              "ML180UH090V48B",
+              "ML180UH110V60C",
+              "ML180UH070V36A",
+              "GM9S960803B",
+              "GM9S961205",
+              "58SC1B090M21-20",
+              "58SC1B110M21-20",
+              "58SC1B070M21-16",
+              "58SC1B045M17-14",
+              "58SC1B090M21-16",
+              "58SC1B070M17-16",
+              "58SP0A070V17-16"
+            ]
+          }
+        ]
+      },
+      {
+        "Name": "Quality Installed Insulation",
+        "Number": "8",
+        "Items": [
+          {
+            "Name": "Ceiling insulation meet or exceed  IECC",
+            "Number": "8.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Ceiling R-value",
+            "Number": "8.2",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "R30, 24\" o.c., Grade 1",
+              "R30, 24\" o.c., Grade 2",
+              "R30, 24\" o.c., Grade 3",
+              "R38, 24\" o.c., Grade 1",
+              "R38, 24\" o.c., Grade 2",
+              "R38, 24\" o.c., Grade 3",
+              "R42, 24\" o.c., Grade 1",
+              "R42, 24\" o.c., Grade 2",
+              "R42, 24\" o.c., Grade 3",
+              "R20 5.5\" FOAM Grade 1",
+              "R25 7\" FOAM Grade 1",
+              "R29 8\" FOAM Grade 1",
+              "R30 8.5\" FOAM Grade 1",
+              "R32 9\" FOAM Grade 1",
+              "R36 10\" FOAM Grade 1",
+              "R41 11.5\" FOAM Grade 1",
+              "R49 24\" o.c., Grade 1",
+              "R49 24\" o.c., Grade 2",
+              "R49 24\" o.c., Grade 3"
+            ]
+          },
+          {
+            "Name": "Certificate and markers per code",
+            "Number": "8.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "R-10 Pull Down or equivalent",
+            "Number": "8.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Air Sealing (Penetrations)",
+        "Number": "9",
+        "Items": [
+          {
+            "Name": "Doors adjacent to unconditioned space air-tight",
+            "Number": "9.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Attic access panels or pull downs air-tight",
+            "Number": "9.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Whole house fans equipped with air-tight cover",
+            "Number": "9.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "HVAC boots sealed to sheetrock",
+            "Number": "9.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "9.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Additional Items",
+        "Number": "10",
+        "Items": [
+          {
+            "Name": "Electric meter",
+            "Number": "10.1",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "LED percentage",
+            "Number": "10.2",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Orientation",
+            "Number": "10.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "North",
+              "Northeast",
+              "East",
+              "Southeast",
+              "South",
+              "Southwest",
+              "West",
+              "Northwest"
+            ]
+          },
+          {
+            "Name": "Dishwasher model/serial",
+            "Number": "10.4",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "GDF510PSR6SS",
+              "WDF332PAMS",
+              "WDF520PADM6",
+              "WDP540HAMZ4",
+              "WDT730HAMZ1",
+              "WDT975SAHZ0"
+            ]
+          },
+          {
+            "Name": "Washer/Dryer Model/Serial",
+            "Number": "10.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Refrigerator Model/Serial",
+            "Number": "10.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Stove Gas/Electric",
+            "Number": "10.7",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Gas",
+              "Electric"
+            ]
+          },
+          {
+            "Name": "AC square footage",
+            "Number": "10.8",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "AC volume",
+            "Number": "10.9",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "MERV 6 ",
+            "Number": "10.10",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Other",
+        "Number": "11",
+        "Items": [
+          {
+            "Name": "PT Cables Stressed",
+            "Number": "11.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "HVAC Weighin Testing Results are completed",
+            "Number": "11.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "ACCA testing has passed (name of inspector)",
+            "Number": "11.3",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Energy final testing has passed (name of inspector)",
+            "Number": "11.4",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Other Comments",
+            "Number": "11.5",
+            "ControlName": "Text",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Mechanical Ventilation Testing",
+        "Number": "12",
+        "Items": []
+      },
+      {
+        "Name": "Other",
+        "Number": "13",
+        "Items": []
+      }
+    ]
+  },
+  {
+    "InspectionCode": "HER",
+    "Sections": [
+      {
+        "Name": "Administrative",
+        "Number": "1",
+        "Items": [
+          {
+            "Name": "Architectural plans on site",
+            "Number": "1.1",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "REMrate file",
+            "Number": "1.2",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "IECC code",
+            "Number": "1.3",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "2015",
+              "2018",
+              "2021",
+              "Energy Star"
+            ]
+          },
+          {
+            "Name": "Other plans on site",
+            "Number": "1.4",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Construction matches plans on site (plan #, elevation, opts, etc)",
+            "Number": "1.5",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Superintendent",
+            "Number": "1.6",
+            "ControlName": "SearchLookup",
+            "ValueList": [
+              "",
+              " Grant Timbs",
+              "Alex Chap",
+              "Alex Chapa",
+              "Alex Hirsch",
+              "Casey Smith",
+              "Cody Clark",
+              "Cody Cross",
+              "Cody Gardner",
+              "Collin Garrett",
+              "Colllin Garrett",
+              "Drew Maclellan",
+              "Dylan Orchowski",
+              "Dylan Zachary Orchowski",
+              "Dylan Zachary Orskichow",
+              "Glenn Loving",
+              "Grant Timbes",
+              "Grant Timbs",
+              "Hunter Cornay",
+              "Jordon Wisnoski",
+              "Juan Vidal",
+              "Kurt Berkes",
+              "Kyle Bybee",
+              "Leo Leal",
+              "Max Dodson",
+              "Michael Costello",
+              "Roy Gutierrez",
+              "Ryan Safari",
+              "Stephen Fleming",
+              "Steve Fleming",
+              "Zack Biles",
+              "Zackary Biles"
+            ]
+          },
+          {
+            "Name": "Superintendent on site",
+            "Number": "1.7",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Subcontractor",
+            "Number": "1.8",
+            "ControlName": "Text",
+            "ValueList": []
+          },
+          {
+            "Name": "Subcontractor on site",
+            "Number": "1.9",
+            "ControlName": "YesNo",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "High Performance Fenestration",
+        "Number": "2",
+        "Items": [
+          {
+            "Name": "Type",
+            "Number": "2.1",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "Prescriptive IECC",
+              "Performance IECC"
+            ]
+          },
+          {
+            "Name": "Area weighted average U-factor",
+            "Number": "2.2",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Area weighted average SHGC",
+            "Number": "2.3",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Skylight U-factor",
+            "Number": "2.4",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Installation",
+            "Number": "2.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Overhangs per plan",
+            "Number": "2.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Reduced thermal bridging (ESTAR)",
+            "Number": "2.7",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "2.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Quality Installed Insulation",
+        "Number": "3",
+        "Items": [
+          {
+            "Name": "Ceiling, floor, and wall insulation meet or exceed IECC",
+            "Number": "3.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Sloped ceiling R-value",
+            "Number": "3.2",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "R11",
+              "R13",
+              "R15",
+              "R19",
+              "R21",
+              "R22",
+              "R25",
+              "R30",
+              "R38"
+            ]
+          },
+          {
+            "Name": "Sloped ceiling insulation grade (MRF)",
+            "Number": "3.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": [
+              "Grade 1",
+              "Grade 2",
+              "Grade 3"
+            ]
+          },
+          {
+            "Name": "Wood frame wall R-value (MRF)",
+            "Number": "3.4",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "R11",
+              "R13",
+              "R15",
+              "R19",
+              "R21",
+              "R22",
+              "R25",
+              "R30",
+              "R38"
+            ]
+          },
+          {
+            "Name": "Wood frame insulation grade (MRF)",
+            "Number": "3.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": [
+              "Grade 1",
+              "Grade 2",
+              "Grade 3"
+            ]
+          },
+          {
+            "Name": "Stud spacing (MRF)",
+            "Number": "3.6",
+            "ControlName": "Lookup",
+            "ValueList": [
+              "12\"",
+              "16\"",
+              "19.2\"",
+              "24\""
+            ]
+          },
+          {
+            "Name": "Continuous sheathing R-value (MRF)",
+            "Number": "3.7",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "N/A",
+              "R.18 ",
+              "R1.8",
+              "R3.0",
+              "R5"
+            ]
+          },
+          {
+            "Name": "Floor R-value (MRF)",
+            "Number": "3.8",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "R11",
+              "R13",
+              "R15",
+              "R19",
+              "R21",
+              "R22",
+              "R25",
+              "R30",
+              "R38"
+            ]
+          },
+          {
+            "Name": "Floor insulation properly supported",
+            "Number": "3.9",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Floor insulation grade (MRF)",
+            "Number": "3.10",
+            "ControlName": "PassFailNaNi",
+            "ValueList": [
+              "Grade 1",
+              "Grade 2",
+              "Grade 3"
+            ]
+          },
+          {
+            "Name": "Slab R-value",
+            "Number": "3.11",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "N/A",
+              "R5",
+              "R10",
+              "R15"
+            ]
+          },
+          {
+            "Name": "Crawl space wall R-value",
+            "Number": "3.12",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "R11",
+              "R13",
+              "R15",
+              "R19",
+              "R21",
+              "R22",
+              "R25",
+              "R30",
+              "R38"
+            ]
+          },
+          {
+            "Name": "Corners and headers insulated",
+            "Number": "3.13",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Others",
+            "Number": "3.14",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Fully-Aligned Air Barriers (Walls)",
+        "Number": "4",
+        "Items": [
+          {
+            "Name": "Walls behind showers and tubs",
+            "Number": "4.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Walls behind fireplaces",
+            "Number": "4.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Attic knee walls",
+            "Number": "4.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Skylight shaft walls",
+            "Number": "4.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Wall adjoining porch roof",
+            "Number": "4.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Staircase walls",
+            "Number": "4.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Double walls",
+            "Number": "4.7",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Garage rim/band joist with conditioned space",
+            "Number": "4.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "All other exterior walls",
+            "Number": "4.9",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "4.9",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Fully-Aligned Air Barriers (Floors)",
+        "Number": "5",
+        "Items": [
+          {
+            "Name": "Floor above garage",
+            "Number": "5.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Cantilevered floor",
+            "Number": "5.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Floor above unconditioned basement or crawlspace",
+            "Number": "5.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "5.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Fully-Aligned Air Barriers (Ceilings)",
+        "Number": "6",
+        "Items": [
+          {
+            "Name": "Dropped ceiling/soffit below attic",
+            "Number": "6.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Insulated attic slopes/walls",
+            "Number": "6.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "All other ceilings",
+            "Number": "6.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Baffles at eaves to ensure compliance w/ IRC Sec. 806",
+            "Number": "6.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "6.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Air Sealing (Penetrations)",
+        "Number": "7",
+        "Items": [
+          {
+            "Name": "Duct/ flue shaft",
+            "Number": "7.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Plumbing/piping",
+            "Number": "7.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Electrical wiring",
+            "Number": "7.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Bathroom and kitchen exhaust fans",
+            "Number": "7.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Recessed fixtures ICAT labeled",
+            "Number": "7.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Foam gasket placed beneath sill plate",
+            "Number": "7.6",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Rough opening sealed at windows and exterior doors",
+            "Number": "7.7",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Structural insulated panels taped & sealed",
+            "Number": "7.8",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Gaps between unit common wall fully sealed",
+            "Number": "7.9",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "7.10",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "HVAC System",
+        "Number": "8",
+        "Items": [
+          {
+            "Name": "Supply duct insulation R-value",
+            "Number": "8.1",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "R6",
+              "R8"
+            ]
+          },
+          {
+            "Name": "Return duct insulation R-value",
+            "Number": "8.2",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "R6",
+              "R8"
+            ]
+          },
+          {
+            "Name": "Mechanical ventilation roughed in?",
+            "Number": "8.3",
+            "ControlName": "YesNo",
+            "ValueList": []
+          },
+          {
+            "Name": "Other",
+            "Number": "8.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Plumbing Hot Water Service",
+        "Number": "9",
+        "Items": [
+          {
+            "Name": "Hot water piping insulation R-value",
+            "Number": "9.1",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "R3",
+              "R5"
+            ]
+          },
+          {
+            "Name": "Recirculation system controls",
+            "Number": "9.2",
+            "ControlName": "LookupNaNi",
+            "ValueList": [
+              "Circulation System",
+              "Heat Trace System",
+              "Demand Recirculation System"
+            ]
+          },
+          {
+            "Name": "Other",
+            "Number": "9.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Miscellaneous",
+        "Number": "10",
+        "Items": [
+          {
+            "Name": "Radiant barrier",
+            "Number": "10.1",
+            "ControlName": "YesNo",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Duct Blaster Results (MRF if tested at Rough)",
+        "Number": "11",
+        "Items": [
+          {
+            "Name": "Total Square Footage",
+            "Number": "11.1",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Total Volume",
+            "Number": "11.2",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Target Leakage to outside 1",
+            "Number": "11.3",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Target Leakage to outside 2",
+            "Number": "11.4",
+            "ControlName": "PassFailNaNi",
+            "ValueList": [
+              "Energy Star",
+              "Energy Star",
+              "R0",
+              "R0",
+              "R5",
+              "R1.8",
+              "R5",
+              "R2.0",
+              "R10",
+              "R2.0",
+              "R15",
+              "R3.0",
+              "2021",
+              "2021",
+              "2021",
+              "R5",
+              "Energy Star",
+              "Energy Star",
+              "Energy Star",
+              "Energy Star",
+              "Energy Star",
+              "Energy Star"
+            ]
+          },
+          {
+            "Name": "Total Duct Leakage (unit 1)",
+            "Number": "11.5",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          },
+          {
+            "Name": "Total Duct Leakage (unit 2)",
+            "Number": "11.6",
+            "ControlName": "TextNaNi",
+            "ValueList": []
+          }
+        ]
+      },
+      {
+        "Name": "Other",
+        "Number": "12",
+        "Items": [
+          {
+            "Name": "Other Comments",
+            "Number": "12.1",
+            "ControlName": "PassFailNaNi",
+            "ValueList": []
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -26,7 +26,7 @@ namespace InspectionEditor.Services
         // Kept separate from EC fields: never fed into code-default calculations.
         public Dictionary<string, string> TestingTargets { get; } = new();
         public Dictionary<string, string> TestingTargetSources { get; } = new();
-        public bool HasAvailableTargets => IsLoaded || TestingTargets.Count > 0;
+        public bool HasAvailableTargets => ExtractedFieldCount > 0 || !string.IsNullOrWhiteSpace(EnergyStarProgram) || !string.IsNullOrWhiteSpace(IECCVersion) || TestingTargets.Count > 0;
 
         // Summary
         public string? HersIndex { get; set; }
@@ -76,6 +76,7 @@ namespace InspectionEditor.Services
         public string? DesignAirflowIndoorModel { get; set; }
         public string? DesignAirflowOutdoorModel2 { get; set; }
         public string? DesignAirflowIndoorModel2 { get; set; }
+        internal string? DesignAirflowFallbackSource { get; set; }
         internal string? DesignAirflowFallbackCfm { get; set; }
         internal string? DesignAirflowFallbackCfm2 { get; set; }
         internal string? DesignAirflowFallbackStatusText { get; set; }
@@ -374,6 +375,7 @@ namespace InspectionEditor.Services
                 "HVACCOOLINGSEER" or "COOLINGSEER" => info.HvacCoolingSeer,
                 "HVACTONNAGE" or "TONNAGE" => info.HvacTonnage,
                 "DESIGNAIRFLOWCFM" => info.DesignAirflowCfm,
+                "DESIGNAIRFLOWCFM2" => info.DesignAirflowCfm2,
                 "TARGETFRESHAIRCFM" or "FRESHAIRCFM" => info.TargetFreshAirCfm,
                 "TARGETRUNTIME" or "RUNTIME" => info.TargetRunTime,
                 "VENTFANWATTS" or "FANWATTS" => info.VentFanWatts,
@@ -416,6 +418,7 @@ namespace InspectionEditor.Services
                 "HVACCOOLINGSEER" or "COOLINGSEER" => "SEER",
                 "HVACTONNAGE" or "TONNAGE" => "Tonnage",
                 "DESIGNAIRFLOWCFM" => "Design Airflow",
+                "DESIGNAIRFLOWCFM2" => "Design Airflow (unit 2)",
                 "TARGETFRESHAIRCFM" or "FRESHAIRCFM" => "Fresh Air",
                 "TARGETRUNTIME" or "RUNTIME" => "Run Time",
                 "VENTFANWATTS" or "FANWATTS" => "Fan Watts",
@@ -430,10 +433,13 @@ namespace InspectionEditor.Services
         /// Applies the EC value for the given item only. Returns true if the value was set.
         public static bool ApplySingleItem(EnergyComplianceInfo info, Item item, string? inspCode)
         {
-            if (info == null || item == null || !CanApplyToItem(inspCode, item.Number)) return false;
-            string? value = GetValueForItem(info, inspCode, item.Number);
-            if (string.IsNullOrWhiteSpace(value)) return false;
-            return SetItemValue(item, value);
+            return ApplySingleItem(info, item, inspCode, null);
+        }
+
+        public static bool ApplySingleItem(EnergyComplianceInfo info, Item item, string? inspCode, Section? section)
+        {
+            var resolved = EnergySemanticMappingService.Resolve(info, inspCode, section, item);
+            return resolved is { CanApply: true } && SetItemValue(item, resolved.Value);
         }
 
         // ---------------------------------------------------------------
@@ -481,29 +487,13 @@ namespace InspectionEditor.Services
         /// </summary>
         public static int ApplyToInspection(EnergyComplianceInfo info, InspectionFile inspection)
         {
-            if (!info.IsLoaded || inspection == null) return 0;
-
-            string normCode = NormalizeCode(inspection.InspectionCode);
-
-            // Build item-number → item map (first occurrence wins for duplicates)
-            var byNum = inspection.Sections
-                .SelectMany(s => s.Items)
-                .GroupBy(i => i.Number ?? "")
-                .ToDictionary(g => g.Key, g => g.First());
-
+            if (info == null || inspection == null) return 0;
             int count = 0;
-            foreach (var ((code, num), getter) in Mappings)
+            foreach (var section in inspection.Sections)
+            foreach (var item in section.Items)
             {
-                if (code != normCode || !CanApplyToItem(code, num)) continue;
-                string? ecValue = getter(info);
-                if (string.IsNullOrWhiteSpace(ecValue)) continue;
-                if (!byNum.TryGetValue(num, out var item)) continue;
-
-                // Skip items that already have a value
-                string? cur = item.Value?.ToString();
-                if (!string.IsNullOrWhiteSpace(cur)) continue;
-
-                if (SetItemValue(item, ecValue)) count++;
+                if (!string.IsNullOrWhiteSpace(item.Value?.ToString())) continue;
+                if (ApplySingleItem(info, item, inspection.InspectionCode, section)) count++;
             }
             return count;
         }
@@ -514,7 +504,7 @@ namespace InspectionEditor.Services
         /// </summary>
         internal static int ApplyCppSlabToInspection(SlabEngineeringInfo slab, InspectionFile inspection)
         {
-            if (slab == null || inspection == null) return 0;
+            if (slab == null || inspection == null || NormalizeCode(inspection.InspectionCode) != "CPP") return 0;
 
             var byNum = inspection.Sections
                 .SelectMany(s => s.Items)
@@ -526,10 +516,9 @@ namespace InspectionEditor.Services
             bool TrySet(string num, string? value)
             {
                 if (string.IsNullOrWhiteSpace(value)) return false;
-                if (!byNum.TryGetValue(num, out var item)) return false;
+                if (!byNum.TryGetValue(num, out var item) || !IsSafeSlabPrompt(item)) return false;
                 if (!string.IsNullOrWhiteSpace(item.Value?.ToString())) return false;
-                item.Value = value;
-                return true;
+                return SetItemValue(item, value);
             }
 
             string? bwStr = slab.BeamWidthInches.HasValue ? slab.BeamWidthInches.ToString() : null;
@@ -549,7 +538,8 @@ namespace InspectionEditor.Services
                 if (TrySet(n, bdStr)) count++;
 
             // Cable count total → note in comment on item 5.1.b
-            if (slab.CableCount.HasValue && byNum.TryGetValue("5.1.b", out var cableItem))
+            if (slab.CableCount.HasValue && byNum.TryGetValue("5.1.b", out var cableItem) &&
+                Regex.IsMatch(cableItem.Name ?? "", @"\b(cable|strand)s?\b", RegexOptions.IgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(cableItem.Comments))
                 {
@@ -660,13 +650,43 @@ namespace InspectionEditor.Services
         /// <summary>
         /// Applies slab data to a single item. Returns true if the item was updated.
         /// </summary>
+        internal static bool IsSafeSlabMapping(Item item, string fieldKey)
+        {
+            if (!IsSafeSlabPrompt(item)) return false;
+            string key = ExtractionMappingService.NormalizeFieldKey(fieldKey);
+            return GetSlabLabelForItem(item.Number) switch
+            {
+                "Foundation" => key == "FOUNDATIONTYPE",
+                "Beam W" => key is "BEAMWIDTH" or "BEAMWIDTHINCHES",
+                "Beam D" or "TOF-BOB" => key is "BEAMDEPTH" or "BEAMDEPTHINCHES" or "TOFBOB",
+                "Slab D" => key is "SLABTHICKNESSINCHES" or "SLABTHICKNESS" or "SLABDEPTH" or "SLABDEPTHINCHES",
+                _ => false
+            };
+        }
+
+        internal static bool IsSafeSlabPrompt(Item item)
+        {
+            string name = Regex.Replace((item.Name ?? "").ToUpperInvariant(), @"[^A-Z0-9]+", " ").Trim();
+            string control = (item.ControlName ?? "").ToLowerInvariant();
+            if (control is not ("text" or "textnani" or "numberpad" or "numberpadnani" or "lookup" or "lookupnani")) return false;
+            string? label = GetSlabLabelForItem(item.Number);
+            return label switch
+            {
+                "Foundation" => name is "FOUNDATION TYPE" or "TYPE OF FOUNDATION",
+                "TOF-BOB" => name.EndsWith("TOF TO BOB") || name.EndsWith("TOF BOB"),
+                "Beam W" => name.EndsWith(" BW") || name == "BEAM WIDTH",
+                "Beam D" => name.EndsWith(" BD") || name == "BEAM DEPTH",
+                "Slab D" => name.EndsWith(" SD") || name == "SLAB DEPTH",
+                _ => false
+            };
+        }
+
         internal static bool ApplySlabToSingleItem(SlabEngineeringInfo slab, Item item)
         {
-            if (slab == null || item == null) return false;
+            if (slab == null || item == null || !IsSafeSlabPrompt(item)) return false;
             string? value = GetSlabValueForItem(slab, item.Number);
             if (string.IsNullOrWhiteSpace(value)) return false;
-            item.Value = value;
-            return true;
+            return SetItemValue(item, value);
         }
 
         // ---------------------------------------------------------------
@@ -1764,67 +1784,23 @@ namespace InspectionEditor.Services
                 return true;
             }
 
-            // Fallback for unknown controls
-            item.Value = value;
-            return true;
+            // Unknown controls cannot be assumed to be value-entry controls.
+            return false;
         }
 
         private static string? BestLookupMatch(Item item, string target)
         {
-            var list = item.ValueList;
-            if (list == null || list.Count == 0) return null;
-
-            // 1. Exact match (case-insensitive)
-            var exact = list.FirstOrDefault(v =>
-                string.Equals(v?.Trim(), target.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (exact != null) return exact;
-
-            // 2. R-number match: extract "R{n}" from target and find first option containing it
-            var rMatch = Regex.Match(target, @"R-?\s*(\d+)", RegexOptions.IgnoreCase);
-            if (rMatch.Success)
+            // Only full equivalent options are safe. Substrings turn R3 into R30,
+            // 15 SEER into 15 SEER2, or a fuel into an unrelated equipment model.
+            string Canonical(string v) => Regex.Replace(v.Trim().ToUpperInvariant(), @"\s+", " ");
+            var exact = item.ValueList?.Where(v => v != null && Canonical(v) == Canonical(target)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (exact?.Count == 1) return exact[0];
+            string R(string v) => Regex.Replace(v.Trim().ToUpperInvariant(), @"^R[- ]+(?=\d)", "R");
+            if (Regex.IsMatch(R(target), @"^R\d+(?:\.\d+)?$"))
             {
-                string rKey = $"R{rMatch.Groups[1].Value}";
-                var byR = list.FirstOrDefault(v => v != null && (
-                    v.StartsWith(rKey, StringComparison.OrdinalIgnoreCase) ||
-                    v.Contains(rKey, StringComparison.OrdinalIgnoreCase)));
-                if (byR != null) return byR;
+                var equivalents = item.ValueList?.Where(v => v != null && R(v) == R(target)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (equivalents?.Count == 1) return equivalents[0];
             }
-
-            // 3. SEER match: extract number
-            if (target.IndexOf("SEER", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                string seerNum = Regex.Match(target, @"([\d.]+)").Groups[1].Value;
-                var bySeer = list.FirstOrDefault(v =>
-                    v != null && v.Contains(seerNum, StringComparison.OrdinalIgnoreCase)
-                              && v.Contains("SEER", StringComparison.OrdinalIgnoreCase));
-                if (bySeer != null) return bySeer;
-            }
-
-            // 4. Partial contains
-            var contains = list.FirstOrDefault(v =>
-                v != null && (
-                    v.Contains(target.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                    target.Contains(v.Trim(), StringComparison.OrdinalIgnoreCase)));
-            if (contains != null) return contains;
-
-            // 5. Keyword shortcuts for common fields
-            string lo = target.ToLowerInvariant();
-            if (lo == "gas")
-            {
-                var g = list.FirstOrDefault(v => string.Equals(v?.Trim(), "Gas", StringComparison.OrdinalIgnoreCase));
-                if (g != null) return g;
-            }
-            if (lo == "electric")
-            {
-                var e = list.FirstOrDefault(v => string.Equals(v?.Trim(), "Electric", StringComparison.OrdinalIgnoreCase));
-                if (e != null) return e;
-            }
-            if (lo.Contains("tankless"))
-            {
-                var t = list.FirstOrDefault(v => v?.Contains("Tankless", StringComparison.OrdinalIgnoreCase) == true);
-                if (t != null) return t;
-            }
-
             return null;
         }
 

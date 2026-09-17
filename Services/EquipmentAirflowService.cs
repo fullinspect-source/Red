@@ -104,17 +104,18 @@ namespace InspectionEditor.Services
             // does not leave a stale equipment-match target in the banner.
             if (!string.Equals(info.DesignAirflowSource, "STRADA equipment matchup", StringComparison.Ordinal))
             {
-                info.DesignAirflowFallbackCfm ??= info.DesignAirflowCfm;
-                info.DesignAirflowFallbackCfm2 ??= info.DesignAirflowCfm2;
-                info.DesignAirflowFallbackStatusText ??= info.StatusText;
-                info.DesignAirflowFallbackDisplayName ??= info.DisplayName;
+                info.DesignAirflowFallbackCfm = info.DesignAirflowCfm;
+                info.DesignAirflowFallbackCfm2 = info.DesignAirflowCfm2;
+                info.DesignAirflowFallbackStatusText = info.StatusText;
+                info.DesignAirflowFallbackDisplayName = info.DisplayName;
+                info.DesignAirflowFallbackSource = info.DesignAirflowSource;
             }
 
             info.DesignAirflowCfm = info.DesignAirflowFallbackCfm;
             info.DesignAirflowCfm2 = info.DesignAirflowFallbackCfm2;
             info.StatusText = info.DesignAirflowFallbackStatusText;
             info.DisplayName = info.DesignAirflowFallbackDisplayName;
-            info.DesignAirflowSource = null;
+            info.DesignAirflowSource = info.DesignAirflowFallbackSource;
             info.DesignAirflowOutdoorModel = null;
             info.DesignAirflowIndoorModel = null;
             info.DesignAirflowOutdoorModel2 = null;
@@ -145,6 +146,21 @@ namespace InspectionEditor.Services
                 info.StatusText = $"STRADA equipment airflow found from {info.DesignAirflowSourceFile}.";
                 info.DisplayName ??= info.DesignAirflowSourceFile;
             }
+        }
+
+        // Aggregate source is not evidence that both units have a STRADA matchup.
+        public static string? GetSourceForUnit(EnergyComplianceInfo info, int unitNumber)
+        {
+            bool matched = unitNumber switch
+            {
+                1 => info.DesignAirflowOutdoorModel != null && info.DesignAirflowIndoorModel != null,
+                2 => info.DesignAirflowOutdoorModel2 != null && info.DesignAirflowIndoorModel2 != null,
+                _ => false
+            };
+            if (unitNumber is not (1 or 2)) return null;
+            if (matched) return "STRADA equipment matchup";
+            return info.DesignAirflowSource == "STRADA equipment matchup"
+                ? info.DesignAirflowFallbackSource : info.DesignAirflowSource;
         }
 
         internal static int? GetAirflowForModels(string? outdoorModel, string? indoorModel)
@@ -253,19 +269,32 @@ namespace InspectionEditor.Services
             InspectionFile inspection,
             Func<Section, bool> sectionMatch)
         {
-            var result = new Dictionary<int, string>();
-            foreach (var item in inspection.Sections.Where(sectionMatch).SelectMany(section => section.Items))
+            var candidates = new Dictionary<int, List<string>>();
+            foreach (var section in inspection.Sections.Where(sectionMatch))
+            foreach (var item in section.Items)
             {
                 string name = item.Name ?? "";
-                if (!name.Contains("Model", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!Regex.IsMatch(name, @"\bmodel\b", RegexOptions.IgnoreCase) ||
+                    Regex.IsMatch(name, @"\bserial\b", RegexOptions.IgnoreCase)) continue;
 
+                // The verified Energy Final schema names unit 1 exactly "Unit: Make/Model".
+                // Other unnumbered model prompts remain ambiguous and are rejected.
+                var labels = Regex.Matches(name + " " + section.Name,
+                    @"\bunit\s*#?\s*(\d+)\b", RegexOptions.IgnoreCase)
+                    .Select(m => m.Groups[1].Value).Distinct().ToList();
+                if (labels.Count == 0 && Regex.IsMatch(name.Trim(), @"^Unit\s*:\s*Make\s*/\s*Model$", RegexOptions.IgnoreCase)) labels.Add("1");
+                if (labels.Count != 1 || !int.TryParse(labels[0], out int unit) ||
+                    unit is not (1 or 2)) continue;
                 string value = item.Value?.ToString()?.Trim() ?? "";
-                if (NormalizeModel(value).Length == 0) continue;
-
-                int unit = Regex.IsMatch(name, @"unit\s*2", RegexOptions.IgnoreCase) ? 2 : 1;
-                result.TryAdd(unit, value);
+                if (!candidates.TryGetValue(unit, out var values))
+                    candidates[unit] = values = new List<string>();
+                values.Add(value);
             }
-            return result;
+            // Multiple different model answers for one unit are ambiguous, including
+            // an empty duplicate. Do not silently select whichever happens to be first.
+            return candidates.Where(pair => pair.Value.Select(NormalizeModel).Distinct().Count() == 1 &&
+                    NormalizeModel(pair.Value[0]).Length > 0)
+                .ToDictionary(pair => pair.Key, pair => pair.Value[0]);
         }
     }
 }

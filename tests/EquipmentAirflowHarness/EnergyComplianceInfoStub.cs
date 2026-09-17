@@ -12,6 +12,7 @@ namespace InspectionEditor.Services
         public string? DesignAirflowIndoorModel { get; set; }
         public string? DesignAirflowOutdoorModel2 { get; set; }
         public string? DesignAirflowIndoorModel2 { get; set; }
+        internal string? DesignAirflowFallbackSource { get; set; }
         internal string? DesignAirflowFallbackCfm { get; set; }
         internal string? DesignAirflowFallbackCfm2 { get; set; }
         internal string? DesignAirflowFallbackStatusText { get; set; }

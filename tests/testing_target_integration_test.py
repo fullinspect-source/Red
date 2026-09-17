@@ -27,8 +27,11 @@ class TestingTargetIntegrationTests(unittest.TestCase):
         self.assertNotIn('SetItemValue', TARGETS)
 
     def test_measurement_target_badges_are_display_only(self):
-        self.assertIn('CanApply: false, Source: "testing-target"', MAIN)
-        self.assertIn('Target only; enter the actual field measurement.', MAIN)
+        semantic = (ROOT / 'Services/EnergySemanticMappingService.cs').read_text()
+        self.assertIn('Actual values are NEVER writable from targets', semantic)
+        self.assertIn('apply = false', semantic)
+        self.assertIn('CanApply: resolved.CanApply', MAIN)
+        self.assertIn('fresh == null || !fresh.CanApply', MAIN)
 
 if __name__ == '__main__':
     unittest.main()

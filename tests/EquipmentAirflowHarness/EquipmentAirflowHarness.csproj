@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Compile Include="../../Models/InspectionModels.cs" Link="InspectionModels.cs" />
     <Compile Include="../../Services/EquipmentAirflowService.cs" Link="EquipmentAirflowService.cs" />

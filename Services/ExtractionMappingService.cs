@@ -44,7 +44,8 @@ namespace InspectionEditor.Services
             string promptText = NormalizeText(prompt);
             string legacy = NormalizeItemNumber(legacyItemNumber);
 
-            return rows
+            var candidates = rows
+                .Where(row => !string.IsNullOrWhiteSpace(row.PromptMatch)) // Never route by row number alone.
                 .Where(row => SourceMatches(row, normalizedSource))
                 .Where(row => InspectionCodeMatches(row, normalizedCode))
                 .Select(row => new { Row = row, Score = Score(row, sectionText, promptText, legacy) })
@@ -52,7 +53,13 @@ namespace InspectionEditor.Services
                 .OrderByDescending(x => x.Score)
                 .ThenByDescending(x => x.Row.Priority)
                 .ThenBy(x => x.Row.IsBuiltIn)
-                .FirstOrDefault()?.Row;
+                .ToList();
+            if (candidates.Count == 0) return null;
+            var best = candidates[0];
+            // Equally ranked conflicting targets are ambiguous, not a first-row-wins answer.
+            if (candidates.Any(x => x.Score == best.Score && x.Row.Priority == best.Row.Priority &&
+                NormalizeFieldKey(x.Row.FieldKey) != NormalizeFieldKey(best.Row.FieldKey))) return null;
+            return best.Row;
         }
 
         private static List<ExtractionMapping> GetMappings()
@@ -92,7 +99,7 @@ namespace InspectionEditor.Services
 
             yield return Path.Combine(AppContext.BaseDirectory, "ExtractionMapping.csv");
             yield return Path.Combine(AppContext.BaseDirectory, "data", "ExtractionMapping.csv");
-            yield return Path.Combine(AppContext.BaseDirectory, "docs", "extraction_field_mapping.csv");
+            // Documentation inventories are not executable field-mapping configuration.
         }
 
         private static IEnumerable<ExtractionMapping> ReadCsv(string path)
@@ -294,8 +301,7 @@ namespace InspectionEditor.Services
             if (string.IsNullOrWhiteSpace(haystack) || string.IsNullOrWhiteSpace(needle))
                 return false;
 
-            return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
-                   needle.Contains(haystack, StringComparison.OrdinalIgnoreCase);
+            return (" " + haystack + " ").Contains(" " + needle + " ", StringComparison.OrdinalIgnoreCase);
         }
 
         private static IEnumerable<string> SplitAlternatives(string value) =>

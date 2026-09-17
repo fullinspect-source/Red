@@ -63,6 +63,8 @@ with tempfile.TemporaryDirectory(prefix='red-targets-') as d:
     (d/'Ec.cs').write_text('using InspectionEditor.Models; using System.Text.RegularExpressions; namespace InspectionEditor.Services {\n'+core+helpers+'\n}\n}\n')
     shutil.copy(ROOT/'Models/InspectionModels.cs',d/'Models.cs')
     shutil.copy(ROOT/'Services/TestingTargetsService.cs',d/'Targets.cs')
+    shutil.copy(ROOT/'Services/EnergySemanticMappingService.cs',d/'Semantic.cs')
+    shutil.copy(ROOT/'Services/EquipmentAirflowService.cs',d/'Airflow.cs')
     (d/'Mapping.cs').write_text('namespace InspectionEditor.Services { public static class ExtractionMappingService { public static string NormalizeFieldKey(string key) => System.Text.RegularExpressions.Regex.Replace(key.ToUpperInvariant(), "[^A-Z0-9]", ""); } }')
     (d/'Program.cs').write_text(program)
     subprocess.run(['dotnet','run','--project',str(d/'Harness.csproj'),'--',str(ROOT/'tests/fixtures/testing-targets-real-redacted.json')],check=True)
@@ -71,5 +73,6 @@ u = (ROOT/'MainWindow.xaml.cs').read_text()
 assert 'capturedEcRequestId != _ecExtractionRequestId' in u
 assert '!ReferenceEquals(capturedInspection, _currentInspection)' in u
 assert 'TestingTargetsService.Refresh(info, _currentInspection);' in u
-assert 'Target only; enter the actual field measurement.' in u
+assert 'CanApply: resolved.CanApply' in u
+assert 'fresh == null || !fresh.CanApply' in u
 print('PASS UI generation/identity/latest-snapshot/guidance wiring checks')

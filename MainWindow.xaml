@@ -376,7 +376,7 @@
                                 FontSize="11"
                                 Padding="8,4"
                                 Margin="12,0,0,0"
-                                BorderBrush="#DC143C"
+                                BorderBrush="#48E5FF"
                                 BorderThickness="3"
                                 VerticalAlignment="Stretch"
                                 ToolTip="Show all items (clear filters)"
@@ -393,7 +393,8 @@
                                 FontSize="11"
                                 Padding="8,4"
                                 Margin="12,0,0,0"
-                                BorderThickness="0"
+                                BorderBrush="Transparent"
+                                BorderThickness="3"
                                 VerticalAlignment="Stretch"
                                 ToolTip="Only Fail Items - Show only items with fail status"
                                 TabIndex="7"/>
@@ -409,7 +410,8 @@
                                 FontSize="11"
                                 Padding="8,4"
                                 Margin="12,0,0,0"
-                                BorderThickness="0"
+                                BorderBrush="Transparent"
+                                BorderThickness="3"
                                 VerticalAlignment="Stretch"
                                 ToolTip="Required Items Only - Show only mandatory items (marked with *)"
                                 TabIndex="8"/>
@@ -425,7 +427,8 @@
                                 FontSize="11"
                                 Padding="8,4"
                                 Margin="12,0,0,0"
-                                BorderThickness="0"
+                                BorderBrush="Transparent"
+                                BorderThickness="3"
                                 VerticalAlignment="Stretch"
                                 ToolTip="Incomplete - Show only required items that are blank/incomplete"
                                 TabIndex="9"/>

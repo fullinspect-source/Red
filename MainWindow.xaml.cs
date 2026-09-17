@@ -2597,24 +2597,11 @@ namespace InspectionEditor
                 }
             }
 
-            // REQ filter always off by default
+            // Reset filter state and visuals together on new file load.
             _reqFilterActive = false;
-            ReqFilterButton.Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)); // #2563EB
-            ReqFilterButton.Foreground = new SolidColorBrush(Colors.White);
-            ReqFilterButton.BorderThickness = new Thickness(0);
-            
-            // Reset INC filter on new file load
             _incFilterActive = false;
-            IncFilterButton.Background = new SolidColorBrush(Color.FromRgb(217, 119, 6));
-            IncFilterButton.Foreground = new SolidColorBrush(Colors.White);
-            IncFilterButton.BorderThickness = new Thickness(0);
-            
-            // Set ALL button as active (default filter state)
             _ofiFilterActive = false;
-            ClearSearchButton.Background = new SolidColorBrush(Colors.White);
-            ClearSearchButton.Foreground = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-            ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-            ClearSearchButton.BorderThickness = new Thickness(3);
+            UpdateChecklistFilterButtonStyles();
 
             // Reset editor panel — no item selected yet in new inspection
             _currentItem = null;
@@ -3651,7 +3638,8 @@ namespace InspectionEditor
             // Determine banner state for the currently active item
             string? itemNum    = _currentItem?.Number;
             string? actualValue = _currentItem?.Value?.ToString()?.Trim();
-            string? slabValue  = EnergyComplianceService.GetSlabValueForItem(info, itemNum);
+            string? slabValue  = _currentItem != null && EnergyComplianceService.IsSafeSlabPrompt(_currentItem)
+                ? EnergyComplianceService.GetSlabValueForItem(info, itemNum) : null;
             string? slabLabel  = EnergyComplianceService.GetSlabLabelForItem(itemNum);
 
             // For cable count items, gather F2B (5.1.b) and S2S (5.1.c) from inspection
@@ -3890,21 +3878,20 @@ namespace InspectionEditor
             {
                 HideAll();
 
-                string? inspCode    = _currentInspection?.InspectionCode;
-                string? itemNum     = _currentItem?.Number;
-                string? ecValue     = EnergyComplianceService.GetValueForItem(info, inspCode, itemNum);
-                string? ecLabel     = EnergyComplianceService.GetLabelForItem(inspCode, itemNum);
+                string? inspCode = _currentInspection?.InspectionCode;
+                var resolved = _currentItem == null ? null : EnergySemanticMappingService.Resolve(info, inspCode, _currentSection, _currentItem);
+                string? ecValue = resolved?.Value;
+                string? ecLabel = resolved?.Label;
                 string? actualValue = _currentItem?.Value?.ToString()?.Trim();
-
-                var state = EnergyComplianceService.GetEcItemBannerState(info, inspCode, itemNum, actualValue);
+                var state = EnergyComplianceService.BannerState.Gray;
                 ApplyEcBannerColors(state);
 
                 if (ecValue != null)
                 {
                     bool hasCurrentValue = !string.IsNullOrWhiteSpace(actualValue);
                     string chipText = ecLabel != null ? $"{ecLabel}: {ecValue}" : ecValue;
-                    string? targetSource = EnergyComplianceService.GetTargetSourceForItem(info, inspCode, itemNum);
-                    if (targetSource != null) chipText += $" [Target: {targetSource}]";
+                    string? targetSource = resolved?.Source;
+                    if (targetSource != null) chipText += $" [{targetSource}]";
                     if (state == EnergyComplianceService.BannerState.Red && hasCurrentValue)
                         chipText += $" (actual: {actualValue})";
                     EcChip_Hers.Foreground = EcDataHeaderBorder.BorderBrush; // match banner border
@@ -3912,7 +3899,7 @@ namespace InspectionEditor
 
                     // Equipment model/serial rows display the target as guidance only.
                     // Normal EC-mapped rows keep the one-tap Apply behavior.
-                    bool canApply = EnergyComplianceService.CanApplyToItem(inspCode, itemNum);
+                    bool canApply = resolved?.CanApply == true;
                     ApplyEcButton.Visibility = canApply ? Visibility.Visible : Visibility.Collapsed;
                     if (canApply)
                         SetApplyButtonState(ApplyEcButton, !hasCurrentValue);
@@ -4055,17 +4042,19 @@ namespace InspectionEditor
             sb.AppendLine($"Cooling SEER:      {info.HvacCoolingSeer ?? "not found"}");
             sb.AppendLine($"Tonnage:           {info.HvacTonnage ?? "not found"} tons");
             sb.AppendLine($"Design Airflow 1:  {info.DesignAirflowCfm ?? "not found"} CFM");
+            if (info.DesignAirflowCfm != null)
+                sb.AppendLine($"Unit 1 Source:     {EquipmentAirflowService.GetSourceForUnit(info, 1) ?? "source unavailable"}");
             if (info.DesignAirflowCfm2 != null)
-                sb.AppendLine($"Design Airflow 2:  {info.DesignAirflowCfm2} CFM");
-            if (info.DesignAirflowSource != null)
             {
-                sb.AppendLine($"Airflow Source:    {info.DesignAirflowSource}");
-                sb.AppendLine($"Unit 1 Matchup:    {info.DesignAirflowOutdoorModel ?? "?"} + {info.DesignAirflowIndoorModel ?? "?"}");
-                if (info.DesignAirflowCfm2 != null)
-                    sb.AppendLine($"Unit 2 Matchup:    {info.DesignAirflowOutdoorModel2 ?? "?"} + {info.DesignAirflowIndoorModel2 ?? "?"}");
-                if (info.DesignAirflowSourceFile != null)
-                    sb.AppendLine($"Equipment File:    {info.DesignAirflowSourceFile}");
+                sb.AppendLine($"Design Airflow 2:  {info.DesignAirflowCfm2} CFM");
+                sb.AppendLine($"Unit 2 Source:     {EquipmentAirflowService.GetSourceForUnit(info, 2) ?? "source unavailable"}");
             }
+            if (info.DesignAirflowOutdoorModel != null && info.DesignAirflowIndoorModel != null)
+                sb.AppendLine($"Unit 1 Matchup:    {info.DesignAirflowOutdoorModel} + {info.DesignAirflowIndoorModel}");
+            if (info.DesignAirflowOutdoorModel2 != null && info.DesignAirflowIndoorModel2 != null)
+                sb.AppendLine($"Unit 2 Matchup:    {info.DesignAirflowOutdoorModel2} + {info.DesignAirflowIndoorModel2}");
+            if (info.DesignAirflowSourceFile != null)
+                sb.AppendLine($"Equipment File:    {info.DesignAirflowSourceFile}");
             sb.AppendLine();
             sb.AppendLine($"Fresh Air:         {info.TargetFreshAirCfm ?? "not found"} CFM");
             sb.AppendLine($"Run Time:          {info.TargetRunTime ?? "not found"} hrs/day");
@@ -4185,7 +4174,7 @@ namespace InspectionEditor
         private void ApplyEcButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentEcInfo == null || _currentItem == null || _currentInspection == null) return;
-            bool applied = EnergyComplianceService.ApplySingleItem(_currentEcInfo, _currentItem, _currentInspection.InspectionCode);
+            bool applied = EnergyComplianceService.ApplySingleItem(_currentEcInfo, _currentItem, _currentInspection.InspectionCode, _currentSection);
             if (applied)
             {
                 _hasUnsavedChanges = true;
@@ -4727,7 +4716,7 @@ namespace InspectionEditor
                 Tag = item,
                 Background = new SolidColorBrush(progressColor),
                 BorderBrush = isSelected || isExpanded ? new SolidColorBrush(Color.FromRgb(0, 122, 153)) : new SolidColorBrush(DarkenColor(progressColor, 0.10)),
-                BorderThickness = isSelected || isExpanded ? new Thickness(2) : new Thickness(0, 0, 0, 1),
+                BorderThickness = isSelected || isExpanded ? new Thickness(2) : new Thickness(2, 0, 2, 1),
                 Margin = new Thickness(0, 0, 0, 2),
                 Child = panel,
                 Cursor = Cursors.Hand,
@@ -4927,6 +4916,10 @@ namespace InspectionEditor
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+            // Always reserve the two rightmost lanes, even on optional/fulfilled rows.
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+
             var duplicateButton = new Button
             {
                 Content = "[+]",
@@ -5034,26 +5027,6 @@ namespace InspectionEditor
                 chips.Children.Add(CreateInlineBadge($"Photo {item.Pictures.Count}", new SolidColorBrush(Color.FromRgb(37, 99, 235)), Brushes.White, FontWeights.SemiBold));
             if (!string.IsNullOrWhiteSpace(item.Comments))
                 chips.Children.Add(CreateInlineBadge("Comment", new SolidColorBrush(Color.FromRgb(88, 80, 141)), Brushes.White, FontWeights.SemiBold));
-            if (item.Required && string.IsNullOrWhiteSpace(value))
-                chips.Children.Add(CreateInlineBadge("Value Required", new SolidColorBrush(Color.FromRgb(139, 0, 0)), Brushes.White, FontWeights.SemiBold));
-            if (item.IsPictureRequired && item.Pictures.Count == 0)
-            {
-                var photoRequiredButton = new Button
-                {
-                    Content = "Photo Required",
-                    Tag = item,
-                    Padding = new Thickness(7, 2, 7, 2),
-                    Margin = new Thickness(0, 0, 5, 4),
-                    Background = new SolidColorBrush(Color.FromRgb(180, 83, 9)),
-                    Foreground = Brushes.White,
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(146, 64, 14)),
-                    FontSize = Math.Max(10, _checklistFontSize - 1),
-                    FontWeight = FontWeights.SemiBold,
-                    ToolTip = "Open the camera to add the required photo"
-                };
-                photoRequiredButton.Click += InlinePhotoRequiredButton_Click;
-                chips.Children.Add(photoRequiredButton);
-            }
             var pressureBalanceChip = CreateInlineRoomPressureBalanceChip(item);
             if (pressureBalanceChip != null)
                 chips.Children.Add(pressureBalanceChip);
@@ -5068,6 +5041,54 @@ namespace InspectionEditor
             var statusControl = CreateInlineStatusHeaderControl(item);
             Grid.SetColumn(statusControl, 6);
             grid.Children.Add(statusControl);
+
+            var photoRequiredButton = new Button
+            {
+                Content = "PIC",
+                Tag = item,
+                Width = 34,
+                Height = 34,
+                Padding = new Thickness(0),
+                Margin = new Thickness(2, 0, 2, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(126, 34, 206)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Visibility = item.IsPictureRequired && item.Pictures.Count == 0
+                    ? Visibility.Visible : Visibility.Hidden,
+                ToolTip = "Open the camera to add the required photo"
+            };
+            photoRequiredButton.Click += InlinePhotoRequiredButton_Click;
+            Grid.SetColumn(photoRequiredButton, 7);
+            grid.Children.Add(photoRequiredButton);
+
+            var valueRequiredBadge = new Border
+            {
+                Name = "InlineValueRequirement",
+                Width = 34,
+                Height = 34,
+                Margin = new Thickness(2, 0, 2, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)),
+                Visibility = item.Required && string.IsNullOrWhiteSpace(value)
+                    ? Visibility.Visible : Visibility.Hidden,
+                ToolTip = "Value required",
+                Child = new TextBlock
+                {
+                    Text = "REQ",
+                    Foreground = Brushes.White,
+                    FontSize = 11,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            Grid.SetColumn(valueRequiredBadge, 8);
+            grid.Children.Add(valueRequiredBadge);
 
             return grid;
         }
@@ -5550,7 +5571,7 @@ namespace InspectionEditor
                     section.Name,
                     promptText,
                     item.Number);
-                if (slabMapping != null)
+                if (slabMapping != null && EnergyComplianceService.IsSafeSlabMapping(item, slabMapping.FieldKey))
                 {
                     var slabMappedState = EnergyComplianceService.GetSlabFieldBannerState(
                         _currentSlabInfo,
@@ -5588,7 +5609,7 @@ namespace InspectionEditor
                 var slabState = EnergyComplianceService.GetSlabItemBannerState(_currentSlabInfo, item.Number, actualValue, cableF2B, cableS2S);
                 string? slabValue = EnergyComplianceService.GetSlabValueForItem(_currentSlabInfo, item.Number);
                 string? slabLabel = EnergyComplianceService.GetSlabLabelForItem(item.Number);
-                if (!string.IsNullOrWhiteSpace(slabValue))
+                if (!string.IsNullOrWhiteSpace(slabValue) && EnergyComplianceService.IsSafeSlabPrompt(item))
                 {
                     return new InlineDesignAssist(
                         item,
@@ -5600,7 +5621,8 @@ namespace InspectionEditor
                         ToolTip: "Slab engineering value");
                 }
 
-                if ((item.Number == "5.1.b" || item.Number == "5.1.c") && _currentSlabInfo.CableCount.HasValue)
+                if ((item.Number == "5.1.b" || item.Number == "5.1.c") && _currentSlabInfo.CableCount.HasValue &&
+                    Regex.IsMatch(item.Name ?? "", @"\b(cable|strand)s?\b", RegexOptions.IgnoreCase))
                 {
                     string text = cableF2B.HasValue && cableS2S.HasValue
                         ? $"Plan total: {_currentSlabInfo.CableCount} ({cableF2B + cableS2S})"
@@ -5611,59 +5633,15 @@ namespace InspectionEditor
 
             if (_currentEcInfo != null && _currentEcInfo.HasAvailableTargets)
             {
-                // Current HET targets are measured-value guidance only. Do not route them
-                // through generic field mappings (which may confuse unit 1 and unit 2).
-                if (EnergyComplianceService.NormalizeCode(_currentInspectionCode) == "HET" &&
-                    TestingTargetsService.ItemKey(_currentInspectionCode, item.Number) != null)
-                {
-                    string? target = EnergyComplianceService.GetValueForItem(_currentEcInfo, _currentInspectionCode, item.Number);
-                    if (string.IsNullOrWhiteSpace(target)) return null;
-                    string source = EnergyComplianceService.GetTargetSourceForItem(_currentEcInfo, _currentInspectionCode, item.Number) ?? "EC report";
-                    return new InlineDesignAssist(item, target, $"Target: {target} [{source}]",
-                        EnergyComplianceService.BannerState.Gray, CanApply: false, Source: "testing-target",
-                        ToolTip: $"{source}. Target only; enter the actual field measurement.");
-                }
-                var ecMapping = ExtractionMappingService.Resolve(
-                    "EC",
-                    _currentInspectionCode,
-                    section.Number,
-                    section.Name,
-                    promptText,
-                    item.Number);
-                if (ecMapping != null && _currentEcInfo.IsLoaded)
-                {
-                    string? mappedValue = EnergyComplianceService.GetValueForField(_currentEcInfo, ecMapping.FieldKey);
-                    if (!string.IsNullOrWhiteSpace(mappedValue) && ShouldShowInlineEcAssist(item, mappedValue))
-                    {
-                        string? mappedLabel = !string.IsNullOrWhiteSpace(ecMapping.Label)
-                            ? ecMapping.Label
-                            : EnergyComplianceService.GetLabelForField(ecMapping.FieldKey);
-                        var mappedState = EnergyComplianceService.GetEcFieldBannerState(_currentEcInfo, ecMapping.FieldKey, actualValue, ecMapping.CompareRule);
-                        return new InlineDesignAssist(
-                            item,
-                            mappedValue,
-                            FormatInlineEcAssistText(item, mappedLabel, mappedValue),
-                            mappedState,
-                            CanApply: !IsInlineStatusOnlyDesignTarget(item) && (EnergyComplianceService.NormalizeCode(_currentInspectionCode) != "HET" || EnergyComplianceService.CanApplyToItem(_currentInspectionCode, item.Number)),
-                            Source: "ec",
-                            ToolTip: "Energy compliance report value");
-                    }
-                }
-
-                string? ecValue = EnergyComplianceService.GetValueForItem(_currentEcInfo, _currentInspectionCode, item.Number);
-                if (!string.IsNullOrWhiteSpace(ecValue) && ShouldShowInlineEcAssist(item, ecValue))
-                {
-                    string? ecLabel = EnergyComplianceService.GetLabelForItem(_currentInspectionCode, item.Number);
-                    var ecState = EnergyComplianceService.GetEcItemBannerState(_currentEcInfo, _currentInspectionCode, item.Number, actualValue);
-                    return new InlineDesignAssist(
-                        item,
-                        ecValue,
-                        FormatInlineEcAssistText(item, ecLabel, ecValue),
-                        ecState,
-                        CanApply: !IsInlineStatusOnlyDesignTarget(item) && (EnergyComplianceService.NormalizeCode(_currentInspectionCode) != "HET" || EnergyComplianceService.CanApplyToItem(_currentInspectionCode, item.Number)),
-                        Source: "ec",
-                        ToolTip: "Energy compliance report value");
-                }
+                // One semantic decision drives value, source, unit and click eligibility.
+                var resolved = EnergySemanticMappingService.Resolve(_currentEcInfo, _currentInspectionCode, section, item);
+                if (resolved != null)
+                    return new InlineDesignAssist(item, resolved.Value,
+                        $"{resolved.Label}: {resolved.Value} [{resolved.Source}]",
+                        EnergyComplianceService.BannerState.Gray, CanApply: resolved.CanApply,
+                        Source: "ec", ToolTip: resolved.CanApply
+                            ? $"{resolved.Source}; {resolved.Units}"
+                            : $"{resolved.Source}; reference only, not an answer to copy.");
             }
 
             return null;
@@ -7776,6 +7754,29 @@ namespace InspectionEditor
         {
             if (sender is Button { Tag: InlineDesignAssist assist } && assist.CanApply)
             {
+                if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, assist.Item)) return;
+                if (assist.Source == "ec")
+                {
+                    var section = _currentInspection?.Sections.FirstOrDefault(s => s.Items.Contains(assist.Item));
+                    var fresh = _currentEcInfo == null ? null : EnergySemanticMappingService.Resolve(
+                        _currentEcInfo, _currentInspection?.InspectionCode, section, assist.Item);
+                    if (fresh == null || !fresh.CanApply || fresh.Value != assist.Value) return;
+                    if (!EnergyComplianceService.ApplySingleItem(_currentEcInfo!, assist.Item,
+                        _currentInspection?.InspectionCode, section)) return;
+                    MarkUnsaved();
+                    LoadItemEditor(assist.Item);
+                    RefreshEcDataPanel();
+                    PopulateTreeView(SearchFilterBox.Text);
+                    e.Handled = true;
+                    return;
+                }
+                if (assist.Source == "slab")
+                {
+                    if (_currentSlabInfo == null || _currentInspection?.InspectionCode != "CPP" ||
+                        !EnergyComplianceService.ApplySlabToSingleItem(_currentSlabInfo, assist.Item)) return;
+                    MarkUnsaved(); LoadItemEditor(assist.Item); PopulateTreeView(SearchFilterBox.Text);
+                    e.Handled = true; return;
+                }
                 LoadItemEditor(assist.Item);
                 assist.Item.Value = assist.AppendValue
                     ? FramingDesignParser.AppendValue(assist.Item.Value?.ToString(), assist.Value)
@@ -10139,6 +10140,24 @@ namespace InspectionEditor
             PopulateTreeView(filter);
         }
 
+        private void UpdateChecklistFilterButtonStyles()
+        {
+            SetChecklistFilterButtonStyle(ClearSearchButton,
+                !_ofiFilterActive && !_reqFilterActive && !_incFilterActive, Color.FromRgb(85, 85, 85));
+            SetChecklistFilterButtonStyle(OfiFilterButton, _ofiFilterActive, Color.FromRgb(220, 38, 38));
+            SetChecklistFilterButtonStyle(ReqFilterButton, _reqFilterActive, Color.FromRgb(37, 99, 235));
+            SetChecklistFilterButtonStyle(IncFilterButton, _incFilterActive, Color.FromRgb(217, 119, 6));
+        }
+
+        private static void SetChecklistFilterButtonStyle(Button button, bool selected, Color inactiveColor)
+        {
+            button.Background = selected ? Brushes.White : new SolidColorBrush(inactiveColor);
+            button.Foreground = selected ? new SolidColorBrush(inactiveColor) : Brushes.White;
+            button.BorderBrush = selected ? new SolidColorBrush(SelectedItemHighlightColor) : Brushes.Transparent;
+            // Reserve the selected border in every state so labels and neighbors never move.
+            button.BorderThickness = new Thickness(3);
+        }
+
         private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
         {
             // Clear search text
@@ -10149,27 +10168,8 @@ namespace InspectionEditor
             _reqFilterActive = false;
             _incFilterActive = false;
             
-            // ALL active style (white bg, dark gray text, red border = active)
-            ClearSearchButton.Background = new SolidColorBrush(Colors.White);
-            ClearSearchButton.Foreground = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-            ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-            ClearSearchButton.BorderThickness = new Thickness(3);
-            
-            // Reset OFI button to inactive state (red bg, white text)
-            OfiFilterButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // #DC2626
-            OfiFilterButton.Foreground = new SolidColorBrush(Colors.White);
-            OfiFilterButton.BorderThickness = new Thickness(0);
-            
-            // Reset REQ button to inactive state (blue bg, white text)
-            ReqFilterButton.Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)); // #2563EB
-            ReqFilterButton.Foreground = new SolidColorBrush(Colors.White);
-            ReqFilterButton.BorderThickness = new Thickness(0);
-            
-            // Reset INC button to inactive state (amber bg, white text)
-            IncFilterButton.Background = new SolidColorBrush(Color.FromRgb(217, 119, 6));
-            IncFilterButton.Foreground = new SolidColorBrush(Colors.White);
-            IncFilterButton.BorderThickness = new Thickness(0);
-            
+            UpdateChecklistFilterButtonStyles();
+
             // Defer tree rebuild to reduce UI freeze - let button states render first
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -10180,52 +10180,11 @@ namespace InspectionEditor
 
         private void OfiFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            // Radio button behavior: turn off other filters when this is activated
-            if (!_ofiFilterActive)
-            {
-                // Turning OFI on - deactivate others
-                _ofiFilterActive = true;
-                _reqFilterActive = false;
-                _incFilterActive = false;
-                
-                // OFI active style (red border = active)
-                OfiFilterButton.Background = new SolidColorBrush(Colors.White);
-                OfiFilterButton.Foreground = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // #DC2626
-                OfiFilterButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-                OfiFilterButton.BorderThickness = new Thickness(3);
-                
-                // REQ inactive style
-                ReqFilterButton.Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)); // #2563EB
-                ReqFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                ReqFilterButton.BorderThickness = new Thickness(0);
-                
-                // INC inactive style
-                IncFilterButton.Background = new SolidColorBrush(Color.FromRgb(217, 119, 6));
-                IncFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                IncFilterButton.BorderThickness = new Thickness(0);
-                
-                // ALL inactive style
-                ClearSearchButton.Background = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-                ClearSearchButton.Foreground = new SolidColorBrush(Colors.White);
-                ClearSearchButton.BorderThickness = new Thickness(0);
-            }
-            else
-            {
-                // Toggle off - activate ALL instead
-                _ofiFilterActive = false;
-                
-                OfiFilterButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // #DC2626
-                OfiFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                OfiFilterButton.BorderThickness = new Thickness(0);
-                
-                // Activate ALL
-                ClearSearchButton.Background = new SolidColorBrush(Colors.White);
-                ClearSearchButton.Foreground = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-                ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-                ClearSearchButton.BorderThickness = new Thickness(3);
-            }
+            _ofiFilterActive = !_ofiFilterActive;
+            _reqFilterActive = false;
+            _incFilterActive = false;
+            UpdateChecklistFilterButtonStyles();
 
-            // Refresh tree with current search filter
             PopulateTreeView(SearchFilterBox.Text);
             
             // When activating OFI filter, jump to first fail item and load it in the editor
@@ -10260,101 +10219,20 @@ namespace InspectionEditor
 
         private void ReqFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            // Radio button behavior: turn off other filters when this is activated
-            if (!_reqFilterActive)
-            {
-                // Turning REQ on - deactivate others
-                _reqFilterActive = true;
-                _ofiFilterActive = false;
-                _incFilterActive = false;
-                
-                // REQ active style (red border = active)
-                ReqFilterButton.Background = new SolidColorBrush(Colors.White);
-                ReqFilterButton.Foreground = new SolidColorBrush(Color.FromRgb(37, 99, 235)); // #2563EB
-                ReqFilterButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-                ReqFilterButton.BorderThickness = new Thickness(3);
-                
-                // OFI inactive style
-                OfiFilterButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // #DC2626
-                OfiFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                OfiFilterButton.BorderThickness = new Thickness(0);
-                
-                // INC inactive style
-                IncFilterButton.Background = new SolidColorBrush(Color.FromRgb(217, 119, 6));
-                IncFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                IncFilterButton.BorderThickness = new Thickness(0);
-                
-                // ALL inactive style
-                ClearSearchButton.Background = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-                ClearSearchButton.Foreground = new SolidColorBrush(Colors.White);
-                ClearSearchButton.BorderThickness = new Thickness(0);
-            }
-            else
-            {
-                // Toggle off - activate ALL instead
-                _reqFilterActive = false;
-                
-                ReqFilterButton.Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)); // #2563EB
-                ReqFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                ReqFilterButton.BorderThickness = new Thickness(0);
-                
-                // Activate ALL
-                ClearSearchButton.Background = new SolidColorBrush(Colors.White);
-                ClearSearchButton.Foreground = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-                ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-                ClearSearchButton.BorderThickness = new Thickness(3);
-            }
+            _reqFilterActive = !_reqFilterActive;
+            _ofiFilterActive = false;
+            _incFilterActive = false;
+            UpdateChecklistFilterButtonStyles();
 
-            // Refresh tree with current search filter
             PopulateTreeView(SearchFilterBox.Text);
         }
 
         private void IncFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            // Radio button behavior: turn off other filters when this is activated
-            if (!_incFilterActive)
-            {
-                // Turning INC on - deactivate others
-                _incFilterActive = true;
-                _ofiFilterActive = false;
-                _reqFilterActive = false;
-                
-                // INC active style (red border = active)
-                IncFilterButton.Background = new SolidColorBrush(Colors.White);
-                IncFilterButton.Foreground = new SolidColorBrush(Color.FromRgb(217, 119, 6));
-                IncFilterButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-                IncFilterButton.BorderThickness = new Thickness(3);
-                
-                // OFI inactive style
-                OfiFilterButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // #DC2626
-                OfiFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                OfiFilterButton.BorderThickness = new Thickness(0);
-                
-                // REQ inactive style
-                ReqFilterButton.Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)); // #2563EB
-                ReqFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                ReqFilterButton.BorderThickness = new Thickness(0);
-                
-                // ALL inactive style
-                ClearSearchButton.Background = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-                ClearSearchButton.Foreground = new SolidColorBrush(Colors.White);
-                ClearSearchButton.BorderThickness = new Thickness(0);
-            }
-            else
-            {
-                // Toggle off - activate ALL instead
-                _incFilterActive = false;
-                
-                IncFilterButton.Background = new SolidColorBrush(Color.FromRgb(217, 119, 6));
-                IncFilterButton.Foreground = new SolidColorBrush(Colors.White);
-                IncFilterButton.BorderThickness = new Thickness(0);
-                
-                // Activate ALL
-                ClearSearchButton.Background = new SolidColorBrush(Colors.White);
-                ClearSearchButton.Foreground = new SolidColorBrush(Color.FromRgb(85, 85, 85)); // #555
-                ClearSearchButton.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 20, 60)); // Crimson red = active
-                ClearSearchButton.BorderThickness = new Thickness(3);
-            }
+            _incFilterActive = !_incFilterActive;
+            _ofiFilterActive = false;
+            _reqFilterActive = false;
+            UpdateChecklistFilterButtonStyles();
 
             PopulateTreeView(SearchFilterBox.Text);
         }
@@ -12864,17 +12742,9 @@ namespace InspectionEditor
         // whose names match a key in the transcription — for the cost of 1 API call.
         private string ApplyTranscriptionSuggestion(Item anchor, string transcription)
         {
-            // Use the most verbose transcription option — it has the most key-value pairs.
-            // This handles the case where the user tapped the simple option (e.g. just "2.3")
-            // but a more detailed option like "Post: 2.3 / U-Factor: 2.2" was also available.
+            if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, anchor)) return anchor.Value?.ToString() ?? "";
+            // Use only the option the inspector selected, never a different AI answer.
             string bestTranscription = transcription;
-            if (_transcriptionOptionsByItem.TryGetValue(anchor, out var transcriptionOptions) &&
-                transcriptionOptions.Count > 0)
-            {
-                bestTranscription = transcriptionOptions
-                    .OrderByDescending(s => ParseTranscriptionPairs(s).Count)
-                    .First();
-            }
 
             var pairs = ParseTranscriptionPairs(bestTranscription);
             string anchorValue = transcription;
@@ -12891,23 +12761,28 @@ namespace InspectionEditor
 
             // Use the inspection's actual persisted order, not the filtered/visible list.
             // Required partner fields still need values when a filter or collapsed section hides them.
-            var items = _currentInspection?.Sections?
-                .SelectMany(section => section.Items)
-                .ToList() ?? new List<Item>();
+            var ownerSection = _currentInspection?.Sections?.FirstOrDefault(section => section.Items.Contains(anchor));
+            var items = ownerSection?.Items?.ToList() ?? new List<Item>();
             int idx = items.IndexOf(anchor);
             if (idx < 0)
                 return anchorValue;
 
             var autoFilled = new List<string>();
+            var consumedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             for (int offset = 1; offset <= 2 && idx + offset < items.Count; offset++)
             {
                 var candidate = items[idx + offset];
+                if (!string.IsNullOrWhiteSpace(candidate.Value?.ToString()) ||
+                    TranscriptionUnit(anchor) < 1 || TranscriptionUnit(anchor) != TranscriptionUnit(candidate)) continue;
                 foreach (var (key, val) in pairs)
                 {
+                    // A model/serial pair may fill its companion, never another model/serial row.
+                    if (consumedKeys.Contains(key) || TranscriptionKeyMatchesItem(key, anchor)) continue;
                     if (!string.IsNullOrWhiteSpace(val) && TranscriptionKeyMatchesItem(key, candidate))
                     {
                         candidate.Value = val;
+                        consumedKeys.Add(key);
                         autoFilled.Add(candidate.DisplayLabel ?? candidate.Name ?? "next item");
                         break;
                     }
@@ -12929,6 +12804,13 @@ namespace InspectionEditor
             }
 
             return anchorValue;
+        }
+
+        private static int TranscriptionUnit(Item item)
+        {
+            var matches = Regex.Matches($"{item.Name} {item.DisplayLabel}", @"\b(?:unit|system)\s*#?\s*(\d+)\b", RegexOptions.IgnoreCase);
+            var units = matches.Cast<Match>().Select(m => m.Groups[1].Value).Distinct().ToList();
+            return units.Count == 0 ? 1 : units.Count == 1 && int.TryParse(units[0], out int unit) ? unit : -1;
         }
 
         // Splits "Model: X / Serial: Y" or "U-Value = 0.30 / SHGC = 0.25" into (key, value) pairs.
@@ -12968,6 +12850,8 @@ namespace InspectionEditor
         private static bool TranscriptionKeyMatchesItem(string key, Item item)
         {
             string k = key.ToLowerInvariant().Trim();
+            var unitMatch = Regex.Match(k, @"\b(?:unit|system)\s*#?\s*(\d+)\b");
+            if (unitMatch.Success && (!int.TryParse(unitMatch.Groups[1].Value, out int keyUnit) || keyUnit != TranscriptionUnit(item))) return false;
             string name = $"{item.DisplayLabel} {item.Name}".ToLowerInvariant();
 
             if (k.Contains("serial") && name.Contains("serial")) return true;
@@ -13881,6 +13765,12 @@ namespace InspectionEditor
             if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
             MarkUnsaved();
             MirrorInlineEdit(item, text, isComment: false);
+            // Hide/show the reserved requirement marker without rebuilding the active editor.
+            if (_inlineItemRows.TryGetValue(item, out var requiredRow))
+                foreach (var marker in FindVisualChildren<Border>(requiredRow.Row))
+                    if (marker.Name == "InlineValueRequirement")
+                        marker.Visibility = item.Required && string.IsNullOrWhiteSpace(text)
+                            ? Visibility.Visible : Visibility.Hidden;
             if (_currentEcInfo != null && EnergyComplianceService.NormalizeCode(_currentInspection?.InspectionCode) == "HET" &&
                 item.Number?.StartsWith("1.", StringComparison.Ordinal) == true)
             {
