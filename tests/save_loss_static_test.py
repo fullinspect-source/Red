@@ -42,6 +42,12 @@ class SaveLossTests(unittest.TestCase):
         self.assertIn('editor.SyncCurrentItemFromUI();', SRC[start:launch])
         self.assertIn('!editor.TrySaveCurrentInspection()', SRC[start:launch])
         self.assertIn('editor.IsEnabled = false;', SRC[launch:launch + 650])
+    def test_failed_save_is_logged_without_discarding_edits(self):
+        s = method('TrySaveCurrentInspection')
+        self.assertIn('DiagnosticLogService.Log("Report save failed; edits retained", ex);', s)
+        self.assertIn('MarkUnsaved();', s)
+        self.assertIn('return false;', s)
+        self.assertNotIn('_hasUnsavedChanges = false', s)
     def test_save_does_not_truncate_primary(self):
         s = (ROOT / 'Services/SurgicalSaveService.cs').read_text()
         self.assertNotIn('File.WriteAllText(targetPath, json)', s)

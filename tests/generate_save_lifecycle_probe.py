@@ -25,6 +25,7 @@ static class MessageBox {
  public static MessageBoxResult Result = MessageBoxResult.No;
  public static MessageBoxResult Show(string text, string title, MessageBoxButton buttons, MessageBoxImage icon) => Result;
 }
+static class DiagnosticLogService { public static int Count; public static void Log(string context, Exception error) { Count++; } }
 class Activity { public int Closes; public void LogClose() => Closes++; }
 class Camera { public event Action? PhotoCaptured; public void StopSession() { } }
 public class LifecycleProbe {
@@ -48,7 +49,7 @@ public class LifecycleProbe {
   var e = new CancelEventArgs(); p.MainWindow_Closing(null,e);
   Check(p.writes == 1 && p.unlocked && !e.Cancel, "still-focused edit flushed before dirty gate");
   p = new LifecycleProbe { pending = true, fail = true }; e = new(); p.MainWindow_Closing(null,e);
-  Check(e.Cancel && p._hasUnsavedChanges && !p.unlocked && p._activityService.Closes == 0, "failed close retains dirty state and locks");
+  Check(DiagnosticLogService.Count == 1 && e.Cancel && p._hasUnsavedChanges && !p.unlocked && p._activityService.Closes == 0, "failed close retains dirty state and locks");
   p.fail = false; e = new(); p.MainWindow_Closing(null,e);
   Check(!e.Cancel && p.writes == 1 && !p._hasUnsavedChanges && p.unlocked, "retry closes only after successful save");
   p = new LifecycleProbe { pending = true, summary = true }; MessageBox.Result = MessageBoxResult.Cancel;

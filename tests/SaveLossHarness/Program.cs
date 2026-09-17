@@ -3,6 +3,7 @@ using InspectionEditor.Services;
 using Newtonsoft.Json.Linq;
 
 LifecycleControlFlow.LifecycleProbe.Run();
+AtomicRetryProbe.Run();
 int passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception(name); Console.WriteLine("PASS " + name); passed++; }
 void Throws(Action action, string name) { try { action(); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Check(true, name); return; } throw new Exception("Expected IOException: " + name); }

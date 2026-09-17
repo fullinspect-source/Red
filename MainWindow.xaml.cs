@@ -13962,6 +13962,7 @@ namespace InspectionEditor
             catch (Exception ex)
             {
                 // Keep both the model and dirty state available for retry. Never reset/close on failure.
+                DiagnosticLogService.Log("Report save failed; edits retained", ex);
                 MarkUnsaved();
                 MessageBox.Show($"Your changes could not be saved. The report is still open with your edits.\n\n{ex.Message}",
                     "Report not saved", MessageBoxButton.OK, MessageBoxImage.Error);
