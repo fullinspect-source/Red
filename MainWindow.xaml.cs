@@ -9679,6 +9679,8 @@ namespace InspectionEditor
 
         private void PopulateTreeView(string filter = null)
         {
+            // Invalidate navigation queued for any previously rendered filter/search.
+            _checklistFilterGeneration++;
             SectionsTreeView.Items.Clear();
             if (_currentInspection?.Sections == null) return;
 
@@ -10260,8 +10262,26 @@ namespace InspectionEditor
                    $"({stats.InspectorCatches} catches in {stats.InspectorInspections} inspections)";
         }
 
+        private bool _resettingChecklistFilters;
+        private int _checklistFilterGeneration;
+
+        private void ResetChecklistFilters()
+        {
+            // Reset ALL state atomically, without an intermediate TextChanged rebuild.
+            _resettingChecklistFilters = true;
+            try
+            {
+                _ofiFilterActive = false;
+                _reqFilterActive = false;
+                _incFilterActive = false;
+                SearchFilterBox.Text = "";
+            }
+            finally { _resettingChecklistFilters = false; }
+        }
+
         private void SearchFilterBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (_resettingChecklistFilters) return;
             string filter = SearchFilterBox.Text;
             PopulateTreeView(filter);
         }
@@ -10286,38 +10306,31 @@ namespace InspectionEditor
 
         private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
         {
-            // Clear search text
-            SearchFilterBox.Text = "";
-            
-            // Turn off all other filters (ALL is now the active "filter")
-            _ofiFilterActive = false;
-            _reqFilterActive = false;
-            _incFilterActive = false;
-            
+            ResetChecklistFilters();
             UpdateChecklistFilterButtonStyles();
-
-            // Defer tree rebuild to reduce UI freeze - let button states render first
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                PopulateTreeView("");
-                SearchFilterBox.Focus();
-            }), System.Windows.Threading.DispatcherPriority.Background);
+            // Complete ALL now; never leave an old rebuild/focus callback queued.
+            PopulateTreeView("");
+            SearchFilterBox.Focus();
         }
 
         private void OfiFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            _ofiFilterActive = !_ofiFilterActive;
-            _reqFilterActive = false;
-            _incFilterActive = false;
+            ResetChecklistFilters();
+            _ofiFilterActive = true;
             UpdateChecklistFilterButtonStyles();
 
             PopulateTreeView(SearchFilterBox.Text);
             
-            // When activating OFI filter, jump to first fail item and load it in the editor
+            // When activating OFI filter, jump to first fail item and load it in the editor.
+            // A later filter/search/rebuild or report switch supersedes this navigation.
+            int generation = _checklistFilterGeneration;
+            var inspection = _currentInspection;
             if (_ofiFilterActive)
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    if (generation != _checklistFilterGeneration || !_ofiFilterActive ||
+                        !ReferenceEquals(inspection, _currentInspection)) return;
                     foreach (TreeViewItem sectionNode in SectionsTreeView.Items)
                     {
                         if (sectionNode.Tag is Section)
@@ -10345,9 +10358,8 @@ namespace InspectionEditor
 
         private void ReqFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            _reqFilterActive = !_reqFilterActive;
-            _ofiFilterActive = false;
-            _incFilterActive = false;
+            ResetChecklistFilters();
+            _reqFilterActive = true;
             UpdateChecklistFilterButtonStyles();
 
             PopulateTreeView(SearchFilterBox.Text);
@@ -10355,9 +10367,8 @@ namespace InspectionEditor
 
         private void IncFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            _incFilterActive = !_incFilterActive;
-            _ofiFilterActive = false;
-            _reqFilterActive = false;
+            ResetChecklistFilters();
+            _incFilterActive = true;
             UpdateChecklistFilterButtonStyles();
 
             PopulateTreeView(SearchFilterBox.Text);

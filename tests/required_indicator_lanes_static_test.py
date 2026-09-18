@@ -73,10 +73,13 @@ class RequirementLaneTests(unittest.TestCase):
         for name, flag in [('Ofi', 'ofi'), ('Req', 'req'), ('Inc', 'inc')]:
             self.assertIn(f'{name}FilterButton, _{flag}FilterActive', styles)
             handler = method(f'private void {name}FilterButton_Click')
-            self.assertIn(f'_{flag}FilterActive = !_{flag}FilterActive;', handler)
+            self.assertIn('ResetChecklistFilters();', handler)
+            self.assertIn(f'_{flag}FilterActive = true;', handler)
+            self.assertLess(handler.index('ResetChecklistFilters();'), handler.index(f'_{flag}FilterActive = true;'))
+            self.assertNotIn(f'_{flag}FilterActive = !_{flag}FilterActive;', handler)
             self.assertIn('UpdateChecklistFilterButtonStyles();', handler)
-            for other in {'ofi', 'req', 'inc'} - {flag}:
-                self.assertIn(f'_{other}FilterActive = false;', handler)
+            for other in {'ofi', 'req', 'inc'}:
+                self.assertIn(f'_{other}FilterActive = false;', method('private void ResetChecklistFilters'))
         self.assertIn('UpdateChecklistFilterButtonStyles();', method('private void ClearSearchButton_Click'))
         self.assertIn('// Reset filter state and visuals together on new file load.', CODE)
 

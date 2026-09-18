@@ -34,6 +34,7 @@ namespace InspectionEditor
             { "Builder",  "Builder" },
             { "Attempt#", "AttemptNumberSort" },
             { "Signed",   "EditStatus" },
+            { "Last edit", "LastEditUtc" },
         };
         private string _currentFolderPath = "";
         private PickerSettings? _settings;
@@ -56,8 +57,10 @@ namespace InspectionEditor
         private readonly Dictionary<string, CheckBox> _columnCheckBoxesByKey = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, double> _defaultColumnWidthsByKey = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _columnOrder = new();
+        private readonly Dictionary<string, double> _preferredColumnWidths = new(StringComparer.OrdinalIgnoreCase);
         private bool _hasAppliedColumnSettingsOnce = false;
         private readonly System.Windows.Threading.DispatcherTimer _columnWidthSaveTimer;
+        private readonly System.Windows.Threading.DispatcherTimer _lastEditTimer = new() { Interval = TimeSpan.FromMinutes(1) };
         private int _ordersLoadVersion = 0;
         private readonly HashSet<string> _openingFilePaths = new(StringComparer.OrdinalIgnoreCase);
         private int _aboutLogoClickCount = 0;
@@ -100,6 +103,7 @@ namespace InspectionEditor
                     return;
 
                 CaptureVisibleColumnWidths();
+                FitColumnsToViewport();
                 SaveSettings();
             };
             InitializeComponent();
@@ -108,7 +112,12 @@ namespace InspectionEditor
             AboutPublishedText.Text = $"Published {AppIdentity.PublishedDateText}";
             InitializeColumnLayout();
             WatchColumnWidthChanges();
+            InspectionListView.SizeChanged += (_, _) => FitColumnsToViewport();
             Loaded += InspectionPickerWindow_Loaded;
+            _lastEditTimer.Tick += (_, _) => RefreshLastEditLabels(false);
+            Activated += (_, _) => RefreshLastEditLabels(true);
+            Loaded += (_, _) => _lastEditTimer.Start();
+            Closed += (_, _) => { _pickerClosed = true; ++_lastEditRefreshGeneration; _lastEditTimer.Stop(); _columnWidthSaveTimer.Stop(); };
             if (_stayOpenHome)
             {
                 OpenButton.Content = "Open";
@@ -128,6 +137,39 @@ namespace InspectionEditor
             LoadInspections(savedPath ?? defaultFolderPath);
         }
 
+        private int _lastEditRefreshGeneration;
+        private bool _pickerClosed;
+        private async void RefreshLastEditLabels(bool readSavedMetadata)
+        {
+            // No ItemsSource reset, view refresh, sorting, selection or scroll changes.
+            if (!IsVisible || _pickerClosed) return;
+            foreach (var item in _allInspections) item.RefreshLastEditLabel();
+            if (!readSavedMetadata) return;
+            int generation = ++_lastEditRefreshGeneration;
+            var snapshot = _allInspections.ToArray();
+            try
+            {
+                var stamps = await Task.Run(() => snapshot.Select(item =>
+                {
+                    try
+                    {
+                        byte[] bytes = File.ReadAllBytes(item.FilePath);
+                        return (Item: item, Stamp: LastEditTime.ReadForFile(item.FilePath, bytes));
+                    }
+                    catch { return (Item: item, Stamp: (DateTimeOffset?)null); }
+                }).ToArray());
+                if (_pickerClosed || generation != _lastEditRefreshGeneration) return;
+                var current = new HashSet<InspectionFileInfo>(_allInspections);
+                foreach (var result in stamps)
+                {
+                    if (!current.Contains(result.Item)) continue;
+                    result.Item.LastEditUtc = result.Stamp;
+                    result.Item.RefreshLastEditLabel();
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
+        }
+
         private void InspectionPickerWindow_Loaded(object sender, RoutedEventArgs e)
         {
             bool canRestoreLayout = _settings?.LayoutVersion >= 2;
@@ -142,8 +184,13 @@ namespace InspectionEditor
             ApplyListFontSize();
 
             // Restore column widths
-            if (canRestoreLayout && _settings?.ColumnWidths?.Length > 0)
-                ApplyColumnWidths(_settings.ColumnWidths);
+            if (canRestoreLayout && _settings?.ColumnWidths?.Length > 0 &&
+                (_settings.ColumnWidthsByKey == null || _settings.ColumnWidthsByKey.Count == 0))
+            {
+                _isApplyingColumnSettings = true;
+                try { ApplyColumnWidths(_settings.ColumnWidths); }
+                finally { _isApplyingColumnSettings = false; }
+            }
             ApplyColumnSettings();
 
             LoadSettingsTabValues();
@@ -223,7 +270,7 @@ namespace InspectionEditor
             {
                 var s = new PickerSettings
                 {
-                    LayoutVersion = 4,
+                    LayoutVersion = 5,
                     LastFolderPath = _currentFolderPath,
                     ColumnWidths   = GetColumnWidths(),
                     ColumnWidthsByKey = GetColumnWidthsByKey(),
@@ -1113,8 +1160,9 @@ namespace InspectionEditor
                 string fullPath = Path.GetFullPath(filePath);
                 bool isFileAlreadyOpen = _openFilePaths.Contains(fullPath);
 
-                string json = File.ReadAllText(filePath);
-                using var doc = JsonDocument.Parse(json);
+                byte[] fileBytes = File.ReadAllBytes(filePath);
+                using var reader = new StreamReader(new MemoryStream(fileBytes), detectEncodingFromByteOrderMarks: true);
+                using var doc = JsonDocument.Parse(reader.ReadToEnd());
                 var root = doc.RootElement;
                 
                 string address = "";
@@ -1244,6 +1292,7 @@ namespace InspectionEditor
                 return new InspectionFileInfo
                 {
                     FilePath = filePath,
+                    LastEditUtc = LastEditTime.ReadForFile(filePath, fileBytes),
                     Address = fullAddress,
                     Subdivision = subdivision,
                     InspectionCode = inspectionCode,
@@ -1470,7 +1519,7 @@ namespace InspectionEditor
         private double[] GetColumnWidths()
         {
             if (InspectionListView.View is GridView gridView)
-                return gridView.Columns.Select(c => c.Width).ToArray();
+                return _columnOrder.Select(k => _preferredColumnWidths.GetValueOrDefault(k, _columnsByKey[k].Width)).ToArray();
             return Array.Empty<double>();
         }
 
@@ -1495,9 +1544,10 @@ namespace InspectionEditor
             _columnsByKey["Open"] = OpenColumn;
             _columnsByKey["Signed"] = SignedColumn;
             _columnsByKey["Call"] = CallColumn;
+            _columnsByKey["LastEdit"] = LastEditColumn;
 
             _columnOrder.Clear();
-            _columnOrder.AddRange(new[] { "Address", "Type", "Date", "Builder", "Filename", "Open", "Signed", "Call" });
+            _columnOrder.AddRange(new[] { "Address", "Type", "Date", "Builder", "Filename", "Open", "Signed", "Call", "LastEdit" });
 
             _columnCheckBoxesByKey.Clear();
             _columnCheckBoxesByKey["Address"] = AddressColumnCheckBox;
@@ -1508,6 +1558,7 @@ namespace InspectionEditor
             _columnCheckBoxesByKey["Open"] = OpenColumnCheckBox;
             _columnCheckBoxesByKey["Signed"] = SignedColumnCheckBox;
             _columnCheckBoxesByKey["Call"] = CallColumnCheckBox;
+            _columnCheckBoxesByKey["LastEdit"] = LastEditColumnCheckBox;
 
             _defaultColumnWidthsByKey.Clear();
             foreach (var kvp in _columnsByKey)
@@ -1535,6 +1586,11 @@ namespace InspectionEditor
             if (_isApplyingColumnSettings || _settings == null)
                 return;
 
+            if (sender is GridViewColumn resized)
+            {
+                string? key = _columnsByKey.FirstOrDefault(x => x.Value == resized).Key;
+                if (key != null) _preferredColumnWidths[key] = resized.Width;
+            }
             CaptureVisibleColumnWidths();
             _columnWidthSaveTimer.Stop();
             _columnWidthSaveTimer.Start();
@@ -1545,7 +1601,7 @@ namespace InspectionEditor
             var widths = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in _columnsByKey)
             {
-                double width = kvp.Value.Width;
+                double width = _preferredColumnWidths.GetValueOrDefault(kvp.Key, kvp.Value.Width);
                 if (!IsColumnInView(kvp.Key) && _settings?.ColumnWidthsByKey != null &&
                     _settings.ColumnWidthsByKey.TryGetValue(kvp.Key, out double savedWidth))
                 {
@@ -1591,6 +1647,7 @@ namespace InspectionEditor
                     if (effectiveVisible)
                     {
                         column.Width = GetSavedColumnWidth(key, column);
+                        _preferredColumnWidths[key] = column.Width;
                         gridView.Columns.Add(column);
                     }
 
@@ -1610,7 +1667,37 @@ namespace InspectionEditor
                 _isApplyingColumnSettings = false;
                 _hasAppliedColumnSettingsOnce = true;
             }
+            FitColumnsToViewport();
         }
+
+        private void FitColumnsToViewport()
+        {
+            if (!_hasAppliedColumnSettingsOnce || InspectionListView.ActualWidth <= 0) return;
+            var visible = _columnOrder.Where(IsColumnInView).ToArray();
+            double available = Math.Max(0, InspectionListView.ActualWidth - 32);
+            double preferred = visible.Sum(k => Math.Max(FitMinimumWidth(k), _preferredColumnWidths.GetValueOrDefault(k, _columnsByKey[k].Width)));
+            double minimum = visible.Sum(k => FitMinimumWidth(k));
+            ScrollViewer.SetHorizontalScrollBarVisibility(InspectionListView,
+                minimum > available ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden);
+            double fraction = preferred <= available ? 1 : Math.Clamp((available - minimum) / Math.Max(1, preferred - minimum), 0, 1);
+            _isApplyingColumnSettings = true;
+            try
+            {
+                foreach (string key in visible)
+                {
+                    double width = _preferredColumnWidths.GetValueOrDefault(key, _columnsByKey[key].Width);
+                    double min = FitMinimumWidth(key);
+                    _columnsByKey[key].Width = min + Math.Max(0, width - min) * fraction;
+                }
+            }
+            finally { _isApplyingColumnSettings = false; }
+        }
+
+        private static double FitMinimumWidth(string key) => key switch
+        {
+            "Address" => 160, "Type" => 120, "Builder" => 90,
+            _ => GetMinimumColumnWidth(key)
+        };
 
         private void ColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
         {
@@ -1623,7 +1710,7 @@ namespace InspectionEditor
 
             _settings ??= new PickerSettings();
             if (IsColumnInView(key) && column.Width > 4)
-                _settings.ColumnWidthsByKey[key] = column.Width;
+                _settings.ColumnWidthsByKey[key] = _preferredColumnWidths.GetValueOrDefault(key, column.Width);
             _settings.ColumnVisibility[key] = checkBox.IsChecked == true;
 
             ApplyColumnSettings();
@@ -1636,7 +1723,7 @@ namespace InspectionEditor
             foreach (var kvp in _columnsByKey)
             {
                 if (IsColumnInView(kvp.Key) && kvp.Value.Width > 4)
-                    _settings.ColumnWidthsByKey[kvp.Key] = kvp.Value.Width;
+                    _settings.ColumnWidthsByKey[kvp.Key] = _preferredColumnWidths.GetValueOrDefault(kvp.Key, kvp.Value.Width);
             }
         }
 
@@ -1661,7 +1748,13 @@ namespace InspectionEditor
                 _settings.ColumnWidthsByKey.TryGetValue(key, out double savedWidth) &&
                 savedWidth > 4)
             {
-                width = savedWidth;
+                double oldDefault = key switch { "Address" => 430, "Type" => 220, "Builder" => 180, "Filename" => 110, _ => -1 };
+                width = _settings.LayoutVersion < 5 && savedWidth == oldDefault ? width : savedWidth;
+            }
+            else if (_settings?.ColumnWidthsByKey?.Count == 0 && column.Width > 4)
+            {
+                // Legacy positional settings have already been applied to the original columns.
+                width = column.Width;
             }
 
             return Math.Max(width, GetMinimumColumnWidth(key));
@@ -1676,6 +1769,7 @@ namespace InspectionEditor
 
         private static double GetMinimumColumnWidth(string key) => key switch
         {
+            "LastEdit" => 82,
             "Call" => 86,
             "Open" => 64,
             "Signed" => 70,
@@ -2198,8 +2292,20 @@ namespace InspectionEditor
         #endregion
     }
     
-    public class InspectionFileInfo
+    public class InspectionFileInfo : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public DateTimeOffset? LastEditUtc { get; set; }
+        public string LastEditDisplay => LastEditTime.Format(LastEditUtc, DateTimeOffset.UtcNow);
+        public string LastEditTooltip => LastEditUtc.HasValue
+            ? $"Last successful RED edit saved on this device: {LastEditUtc.Value.ToLocalTime():g}" : "";
+        public void RefreshLastEditLabel()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditUtc)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditDisplay)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditTooltip)));
+        }
+
         public string FilePath { get; set; } = "";
         public string Address { get; set; } = "";
         public string Subdivision { get; set; } = "";

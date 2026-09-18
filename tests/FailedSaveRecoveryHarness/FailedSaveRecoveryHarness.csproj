@@ -7,4 +7,4 @@
 <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" />
 <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs" />
 <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs" />
-</ItemGroup></Project>
+</ItemGroup><ItemGroup><Compile Include="../../Services/LastEditTime.cs" Link="LastEditTime.cs" /></ItemGroup></Project>

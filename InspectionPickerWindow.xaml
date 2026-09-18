@@ -246,7 +246,7 @@
                               PreviewMouseLeftButtonUp="InspectionListView_PreviewMouseLeftButtonUp">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn x:Name="AddressColumn" Header="Address" Width="430">
+                                <GridViewColumn x:Name="AddressColumn" Header="Address" Width="400">
                                     <GridViewColumn.HeaderContainerStyle>
                                         <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
                                     </GridViewColumn.HeaderContainerStyle>
@@ -263,7 +263,7 @@
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
 
-                                <GridViewColumn x:Name="TypeColumn" Header="Type" Width="220">
+                                <GridViewColumn x:Name="TypeColumn" Header="Type" Width="200">
                                     <GridViewColumn.HeaderContainerStyle>
                                         <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
                                     </GridViewColumn.HeaderContainerStyle>
@@ -296,7 +296,7 @@
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
 
-                                <GridViewColumn x:Name="BuilderColumn" Header="Builder" Width="180">
+                                <GridViewColumn x:Name="BuilderColumn" Header="Builder" Width="160">
                                     <GridViewColumn.HeaderContainerStyle>
                                         <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
                                     </GridViewColumn.HeaderContainerStyle>
@@ -312,7 +312,7 @@
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
 
-                                <GridViewColumn x:Name="FilenameColumn" Header="Attempt#" Width="110">
+                                <GridViewColumn x:Name="FilenameColumn" Header="Attempt#" Width="98">
                                     <GridViewColumn.HeaderContainerStyle>
                                         <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
                                     </GridViewColumn.HeaderContainerStyle>
@@ -412,6 +412,17 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn x:Name="LastEditColumn" Header="Last edit" Width="82">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}"/>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding LastEditDisplay}" ToolTip="{Binding LastEditTooltip}"
+                                                       VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -654,6 +665,7 @@
                                     <CheckBox x:Name="OpenColumnCheckBox" Content="Open" Margin="0,0,16,0" IsChecked="False" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
                                     <CheckBox x:Name="SignedColumnCheckBox" Content="Signed" Margin="0,0,16,0" IsChecked="False" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
                                     <CheckBox x:Name="CallColumnCheckBox" Content="Call" Margin="0,0,16,0" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
+                                    <CheckBox x:Name="LastEditColumnCheckBox" Content="Last edit" Margin="0,10,16,0" IsChecked="True" Checked="ColumnVisibilityCheckBox_Changed" Unchecked="ColumnVisibilityCheckBox_Changed"/>
                                 </UniformGrid>
                             </StackPanel>
                         </Border>

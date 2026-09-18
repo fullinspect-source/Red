@@ -48,8 +48,8 @@ class Gemini37RoutingStaticTests(unittest.TestCase):
         self.assertTrue(all('thinkingLevel: null' in call for call in fallback_calls))
 
     def test_release_metadata_is_current(self):
-        self.assertIn("<Version>2.1.34</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-09-17</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.1.35</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-09-18</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

@@ -19,13 +19,15 @@ namespace InspectionEditor.Services
         private byte[]? _lastSavedBytes;
         private readonly FailedSaveRecoveryService _recovery;
         private readonly Func<string, string, byte[]?, byte[]> _write;
+        private readonly string? _saveRegistryRoot;
 
         public SurgicalSaveService() : this(new FailedSaveRecoveryService(), AtomicInspectionWriter.Write) { }
 
         internal SurgicalSaveService(FailedSaveRecoveryService recovery,
-            Func<string, string, byte[]?, byte[]>? write = null)
+            Func<string, string, byte[]?, byte[]>? write = null, string? saveRegistryRoot = null)
         {
             _recovery = recovery;
+            _saveRegistryRoot = saveRegistryRoot;
             _write = write ?? AtomicInspectionWriter.Write;
         }
 
@@ -39,7 +41,8 @@ namespace InspectionEditor.Services
             string jsonText;
             using (var reader = new StreamReader(new MemoryStream(loadedBytes), detectEncodingFromByteOrderMarks: true))
                 jsonText = reader.ReadToEnd();
-            var originalJson = JObject.Parse(jsonText);
+            using var jsonReader = new JsonTextReader(new StringReader(jsonText)) { DateParseHandling = DateParseHandling.None };
+            var originalJson = JObject.Load(jsonReader);
 
             // Deserialize to model for UI
             var inspection = JsonConvert.DeserializeObject<InspectionFile>(jsonText);
@@ -140,6 +143,8 @@ namespace InspectionEditor.Services
                     }
                     throw new IOException($"{saveError.Message}\n\n{recoveryMessage}", saveError);
                 }
+                if (_saveRegistryRoot == null) LastEditTime.RecordSuccessfulSave(targetPath, savedBytes);
+                else LastEditTime.RecordSuccessfulSave(targetPath, savedBytes, _saveRegistryRoot);
                 _lastSavedBytes = savedBytes;
                 _filePath = targetPath;
             }
