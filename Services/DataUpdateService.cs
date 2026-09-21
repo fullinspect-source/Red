@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace InspectionEditor.Services
@@ -22,7 +23,7 @@ namespace InspectionEditor.Services
     {
         private static readonly HttpClient _httpClient = new HttpClient 
         { 
-            Timeout = System.Threading.Timeout.InfiniteTimeSpan // Per-attempt bounds are enforced by UpdateNetworkService.
+            Timeout = TimeSpan.FromSeconds(30) // UpdateNetworkService also bounds response bodies.
         };
         
         // Dropbox public links (dl=1 for direct download)
@@ -195,18 +196,20 @@ namespace InspectionEditor.Services
         /// Force-downloads the latest stats (bypasses 12 h throttle) and returns
         /// what was found versus what the user already had.
         /// </summary>
-        public static async Task<StatsUpdateResult> ForceUpdateStatsAsync()
+        public static async Task<StatsUpdateResult> ForceUpdateStatsAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var result = new StatsUpdateResult { CurrentDate = GetLocalStatsDate() };
             // Companion failures must not prevent stats refresh, or claim the stats server is offline.
             var quickTask = DownloadIfNewerAsync(QUICK_COMMENTS_URL, QuickCommentsPath,
-                IsValidQuickCommentsPayload, preserveNewerGeneratedData: true);
+                IsValidQuickCommentsPayload, preserveNewerGeneratedData: true, cancellationToken: cancellationToken);
             var typesTask = DownloadIfNewerAsync(INSPECTION_TYPES_URL, InspectionTypesPath,
-                content => content.TrimStart().StartsWith("INS Type"));
+                content => content.TrimStart().StartsWith("INS Type"), cancellationToken: cancellationToken);
             bool statsSucceeded = false;
             try
             {
-                string remote = (await UpdateNetworkService.GetStringAsync(_httpClient, INSPECTOR_STATS_URL)).Trim();
+                string remote = (await UpdateNetworkService.GetStringAsync(_httpClient, INSPECTOR_STATS_URL, cancellationToken)).Trim();
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsValidStatsPayload(remote)) throw new InvalidDataException("Invalid stats dataset.");
                 string? before = File.Exists(InspectorStatsPath) ? File.ReadAllText(InspectorStatsPath) : null;
                 StoreValidatedData(InspectorStatsPath, remote, preserveNewerGeneratedData: true);
@@ -222,6 +225,7 @@ namespace InspectionEditor.Services
                 result.LatestDate = result.CurrentDate;
             }
             bool[] companions = await Task.WhenAll(quickTask, typesTask);
+            cancellationToken.ThrowIfCancellationRequested();
             if (statsSucceeded && Array.TrueForAll(companions, succeeded => succeeded))
             {
                 try
@@ -244,7 +248,8 @@ namespace InspectionEditor.Services
             string url,
             string localPath,
             Func<string, bool>? isValid = null,
-            bool preserveNewerGeneratedData = false)
+            bool preserveNewerGeneratedData = false,
+            CancellationToken cancellationToken = default)
         {
             if (url.Contains("PLACEHOLDER")) return false;
             isValid ??= content => content.StartsWith("{") || content.StartsWith("[");
@@ -252,7 +257,8 @@ namespace InspectionEditor.Services
             {
                 string separator = url.Contains('?') ? "&" : "?";
                 string requestUrl = $"{url}{separator}_={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
-                string remoteContent = (await UpdateNetworkService.GetStringAsync(_httpClient, requestUrl)).Trim();
+                string remoteContent = (await UpdateNetworkService.GetStringAsync(_httpClient, requestUrl, cancellationToken)).Trim();
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!isValid(remoteContent)) return false;
                 StoreValidatedData(localPath, remoteContent, preserveNewerGeneratedData);
                 return true;

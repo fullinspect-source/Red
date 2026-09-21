@@ -23,12 +23,21 @@ class UpdateUiTests(unittest.TestCase):
         start = ABOUT.index("private async Task<AppUpdateResult> RunAboutAppUpdateAsync")
         end = ABOUT.index("private async Task ForceAboutUpdateCoreAsync", start)
         body = ABOUT[start:end]
-        self.assertLess(body.index("!editor.TryPrepareForAppUpdate()"), body.index("AppUpdateService.CheckAndInstallIfAvailableAsync"))
-        self.assertLess(body.index("entry.Window.IsEnabled = false"), body.index("AppUpdateService.CheckAndInstallIfAvailableAsync"))
+        self.assertLess(body.index("!editor.TryPrepareForAppUpdate()"), body.index("AppUpdateService.PrepareAsync"))
+        self.assertLess(body.index("entry.Window.IsEnabled = false"), body.index("AppUpdateService.PrepareAsync"))
+        self.assertLess(body.index("await UpdateUiCoordinator.RunPreparationAsync"), body.index("AppUpdateService.InstallPreparedUpdate"))
         self.assertIn("if (!installerStarted)", body)
         self.assertIn("entry.Window.IsEnabled = entry.WasEnabled", body)
         self.assertIn("if (_aboutUpdateRunning) return;", ABOUT)
     def test_installer_handled_before_stats_wait(self):
         body = ABOUT[ABOUT.index("private async Task ForceAboutUpdateCoreAsync"):]
         self.assertLess(body.index("Application.Current.Shutdown();"), body.index("statsResult = await statsTask;"))
+    def test_manual_routes_share_deadline_and_terminal_cleanup(self):
+        for source in (MAIN, ABOUT):
+            self.assertIn("CancellationTokenSource(UpdateUiCoordinator.ManualBudget)", source)
+            self.assertIn("await UpdateUiCoordinator.RunVisibleAsync", source)
+            self.assertIn("token => DataUpdateService.ForceUpdateStatsAsync(token)", source)
+            self.assertNotIn("Timeout.InfiniteTimeSpan", source)
+        self.assertIn("cancellationToken.ThrowIfCancellationRequested();\n                        using var installer", MAIN)
+        self.assertNotIn("await Task.Delay(120000)", MAIN)
 if __name__ == "__main__": unittest.main()

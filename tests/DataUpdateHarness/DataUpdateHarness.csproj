@@ -4,5 +4,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Compile Include="../../Services/DataUpdateService.cs" Link="DataUpdateService.cs" />
     <Compile Include="../../Services/AppUpdateService.cs" Link="AppUpdateService.cs" />
+    <Compile Include="../../Services/UpdateUiCoordinator.cs" Link="UpdateUiCoordinator.cs" />
   </ItemGroup>
 </Project>

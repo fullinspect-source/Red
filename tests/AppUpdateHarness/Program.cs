@@ -106,6 +106,42 @@ await Test("failed forced check preserves prior marker", async () => {
     var stamp = File.GetLastWriteTimeUtc(f.Options.MarkerPath);
     Assert((await f.Run(true)).Error != null && File.ReadAllText(f.Options.MarkerPath) == marker && File.GetLastWriteTimeUtc(f.Options.MarkerPath) == stamp, "failed check changed marker");
 });
+await Test("non-cooperative network metadata is hard bounded", async () => {
+    var hung = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+    using var f = new Fixture((_,_) => hung.Task);
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    var r = await f.Run().WaitAsync(TimeSpan.FromSeconds(2));
+    Assert(r.Error!.Contains("timed out") && f.Handler.Calls == 3 && f.Started == 0 && watch.ElapsedMilliseconds < 1000, "hard deadline");
+    hung.SetException(new IOException("late failure"));
+});
+foreach (bool download in new[] { false, true }) await Test("non-cooperative response body bounded: download=" + download, async () => {
+    var hung = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+    using var f = new Fixture((n,_) => Task.FromResult(download && n == 1 ? Json(New) : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new NonCooperativeStream(hung.Task)) }));
+    var r = await f.Run().WaitAsync(TimeSpan.FromSeconds(2));
+    Assert(r.Error!.Contains("timed out") && f.Started == 0 && !File.Exists(f.Options.MarkerPath), "body timeout/installer safety");
+    hung.SetException(new IOException("late body failure"));
+    await Task.Delay(30);
+});
+await Test("prepared package cannot install itself; cancelled handoff rejected", async () => {
+    using var f = new Fixture((n,_) => Task.FromResult(n == 1 ? Json(New) : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Zip()) }));
+    var prepared = await f.Prepare();
+    Assert(prepared.ExtractDirectory != null && f.Started == 0 && !File.Exists(f.Options.MarkerPath), "preparation launched installer");
+    using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+    var r = AppUpdateService.InstallPreparedUpdate(prepared, f.Options, cancelled.Token);
+    Assert(!r.InstallerStarted && f.Started == 0 && !File.Exists(f.Options.MarkerPath), "cancelled handoff installed");
+});
+await Test("visible timeout of late preparation cannot launch installer", async () => {
+    using var f = new Fixture((n,_) => Task.FromResult(n == 1 ? Json(New) : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Zip()) }));
+    var prepared = await f.Prepare();
+    var late = new TaskCompletionSource<AppUpdateService.PreparedUpdate>(TaskCreationOptions.RunContinuationsAsynchronously);
+    try {
+        var value = await UpdateUiCoordinator.RunPreparationAsync(_ => late.Task, TimeSpan.FromMilliseconds(30));
+        AppUpdateService.InstallPreparedUpdate(value, f.Options);
+        throw new Exception("missing timeout");
+    } catch (TimeoutException) { }
+    late.SetResult(prepared); await Task.Delay(30);
+    Assert(f.Started == 0 && !File.Exists(f.Options.MarkerPath), "late install");
+});
 Console.WriteLine($"{passed} production updater tests passed.");
 
 sealed class Fixture : IDisposable {
@@ -119,6 +155,7 @@ sealed class Fixture : IDisposable {
         Options = new() { MarkerPath = Path.Combine(root,"marker"), TempDirectory = Path.Combine(root,"download"), CheckTimeout = TimeSpan.FromMilliseconds(40), DownloadTimeout = TimeSpan.FromMilliseconds(40), RetryDelay = TimeSpan.Zero, StartInstaller = (_,dir) => { if (launchFails) throw new IOException("launch failed"); if (!File.Exists(Path.Combine(dir,"Red.exe"))) throw new Exception("validation bypassed"); Started++; } };
     }
     public Task<AppUpdateResult> Run(bool force=false,CancellationToken ct=default) => AppUpdateService.CheckAndInstallIfAvailableAsync(client,Options,force,ct);
+    public Task<AppUpdateService.PreparedUpdate> Prepare() => AppUpdateService.PrepareAsync(client,Options,true);
     public void Dispose() { client.Dispose(); if (Directory.Exists(root)) Directory.Delete(root,true); }
 }
 sealed class FakeHandler(Func<int,CancellationToken,Task<HttpResponseMessage>> response) : HttpMessageHandler {
@@ -132,6 +169,12 @@ sealed class BrokenStream(bool stall) : Stream {
         if (stall) await Task.Delay(Timeout.Infinite,ct);
         throw new IOException("connection reset mid-body");
     }
+    public override bool CanRead=>true; public override bool CanSeek=>false; public override bool CanWrite=>false;
+    public override long Length=>throw new NotSupportedException(); public override long Position {get=>0;set=>throw new NotSupportedException();}
+    public override int Read(byte[] b,int o,int c)=>throw new NotSupportedException(); public override void Flush(){} public override long Seek(long o,SeekOrigin s)=>throw new NotSupportedException(); public override void SetLength(long l)=>throw new NotSupportedException(); public override void Write(byte[] b,int o,int c)=>throw new NotSupportedException();
+}
+sealed class NonCooperativeStream(Task<int> stalled) : Stream {
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct=default) => new(stalled);
     public override bool CanRead=>true; public override bool CanSeek=>false; public override bool CanWrite=>false;
     public override long Length=>throw new NotSupportedException(); public override long Position {get=>0;set=>throw new NotSupportedException();}
     public override int Read(byte[] b,int o,int c)=>throw new NotSupportedException(); public override void Flush(){} public override long Seek(long o,SeekOrigin s)=>throw new NotSupportedException(); public override void SetLength(long l)=>throw new NotSupportedException(); public override void Write(byte[] b,int o,int c)=>throw new NotSupportedException();

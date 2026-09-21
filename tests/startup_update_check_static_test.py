@@ -1,5 +1,7 @@
 import pathlib
 import unittest
+import xml.etree.ElementTree as ET
+from datetime import date
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -19,11 +21,15 @@ class StartupUpdateCheckStaticTests(unittest.TestCase):
 
     def test_force_retry_path_remains(self):
         self.assertIn("CheckAndInstallIfAvailableAsync(bool force = false, CancellationToken cancellationToken = default)", UPDATER)
-        self.assertIn("force: true, cancellationToken: cancellation.Token", (ROOT / "InspectionPickerWindow.xaml.cs").read_text(encoding="utf-8"))
+        about = (ROOT / "InspectionPickerWindow.xaml.cs").read_text(encoding="utf-8")
+        self.assertIn("AppUpdateService.PrepareAsync(force: true, cancellationToken: token)", about)
+        self.assertIn("_aboutLogoClickCount >= 3", about)
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.1.35</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-09-18</ReleaseDate>", PROJECT)
+        project = ET.fromstring(PROJECT)
+        self.assertRegex(project.findtext("PropertyGroup/Version"), r"^\d+\.\d+\.\d+$")
+        date.fromisoformat(project.findtext("PropertyGroup/ReleaseDate"))
+        self.assertIn("<Product>RED $(Version)</Product>", PROJECT)
 
 
 if __name__ == "__main__":

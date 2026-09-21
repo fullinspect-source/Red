@@ -999,7 +999,29 @@ namespace InspectionEditor
         /// Update check - works via direct HTTP to public GitHub repo (no gh CLI needed).
         /// Runs automatically for editor-only launches; About owns the visible manual update UI.
         /// </summary>
+        private bool _manualUpdateRunning;
+
         private async void CheckForUpdatesAsync(bool silent = false)
+        {
+            if (_manualUpdateRunning) return;
+            _manualUpdateRunning = true;
+            using var deadline = new System.Threading.CancellationTokenSource(UpdateUiCoordinator.ManualBudget);
+            EventHandler closed = (_, _) => deadline.Cancel();
+            Closed += closed;
+            await UpdateUiCoordinator.RunVisibleAsync(() => CheckForUpdatesCoreAsync(silent, deadline.Token), ex =>
+            {
+                UpdateResultsGrid.Visibility = Visibility.Collapsed;
+                UpdateStatusText.Visibility = Visibility.Visible;
+                UpdateStatusText.Text = UpdateNetworkService.DescribeFailure(ex, "finish the update check");
+            }, () =>
+            {
+                Closed -= closed;
+                UpdateProgressBar.IsIndeterminate = false;
+                _manualUpdateRunning = false;
+            });
+        }
+
+        private async Task CheckForUpdatesCoreAsync(bool silent, System.Threading.CancellationToken cancellationToken)
         {
             const string API_URL = "https://api.github.com/repos/fullinspect-source/Red/releases/latest";
 
@@ -1013,7 +1035,8 @@ namespace InspectionEditor
 
                 try
                 {
-                    var devStatsResult = await InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
+                    var devStatsResult = await UpdateUiCoordinator.RunPreparationAsync(
+                        token => DataUpdateService.ForceUpdateStatsAsync(token), UpdateUiCoordinator.ManualBudget, cancellationToken);
                     _inspTypeService.InvalidateCache();
                     UpdateProgressBar.IsIndeterminate = false;
                     UpdateProgressBar.Value = 100;
@@ -1034,7 +1057,8 @@ namespace InspectionEditor
             {
                 try
                 {
-                    await InspectionEditor.Services.DataUpdateService.ForceUpdateStatsAsync();
+                    await UpdateUiCoordinator.RunPreparationAsync(
+                        token => DataUpdateService.ForceUpdateStatsAsync(token), UpdateUiCoordinator.ManualBudget, cancellationToken);
                     _inspTypeService.InvalidateCache();
                 }
                 catch { }
@@ -1047,7 +1071,7 @@ namespace InspectionEditor
                 UpdatePanel.Visibility = Visibility.Visible;
                 UpdateResultsGrid.Visibility = Visibility.Collapsed;
                 UpdateStatusText.Visibility = Visibility.Visible;
-                UpdateStatusText.Text = "Checking for updates…";
+                UpdateStatusText.Text = "Checking for updates... (2 minute limit)";
                 UpdateProgressBar.IsIndeterminate = true;
                 UpdateProgressBar.Value = 0;
             }
@@ -1061,15 +1085,19 @@ namespace InspectionEditor
 
             using var http = new System.Net.Http.HttpClient();
             http.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionEditor");
-            http.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+            http.Timeout = TimeSpan.FromSeconds(30);
             var redTask = UpdateUiCoordinator.CaptureAsync(
-                () => UpdateNetworkService.GetStringAsync(http, API_URL), ex =>
+                () => UpdateUiCoordinator.RunPreparationAsync(
+                    token => UpdateNetworkService.GetStringAsync(http, API_URL, token),
+                    UpdateUiCoordinator.ManualBudget, cancellationToken), ex =>
                 {
                     redCheckError = UpdateNetworkService.DescribeFailure(ex, "check for app updates");
                     return "";
                 });
             var statsTask = UpdateUiCoordinator.CaptureAsync(
-                () => DataUpdateService.ForceUpdateStatsAsync(), ex => new StatsUpdateResult
+                () => UpdateUiCoordinator.RunPreparationAsync(
+                    token => DataUpdateService.ForceUpdateStatsAsync(token),
+                    UpdateUiCoordinator.ManualBudget, cancellationToken), ex => new StatsUpdateResult
                 {
                     CurrentDate = DataUpdateService.GetLocalStatsDate(),
                     Error = UpdateNetworkService.DescribeFailure(ex, "update inspector stats")
@@ -1135,38 +1163,41 @@ namespace InspectionEditor
                         UpdateStatusText.Text = $"Downloading RED v{remoteRedVersion}…";
                         using var http2 = new System.Net.Http.HttpClient();
                         http2.DefaultRequestHeaders.Add("User-Agent", "Red-InspectionEditor");
-                        http2.Timeout = System.Threading.Timeout.InfiniteTimeSpan; // Each retry bounds headers and body.
+                        http2.Timeout = TimeSpan.FromSeconds(30); // Each retry also bounds the body.
 
                         string tempDir = Path.Combine(Path.GetTempPath(), "RedUpdate", Guid.NewGuid().ToString("N"));
                         Directory.CreateDirectory(tempDir);
 
-                        // Stream to disk with progress — avoids 96 MB memory spike and timeout on slow connections
+                        // Stream to isolated staging files, without touching UI from background work.
                         string zipPath = Path.Combine(tempDir, $"Red-v{remoteRedVersion}.zip");
-                        await AppUpdateService.WithRetryAsync(async token =>
+                        string downloadedPath = await AppUpdateService.WithRetryAsync(async token =>
                         {
+                        string attemptPath = zipPath + "." + Guid.NewGuid().ToString("N") + ".partial";
                         using (var resp2 = await http2.GetAsync(redDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, token))
                         {
                             resp2.EnsureSuccessStatusCode();
-                            long? totalBytes = resp2.Content.Headers.ContentLength;
                             using var netStream = await resp2.Content.ReadAsStreamAsync(token);
-                            using var fileStream = File.Create(zipPath);
+                            using var fileStream = File.Create(attemptPath);
                             var buf = new byte[81920];
-                            long got = 0; int read2;
+                            int read2;
                             while ((read2 = await netStream.ReadAsync(buf.AsMemory(), token)) > 0)
                             {
                                 await fileStream.WriteAsync(buf.AsMemory(0, read2), token);
-                                got += read2;
-                                string progress = totalBytes.HasValue
-                                    ? $"{got / 1048576} / {totalBytes.Value / 1048576} MB"
-                                    : $"{got / 1048576} MB";
-                                UpdateStatusText.Text = $"Downloading RED v{remoteRedVersion}… {progress}";
                             }
                         }
-                        return true;
-                        }, TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(1), System.Threading.CancellationToken.None);
+                        token.ThrowIfCancellationRequested();
+                        return attemptPath;
+                        }, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(1), cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        File.Move(downloadedPath, zipPath, true);
 
                         string extractDir = Path.Combine(tempDir, "extracted");
-                        System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir);
+                        await UpdateUiCoordinator.RunPreparationAsync(token =>
+                        {
+                            System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir);
+                            token.ThrowIfCancellationRequested();
+                            return Task.FromResult(true);
+                        }, UpdateUiCoordinator.ManualBudget, cancellationToken);
                         if (!IsLoaded) throw new InvalidOperationException("Update postponed because the editor was closed.");
                         if (!File.Exists(Path.Combine(extractDir, "Red.exe")) ||
                             !File.Exists(Path.Combine(extractDir, "SixLabors.ImageSharp.dll")))
@@ -1231,12 +1262,13 @@ namespace InspectionEditor
                             if (editor._hasUnsavedChanges && !editor.TrySaveCurrentInspection())
                                 throw new InvalidOperationException("Update postponed because inspection changes could not be saved.");
                         }
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        cancellationToken.ThrowIfCancellationRequested();
+                        using var installer = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = "cmd.exe",
                             Arguments = $"/c \"{batPath}\"",
                             UseShellExecute = true
-                        });
+                        }) ?? throw new IOException("RED installer did not start. Please try again.");
                         foreach (var editor in editorWindows)
                             editor.IsEnabled = false;
                         // Do NOT delete tempDir — batch script needs the extracted files
@@ -1244,7 +1276,7 @@ namespace InspectionEditor
                     }
                     catch (Exception ex)
                     {
-                        redInstallError = ex.Message;
+                        redInstallError = UpdateNetworkService.DescribeFailure(ex, "install the update");
                     }
                 }
             }
@@ -1362,14 +1394,8 @@ namespace InspectionEditor
                 }
                 Application.Current.Shutdown();
             }
-            else
-            {
-                // Keep results visible for 2 minutes so user can read them
-                await Task.Delay(120000);
-                UpdatePanel.Visibility = Visibility.Collapsed;
-                UpdateResultsGrid.Visibility = Visibility.Collapsed;
-                UpdateStatusText.Visibility = Visibility.Visible;
-            }
+            // Keep terminal results visible until the next check. No old delayed callback
+            // may hide a newer check, and a failed check is immediately retryable.
         }
         
         private void MigrateOldUserData(string newUserDataDir)

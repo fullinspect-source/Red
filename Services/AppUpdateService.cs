@@ -23,7 +23,7 @@ namespace InspectionEditor.Services
 
     internal static class UpdateNetworkService
     {
-        // Caller should use HttpClient.Timeout = Timeout.InfiniteTimeSpan; this bounds headers AND body.
+        // Bound headers AND body, independently of HttpClient's headers-only timeout.
         internal static Task<string> GetStringAsync(HttpClient http, string url, CancellationToken cancellationToken = default) =>
             AppUpdateService.WithRetryAsync(async token =>
             {
@@ -40,6 +40,9 @@ namespace InspectionEditor.Services
 
     internal static class AppUpdateService
     {
+        // Prepared work has no authority to launch an installer. Only the awaiting UI
+        // (or startup owner) can commit it after checking cancellation and save safety.
+        internal sealed record PreparedUpdate(AppUpdateResult Result, string? ExtractDirectory = null);
         // Shared with the data updater; a failed request does not prove the PC is offline.
         internal const string InternetRequiredMessage = "RED couldn't reach the update service. Please try again.";
         private const string LatestReleaseApi = "https://api.github.com/repos/fullinspect-source/Red/releases/latest";
@@ -57,7 +60,7 @@ namespace InspectionEditor.Services
 
         public static async Task<AppUpdateResult> CheckAndInstallIfAvailableAsync(bool force = false, CancellationToken cancellationToken = default)
         {
-            using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
             http.DefaultRequestHeaders.Add("User-Agent", "RED-AppUpdater");
             return await CheckAndInstallIfAvailableAsync(http, new UpdateOptions(), force, cancellationToken);
         }
@@ -66,8 +69,41 @@ namespace InspectionEditor.Services
         internal static async Task<AppUpdateResult> CheckAndInstallIfAvailableAsync(
             HttpClient http, UpdateOptions options, bool force = false, CancellationToken cancellationToken = default)
         {
+            var prepared = await PrepareAsync(http, options, force, cancellationToken);
+            return InstallPreparedUpdate(prepared, options, cancellationToken);
+        }
+
+        internal static async Task<PreparedUpdate> PrepareAsync(bool force, CancellationToken cancellationToken)
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            http.DefaultRequestHeaders.Add("User-Agent", "RED-AppUpdater");
+            return await PrepareAsync(http, new UpdateOptions(), force, cancellationToken);
+        }
+
+        internal static AppUpdateResult InstallPreparedUpdate(PreparedUpdate prepared,
+            UpdateOptions options, CancellationToken cancellationToken = default)
+        {
+            if (prepared.ExtractDirectory == null) return prepared.Result;
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                options.StartInstaller(prepared.Result.LatestVersion, prepared.ExtractDirectory);
+                RecordSuccessfulCheck(options.MarkerPath);
+                return new AppUpdateResult { LatestVersion = prepared.Result.LatestVersion,
+                    UpdateAvailable = true, InstallerStarted = true };
+            }
+            catch (Exception ex)
+            {
+                return CreateFailureResult(ex, "start the update installer", prepared.Result.LatestVersion,
+                    true, cancellationToken.IsCancellationRequested);
+            }
+        }
+
+        internal static async Task<PreparedUpdate> PrepareAsync(
+            HttpClient http, UpdateOptions options, bool force = false, CancellationToken cancellationToken = default)
+        {
             if (AppIdentity.IsDevBuild)
-                return new AppUpdateResult { LatestVersion = AppIdentity.Version, Error = "Dev build skips app self-updates." };
+                return new(new AppUpdateResult { LatestVersion = AppIdentity.Version, Error = "Dev build skips app self-updates." });
 
             string stage = "check for updates";
             string remoteVersion = "";
@@ -77,7 +113,7 @@ namespace InspectionEditor.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!force && File.Exists(options.MarkerPath) &&
                     DateTime.UtcNow - File.GetLastWriteTimeUtc(options.MarkerPath) < CheckInterval)
-                    return new AppUpdateResult { SkippedByThrottle = true };
+                    return new(new AppUpdateResult { SkippedByThrottle = true });
 
                 string apiJson = await WithRetryAsync(async token =>
                 {
@@ -93,8 +129,9 @@ namespace InspectionEditor.Services
 
                 if (!IsRemoteNewer(remoteVersion, AppIdentity.Version))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     RecordSuccessfulCheck(options.MarkerPath);
-                    return new AppUpdateResult { LatestVersion = remoteVersion };
+                    return new(new AppUpdateResult { LatestVersion = remoteVersion });
                 }
 
                 updateAvailable = true;
@@ -105,44 +142,47 @@ namespace InspectionEditor.Services
                             url.GetString() is string candidate && candidate.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                         { zipUrl = candidate; break; }
                 if (string.IsNullOrWhiteSpace(zipUrl))
-                    return new AppUpdateResult { LatestVersion = remoteVersion, UpdateAvailable = true, Error = "GitHub release has no RED zip asset." };
+                    return new(new AppUpdateResult { LatestVersion = remoteVersion, UpdateAvailable = true, Error = "GitHub release has no RED zip asset." });
 
                 stage = "download the update";
                 string tempDir = options.TempDirectory;
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
                 Directory.CreateDirectory(tempDir);
                 string zipPath = Path.Combine(tempDir, $"Red-v{remoteVersion}.zip");
-                await WithRetryAsync(async token =>
+                string downloadedPath = await WithRetryAsync(async token =>
                 {
-                    // Every attempt truncates the previous partial file, never appends.
+                    // Isolate attempts: a cancelled, non-cooperative stream must never
+                    // race a retry for the same file or return an installable package.
+                    string attemptPath = zipPath + "." + Guid.NewGuid().ToString("N") + ".partial";
                     try
                     {
                         using var response = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, token);
                         response.EnsureSuccessStatusCode();
                         await using var input = await response.Content.ReadAsStreamAsync(token);
-                        await using var output = File.Create(zipPath);
+                        await using var output = File.Create(attemptPath);
                         await input.CopyToAsync(output, token);
                         await output.FlushAsync(token);
-                        return true;
+                        token.ThrowIfCancellationRequested();
+                        return attemptPath;
                     }
                     catch
                     {
-                        if (File.Exists(zipPath)) File.Delete(zipPath);
+                        if (File.Exists(attemptPath)) File.Delete(attemptPath);
                         throw;
                     }
                 }, options.DownloadTimeout, options.RetryDelay, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(downloadedPath, zipPath, true);
 
                 stage = "prepare the update installer";
                 cancellationToken.ThrowIfCancellationRequested();
                 string extractDir = ExtractAndValidate(zipPath, tempDir);
                 cancellationToken.ThrowIfCancellationRequested();
-                options.StartInstaller(remoteVersion, extractDir);
-                RecordSuccessfulCheck(options.MarkerPath);
-                return new AppUpdateResult { LatestVersion = remoteVersion, UpdateAvailable = true, InstallerStarted = true };
+                return new(new AppUpdateResult { LatestVersion = remoteVersion, UpdateAvailable = true }, extractDir);
             }
             catch (Exception ex)
             {
-                return CreateFailureResult(ex, stage, remoteVersion, updateAvailable, cancellationToken.IsCancellationRequested);
+                return new(CreateFailureResult(ex, stage, remoteVersion, updateAvailable, cancellationToken.IsCancellationRequested));
             }
         }
 
@@ -193,9 +233,7 @@ namespace InspectionEditor.Services
             for (int attempt = 1; ; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                bounded.CancelAfter(timeout);
-                try { return await operation(bounded.Token); }
+                try { return await UpdateUiCoordinator.RunPreparationAsync(operation, timeout, cancellationToken); }
                 catch (Exception ex) when (attempt < attempts && !cancellationToken.IsCancellationRequested && IsTransient(ex))
                 {
                     await Task.Delay(TimeSpan.FromTicks(retryDelay.Ticks * attempt), cancellationToken);

@@ -24,4 +24,42 @@ foreach (bool appFails in new[] { true, false }) {
     Check(await app == (appFails ? "app failed" : "app ok") && await stats == (appFails ? "stats ok" : "stats failed"), "independent results: appFails=" + appFails);
 }
 Check(await UpdateUiCoordinator.CaptureAsync<int>(() => throw new IOException(), _ => 5) == 5, "synchronous failure captured independently");
+foreach (var hangs in new[] { (true, false), (false, true), (true, true) }) {
+    var hungApp = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var hungStats = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+    bool spinning = true, running = true;
+    string status = "Checking for updates...";
+    var watch = Stopwatch.StartNew();
+    var budget = TimeSpan.FromMilliseconds(60);
+    using var deadline = new CancellationTokenSource(budget);
+    await UpdateUiCoordinator.RunVisibleAsync(async () => {
+        var app = UpdateUiCoordinator.CaptureAsync(
+            () => UpdateUiCoordinator.RunPreparationAsync(_ => hangs.Item1 ? hungApp.Task : Task.FromResult("app ok"), budget, deadline.Token),
+            _ => "app timed out; retry");
+        var stats = UpdateUiCoordinator.CaptureAsync(
+            () => UpdateUiCoordinator.RunPreparationAsync(_ => hangs.Item2 ? hungStats.Task : Task.FromResult("stats ok"), budget, deadline.Token),
+            _ => "stats timed out; retry");
+        await Task.WhenAll(app, stats);
+        status = await app + "; " + await stats;
+    }, _ => status = "failed; retry", () => { spinning = false; running = false; });
+    Check(watch.ElapsedMilliseconds < 600 && !spinning && !running && status.Contains("retry"),
+        $"non-cooperative app/stats {hangs}: terminal retryable UI in {watch.ElapsedMilliseconds} ms (60 ms budget)");
+    Check(status.Contains(hangs.Item1 ? "app timed out" : "app ok") && status.Contains(hangs.Item2 ? "stats timed out" : "stats ok"), "independent terminal results preserved");
+    string terminal = status;
+    hungApp.TrySetException(new IOException("late app failure"));
+    hungStats.TrySetResult("late stats success");
+    await Task.Delay(20);
+    Check(status == terminal && !spinning, "late completion cannot change terminal UI");
+}
+using (var gate = new ManualResetEventSlim()) {
+    var watch = Stopwatch.StartNew();
+    try {
+        await UpdateUiCoordinator.RunPreparationAsync(_ => { gate.Wait(); return Task.FromResult(1); }, TimeSpan.FromMilliseconds(40));
+        throw new Exception("missing deadline");
+    } catch (TimeoutException) { Check(watch.ElapsedMilliseconds < 600, "synchronous non-cooperative preparation cannot pin dispatcher"); }
+    finally { gate.Set(); }
+}
+bool finalized = false;
+await UpdateUiCoordinator.RunVisibleAsync(() => throw new IOException(), _ => { }, () => finalized = true);
+Check(finalized, "unexpected synchronous failure still clears visible running state");
 Console.WriteLine($"{passed} checks passed in {clock.ElapsedMilliseconds} ms");
