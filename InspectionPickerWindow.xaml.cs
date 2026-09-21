@@ -155,16 +155,16 @@ namespace InspectionEditor
                     try
                     {
                         byte[] bytes = File.ReadAllBytes(item.FilePath);
-                        return (Item: item, Stamp: LastEditTime.ReadForFile(item.FilePath, bytes));
+                        return (Item: item, Stamp: LastEditTime.ReadDisplayForFile(item.FilePath, bytes));
                     }
-                    catch { return (Item: item, Stamp: (DateTimeOffset?)null); }
+                    catch { return (Item: item, Stamp: default(LastEditTime.DisplayStamp)); }
                 }).ToArray());
                 if (_pickerClosed || generation != _lastEditRefreshGeneration) return;
                 var current = new HashSet<InspectionFileInfo>(_allInspections);
                 foreach (var result in stamps)
                 {
                     if (!current.Contains(result.Item)) continue;
-                    result.Item.LastEditUtc = result.Stamp;
+                    result.Item.LastEditStamp = result.Stamp;
                     result.Item.RefreshLastEditLabel();
                 }
             }
@@ -1316,7 +1316,7 @@ namespace InspectionEditor
                 return new InspectionFileInfo
                 {
                     FilePath = filePath,
-                    LastEditUtc = LastEditTime.ReadForFile(filePath, fileBytes),
+                    LastEditStamp = LastEditTime.ReadDisplayForFile(filePath, fileBytes),
                     Address = fullAddress,
                     Subdivision = subdivision,
                     InspectionCode = inspectionCode,
@@ -2319,13 +2319,13 @@ namespace InspectionEditor
     public class InspectionFileInfo : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        public DateTimeOffset? LastEditUtc { get; set; }
+        public LastEditTime.DisplayStamp LastEditStamp { get; set; }
+        public DateTimeOffset? LastEditUtc => LastEditStamp.Utc;
         public string LastEditDisplay => LastEditTime.Format(LastEditUtc, DateTimeOffset.UtcNow);
-        public string LastEditTooltip => LastEditUtc.HasValue
-            ? $"Last successful RED edit saved on this device: {LastEditUtc.Value.ToLocalTime():g}" : "";
+        public string LastEditTooltip => LastEditTime.Tooltip(LastEditStamp, DateTimeOffset.UtcNow);
         public void RefreshLastEditLabel()
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditUtc)));
+            // The one-minute tick changes labels only, never the sort key.
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditDisplay)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditTooltip)));
         }

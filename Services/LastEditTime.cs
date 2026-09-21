@@ -6,9 +6,11 @@ using System.Text.Json;
 
 namespace InspectionEditor.Services
 {
-    // Device-local evidence only. INS contents and filesystem times are not provenance.
+    // Verified device-local save evidence and an explicitly labeled display-only fallback.
     public static class LastEditTime
     {
+        public readonly record struct DisplayStamp(DateTimeOffset? Utc, bool IsVerifiedSave);
+
         private static string DefaultRoot => Path.Combine(AppIdentity.LocalAppDataPath, "VerifiedSaves");
         private static string Normalize(string path) => OperatingSystem.IsWindows()
             ? Path.GetFullPath(path).ToUpperInvariant() : Path.GetFullPath(path);
@@ -30,9 +32,45 @@ namespace InspectionEditor.Services
                 if (entry.GetProperty("PathHash").GetString() != Hash(Encoding.UTF8.GetBytes(Normalize(path))) ||
                     entry.GetProperty("ContentHash").GetString() != Hash(bytes)) return null;
                 var stamp = entry.GetProperty("SavedUtc").GetDateTimeOffset();
-                return stamp.Offset == TimeSpan.Zero && stamp <= DateTimeOffset.UtcNow.AddMinutes(1) ? stamp : null;
+                return IsValid(stamp, DateTimeOffset.UtcNow) ? stamp : null;
             }
             catch { return null; } // Missing, corrupt, or inaccessible evidence is unknown.
+        }
+
+        // bytes must come from a successful file read. Never use this display fallback
+        // as save evidence: RecordSuccessfulSave must continue using ReadForFile only.
+        public static DisplayStamp ReadDisplayForFile(string path, byte[] bytes)
+        {
+            var verified = ReadForFile(path, bytes);
+            return ResolveDisplayStamp(path, verified);
+        }
+
+        public static DisplayStamp ReadDisplayForFile(string path, byte[] bytes, string storageRoot)
+            => ResolveDisplayStamp(path, ReadForFile(path, bytes, storageRoot));
+
+        private static DisplayStamp ResolveDisplayStamp(string path, DateTimeOffset? verified)
+        {
+            if (verified.HasValue) return new DisplayStamp(verified, true);
+            try
+            {
+                var modified = new DateTimeOffset(File.GetLastWriteTimeUtc(path));
+                return IsValid(modified, DateTimeOffset.UtcNow) ? new DisplayStamp(modified, false) : default;
+            }
+            catch { return default; }
+        }
+
+        // Reject sentinel/pre-epoch values and tolerate only one minute of clock skew.
+        private static bool IsValid(DateTimeOffset stamp, DateTimeOffset now) =>
+            stamp.Offset == TimeSpan.Zero && stamp > DateTimeOffset.UnixEpoch &&
+            now - stamp >= TimeSpan.FromMinutes(-1);
+
+        public static string Tooltip(DisplayStamp stamp, DateTimeOffset now)
+        {
+            if (!stamp.Utc.HasValue || !IsValid(stamp.Utc.Value, now)) return "";
+            string source = stamp.IsVerifiedSave
+                ? "Last successful RED edit saved on this device (verified)"
+                : "File modified (filesystem timestamp; not a verified RED save)";
+            return $"{source}: {stamp.Utc.Value.ToLocalTime():g}";
         }
 
         // Call ONLY after the atomic writer has returned its verified exact bytes.
@@ -68,9 +106,8 @@ namespace InspectionEditor.Services
 
         public static string Format(DateTimeOffset? saved, DateTimeOffset now)
         {
-            if (!saved.HasValue) return "";
+            if (!saved.HasValue || !IsValid(saved.Value, now)) return "";
             var elapsed = now - saved.Value;
-            if (elapsed < TimeSpan.FromMinutes(-1)) return "";
             if (elapsed.TotalMinutes < 1) return "0 min";
             if (elapsed.TotalHours < 1) return $"{(long)elapsed.TotalMinutes} min";
             if (elapsed.TotalDays < 1) return $"{(long)elapsed.TotalHours} hr";

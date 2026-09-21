@@ -67,10 +67,17 @@ class LastEditUiTests(unittest.TestCase):
         self.assertEqual(columns[-1].get(NAME), 'LastEditColumn')
         self.assertIn('"Call", "LastEdit"', CS)
 
-    def test_blank_provenance_is_verified_local_content(self):
-        self.assertIn('LastEditUtc = LastEditTime.ReadForFile(filePath, fileBytes)', CS)
-        self.assertNotIn('LastEditUtc = File.GetLastWriteTime', CS)
-        self.assertIn('saved on this device', CS)
+    def test_display_resolution_preserves_source_and_utc(self):
+        self.assertIn('LastEditStamp = LastEditTime.ReadDisplayForFile(filePath, fileBytes)', CS)
+        self.assertIn('LastEditTime.ReadDisplayForFile(item.FilePath, bytes)', CS)
+        self.assertIn('LastEditTime.Tooltip(LastEditStamp, DateTimeOffset.UtcNow)', CS)
+        service = (ROOT / 'Services/LastEditTime.cs').read_text()
+        self.assertIn('File.GetLastWriteTimeUtc(path)', service)
+        self.assertIn('filesystem timestamp; not a verified RED save', service)
+        self.assertIn('saved on this device (verified)', service)
+        record = service.split('public static void RecordSuccessfulSave(string path, byte[] bytes, string storageRoot)', 1)[1]
+        self.assertIn('if (ReadForFile(path, bytes, storageRoot).HasValue) return;', record)
+        self.assertNotIn('ReadDisplayForFile', record)
 
     def test_timer_refresh_does_not_reload_or_read_files(self):
         start = CS.index('private async void RefreshLastEditLabels')
@@ -83,6 +90,16 @@ class LastEditUiTests(unittest.TestCase):
         self.assertIn('generation != _lastEditRefreshGeneration', method)
         self.assertIn('current.Contains(result.Item)', method)
         self.assertIn('_lastEditTimer.Stop()', CS)
+        self.assertIn('_lastEditTimer.Tick += (_, _) => RefreshLastEditLabels(false);', CS)
+        self.assertIn('TimeSpan.FromMinutes(1)', CS)
+        timer_path = method.split('if (!readSavedMetadata) return;', 1)[0]
+        for forbidden in ('File.', 'Directory.', 'ReadDisplayForFile', 'Task.Run', 'ItemsSource', 'SelectedItem', 'ScrollIntoView', 'SortDescriptions'):
+            self.assertNotIn(forbidden, '\n'.join(line for line in timer_path.splitlines() if not line.strip().startswith('//')))
+        labels = method_between('public void RefreshLastEditLabel()', 'public string FilePath')
+        self.assertNotIn('nameof(LastEditUtc)', labels)
+        self.assertNotIn('File.', labels)
+        for forbidden in ('ItemsSource =', 'SelectedItem =', 'ScrollIntoView', 'SortDescriptions', '.Refresh()'):
+            self.assertNotIn(forbidden, method)
 
     def test_preferred_widths_survive_fitting(self):
         start = CS.index('private void FitColumnsToViewport')
