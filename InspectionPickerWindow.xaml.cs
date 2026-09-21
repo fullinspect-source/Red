@@ -115,7 +115,7 @@ namespace InspectionEditor
             InspectionListView.SizeChanged += (_, _) => FitColumnsToViewport();
             Loaded += InspectionPickerWindow_Loaded;
             _lastEditTimer.Tick += (_, _) => RefreshLastEditLabels(false);
-            Activated += (_, _) => RefreshLastEditLabels(true);
+            Activated += (_, _) => { if (!_isLoading) RefreshLastEditLabels(true); };
             Loaded += (_, _) => _lastEditTimer.Start();
             Closed += (_, _) => { _pickerClosed = true; ++_lastEditRefreshGeneration; _lastEditTimer.Stop(); _columnWidthSaveTimer.Stop(); };
             if (_stayOpenHome)
@@ -142,7 +142,8 @@ namespace InspectionEditor
         private async void RefreshLastEditLabels(bool readSavedMetadata)
         {
             // No ItemsSource reset, view refresh, sorting, selection or scroll changes.
-            if (!IsVisible || _pickerClosed) return;
+            // A constructor/hidden-window load still needs persisted metadata.
+            if (_pickerClosed || (!IsVisible && !readSavedMetadata)) return;
             foreach (var item in _allInspections) item.RefreshLastEditLabel();
             if (!readSavedMetadata) return;
             int generation = ++_lastEditRefreshGeneration;
@@ -1079,6 +1080,7 @@ namespace InspectionEditor
             // Prevent concurrent loads
             if (_isLoading) return;
             _isLoading = true;
+            ++_lastEditRefreshGeneration; // Discard reads for the previous list.
             
             _allInspections.Clear();
             _currentFolderPath = folderPath;
@@ -1150,6 +1152,10 @@ namespace InspectionEditor
                 
                 _allInspections = loadedInspections;
                 AssignRowColors();
+
+                // Activation can precede this async load. Hydrate every completed
+                // list, including parser fallback rows, without blocking the UI.
+                RefreshLastEditLabels(true);
 
                 if (totalFiles > MaxFiles)
                 {

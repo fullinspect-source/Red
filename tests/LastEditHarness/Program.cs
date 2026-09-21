@@ -1,5 +1,15 @@
 using InspectionEditor.Services;
 using Newtonsoft.Json.Linq;
+// A separate process proves the timestamp survives without any session state.
+if (args.Length == 4 && args[0] == "--reopen")
+{
+    var persisted = LastEditTime.ReadForFile(args[1], File.ReadAllBytes(args[1]), args[2]);
+    var expected = DateTimeOffset.Parse(args[3], System.Globalization.CultureInfo.InvariantCulture);
+    if (persisted != expected || LastEditTime.Format(persisted, expected.AddHours(2)) != "2 hr")
+        throw new Exception("Fresh-process persisted timestamp/aging mismatch");
+    Console.WriteLine("PASS fresh-process reopen retains verified timestamp and ages to 2 hr");
+    return;
+}
 int passed = 0;
 void Check(bool yes, string label) { if (!yes) throw new Exception(label); Console.WriteLine("PASS " + label); passed++; }
 void Fails(Action action) { try { action(); } catch(IOException) { return; } throw new Exception("Expected failure"); }
@@ -26,6 +36,18 @@ try {
     saver.Save(model);
     var stamp = Read(p);
     Check(stamp >= now && stamp <= DateTimeOffset.UtcNow, "verified save persists UTC provenance");
+    var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+    // Also support framework-dependent 'dotnet LastEditHarness.dll' invocation.
+    if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) == "dotnet")
+        start.ArgumentList.Add(System.Reflection.Assembly.GetExecutingAssembly().Location);
+    foreach (string argument in new[] { "--reopen", p, registry, stamp!.Value.ToString("O") })
+        start.ArgumentList.Add(argument);
+    using (var child = System.Diagnostics.Process.Start(start)!)
+    {
+        bool exited = child.WaitForExit(30000);
+        if (!exited) child.Kill(true);
+        Check(exited && child.ExitCode == 0, "persisted evidence survives a fresh RED-service process");
+    }
     Check(JObject.Parse(File.ReadAllText(p))["RedLastSuccessfulSaveUtc"] == null, "no INS schema addition");
     saver.Save(model);
     Check(Read(p) == stamp && writes == 2, "no-op keeps timestamp and still calls writer");

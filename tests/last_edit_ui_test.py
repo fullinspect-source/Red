@@ -10,7 +10,55 @@ XAML = ET.parse(ROOT / 'InspectionPickerWindow.xaml').getroot()
 NS = {'w': 'http://schemas.microsoft.com/winfx/2006/xaml/presentation'}
 NAME = '{http://schemas.microsoft.com/winfx/2006/xaml}Name'
 
+def method_between(start, end):
+    return CS[CS.index(start):CS.index(end, CS.index(start))]
+
 class LastEditUiTests(unittest.TestCase):
+    def test_successful_load_hydrates_after_population(self):
+        load = method_between('public async void LoadInspections', 'private InspectionFileInfo? ParseInspectionFile')
+        self.assertEqual(load.count('RefreshLastEditLabels(true);'), 1)
+        self.assertLess(load.index('_allInspections = loadedInspections;'),
+                        load.index('RefreshLastEditLabels(true);'))
+        self.assertLess(load.index('RefreshLastEditLabels(true);'), load.index('RefreshList();'))
+
+    def test_activation_before_load_completion_cannot_leave_fallback_row_blank(self):
+        # Deterministic lifecycle model driven by the actual load-completion hook.
+        # Normal parsing already hydrates metadata. Exercise a fallback row (or
+        # transient metadata miss), not the false premise that every parse is blank.
+        load = method_between('public async void LoadInspections', 'private InspectionFileInfo? ParseInspectionFile')
+        rows = []
+        persisted_stamp = 100
+        def refresh(read_metadata):
+            for row in rows:
+                if read_metadata:
+                    row['stamp'] = persisted_stamp  # verified-byte result, not mtime
+                row['age'] = None if row['stamp'] is None else now - row['stamp']
+        now = 160
+        refresh(True)  # Activated while asynchronous load is pending: empty snapshot
+        rows.append({'stamp': None, 'age': None})  # parser fallback completes later
+        if 'RefreshLastEditLabels(true);' in load.split('_allInspections = loadedInspections;', 1)[1]:
+            refresh(True)
+        for now in (220, 280, 340):
+            refresh(False)  # timer must age without doing file I/O
+        self.assertEqual(rows[0]['stamp'], persisted_stamp,
+                         'early activation + fallback row stays blank without post-load hydration')
+        self.assertEqual(rows[0]['age'], 240)
+
+    def test_reload_and_editor_close_share_the_hydration_point(self):
+        refresh = method_between('private void RefreshCurrentMyListFolder', 'private bool _isLoading')
+        close = method_between('public void NotifyInspectionWindowClosed', 'private ')
+        self.assertIn('LoadInspections(_currentFolderPath);', refresh)
+        self.assertIn('LoadInspections(_currentFolderPath);', close)
+        self.assertNotIn('RefreshLastEditLabels(true)', refresh + close)
+        activation = next(line for line in CS.splitlines() if 'Activated +=' in line)
+        self.assertRegex(activation, r'Activated\s*\+=.*if\s*\(!_isLoading\)\s*RefreshLastEditLabels\(true\)')
+
+    def test_hidden_load_hydrates_and_reload_invalidates_old_work(self):
+        refresh = method_between('private async void RefreshLastEditLabels', 'private void InspectionPickerWindow_Loaded')
+        self.assertIn('if (_pickerClosed || (!IsVisible && !readSavedMetadata)) return;', refresh)
+        load = method_between('public async void LoadInspections', 'private InspectionFileInfo? ParseInspectionFile')
+        self.assertLess(load.index('++_lastEditRefreshGeneration;'), load.index('_allInspections.Clear();'))
+
     def test_last_column(self):
         grid = XAML.find('.//w:GridView', NS)
         assert grid is not None
