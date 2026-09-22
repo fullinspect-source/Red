@@ -517,12 +517,14 @@
                         <Button x:Name="OpenOrientationPdfButton" Content="Open Orientation PDF"
                                 Click="OpenOrientationPdfButton_Click" Padding="9,7" Margin="0,0,6,3"
                                 Background="#2E86AB" Foreground="White" BorderThickness="0" FontSize="13"/>
-                        <Button x:Name="SaveOrientationPdfButton" Content="Save PDF to INS"
-                                Click="SaveOrientationPdfButton_Click" Padding="9,7" Margin="0,0,6,3"
-                                Background="#26734D" Foreground="White" BorderThickness="0" FontSize="13" IsEnabled="False"/>
+
                     </WrapPanel>
                     <TextBlock x:Name="OrientationPdfHint" FontSize="11" Foreground="#555" TextWrapping="Wrap"/>
                 </StackPanel>
+                <Button x:Name="AttachmentsButton" Content="ATTACHMENTS" Click="AttachmentsButton_Click"
+                        HorizontalAlignment="Left" Padding="14,10" Margin="5,0,5,6"
+                        Background="#26734D" Foreground="White" BorderThickness="0" FontSize="14"
+                        IsEnabled="False" ToolTip="Manage PDFs embedded in this INS (not external job documents)"/>
                 <!-- Docs buttons -->
                 <Grid Margin="5,0,5,5">
                     <Grid.ColumnDefinitions>

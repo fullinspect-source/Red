@@ -482,7 +482,7 @@ namespace InspectionEditor
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
             SyncCurrentItemFromUI();
-            if (!FinishOrientationEditing()) { e.Cancel = true; return; }
+            if (!FinishOrientationEditing(leaving: false)) { e.Cancel = true; return; }
             // Before close, offer the same trade-summary generation that the Save button provides.
             if (_hasUnsavedChanges && _currentInspection != null && ShouldPromptForTradeSummaryOnClose())
             {
@@ -526,6 +526,7 @@ namespace InspectionEditor
                 return;
             }
 
+            if (!FinishOrientationEditing()) { e.Cancel = true; return; }
             // Log activity: inspection closed
             _activityService.LogClose();
             SavePreferences();
@@ -983,7 +984,7 @@ namespace InspectionEditor
         internal bool TryPrepareForAppUpdate()
         {
             SyncCurrentItemFromUI();
-            if (!FinishOrientationEditing()) return false;
+            if (!FinishOrientationEditing(leaving: false)) return false;
             return !_hasUnsavedChanges || TrySaveCurrentInspection();
         }
 
@@ -1261,8 +1262,8 @@ namespace InspectionEditor
                         foreach (var editor in editorWindows)
                         {
                             editor.SyncCurrentItemFromUI();
-                            if (!editor.FinishOrientationEditing())
-                                throw new InvalidOperationException("Update postponed because Orientation PDF editing was not finished. Save or discard the PDF session to continue.");
+                            if (!editor.FinishOrientationEditing(leaving: false))
+                                throw new InvalidOperationException("Update postponed because PDF disk changes are pending. Finish/save/close the PDF editor, then use ATTACHMENTS > Retry Save.");
                             if (editor._hasUnsavedChanges && !editor.TrySaveCurrentInspection())
                                 throw new InvalidOperationException("Update postponed because inspection changes could not be saved.");
                         }
@@ -2435,7 +2436,7 @@ namespace InspectionEditor
         {
             // Prevent double-loading
             if (_isLoadingFile) return;
-            if (!FinishOrientationEditing()) return;
+            if (!FinishOrientationEditing(leaving: false)) return;
             if (_hasUnsavedChanges && _currentInspection != null && !TrySaveCurrentInspection()) return;
             _isLoadingFile = true;
             ShowOpeningInspectionState(filePath);
@@ -2521,6 +2522,15 @@ namespace InspectionEditor
                 }
             }
             
+            // Only end PDF sessions once the new report locks have been acquired.
+            if (!FinishOrientationEditing())
+            {
+                newFileMutex.ReleaseMutex();
+                newFileMutex.Dispose();
+                newTypeMutex?.ReleaseMutex();
+                newTypeMutex?.Dispose();
+                return;
+            }
             // Release previous locks (from previously loaded file)
             ReleaseInspectionLocks();
             
@@ -13883,7 +13893,7 @@ namespace InspectionEditor
         private void DoSave()
         {
             if (_currentInspection == null || !_saveService.HasFile) return;
-            if (!FinishOrientationEditing()) return;
+            if (!FinishOrientationEditing(leaving: false)) return;
             
             try
             {
@@ -13895,6 +13905,8 @@ namespace InspectionEditor
                     return;
                 }
 
+                // DoSave exits this report after the result picker; only now end PDF monitoring.
+                if (!FinishOrientationEditing()) return;
                 _activityService.LogClose();
                 ReleaseInspectionLocks();
                 
@@ -13944,8 +13956,7 @@ namespace InspectionEditor
             if (_readOnlyMode) throw new InvalidOperationException("This report is read-only.");
 
             SyncCurrentItemFromUI();
-            // Orientation bytes are staged only by its explicit save/leave confirmation,
-            // never by ordinary focus-loss/deactivation autosaves.
+            // PDF bytes are staged by stable-disk monitors, never by ordinary focus-loss saves.
 
             // Sweep items with PassFail controls: any with [trade] prefix comment should be Fail
             // BUT respect explicit NI values - don't override inspector's choice
@@ -14145,7 +14156,7 @@ namespace InspectionEditor
                 // Keep both the model and dirty state available for retry. Never reset/close on failure.
                 DiagnosticLogService.Log("Report save failed; edits retained", ex);
                 MarkUnsaved();
-                MessageBox.Show($"Your changes could not be saved. The report is still open with your edits.\n\n{ex.Message}",
+                if (!_pdfSaveInProgress) MessageBox.Show($"Your changes could not be saved. The report is still open with your edits.\n\n{ex.Message}",
                     "Report not saved", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }

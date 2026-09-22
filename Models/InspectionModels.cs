@@ -61,9 +61,22 @@ namespace InspectionEditor.Models
         [JsonIgnore]
         public OrientationAttachmentEdit? OrientationEdit { get; set; }
 
+        [JsonIgnore]
+        public AttachmentCollectionEdit? AttachmentEdit { get; set; }
+
+        // Last successfully loaded/saved collection, including unknown and non-PDF tokens.
+        [JsonIgnore]
+        public Newtonsoft.Json.Linq.JArray? SavedAttachments { get; set; }
+
         // Keep all other properties as dynamic to preserve them
         [JsonExtensionData]
         public Dictionary<string, object>? ExtensionData { get; set; }
+    }
+
+    public sealed class AttachmentCollectionEdit
+    {
+        public Newtonsoft.Json.Linq.JArray Expected { get; set; } = new();
+        public Newtonsoft.Json.Linq.JArray Replacement { get; set; } = new();
     }
 
     public sealed class OrientationAttachmentEdit

@@ -573,6 +573,18 @@
 
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
+                        <Border Background="White" BorderBrush="#D0D5DA" BorderThickness="1"
+                                CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="PDF Viewer" FontSize="18" FontWeight="SemiBold" Foreground="#1F2933" Margin="0,0,0,12"/>
+                                <RadioButton Content="System default PDF program" GroupName="PdfViewer"
+                                             IsChecked="True" IsEnabled="True" MinHeight="40" FontSize="15"/>
+                                <RadioButton Content="RED PDF program (coming later)" GroupName="PdfViewer"
+                                             IsChecked="False" IsEnabled="False" Foreground="#888" MinHeight="40" FontSize="15"/>
+                                <TextBlock Text="RED currently opens owned temporary copies in Windows' default PDF app."
+                                           TextWrapping="Wrap" Foreground="#66737F" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
                         <Border Background="White"
                                 BorderBrush="#D0D5DA"
                                 BorderThickness="1"

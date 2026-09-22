@@ -29,11 +29,28 @@ static class DiagnosticLogService { public static int Count; public static void 
 class Activity { public int Closes; public void LogClose() => Closes++; }
 class Camera { public event Action? PhotoCaptured; public void StopSession() { } }
 public class LifecycleProbe {
- bool _hasUnsavedChanges, _savingEditorChanges, _skipResultCheck;
+ bool _hasUnsavedChanges, _savingEditorChanges, _skipResultCheck, _pdfSaveInProgress;
  InspectionFile? _currentInspection = new();
  Activity _activityService = new(); Camera _cameraService = new();
  bool pending, fail, summary, unlocked, orientationActive, orientationReady = true; int writes;
- bool FinishOrientationEditing() { if (!orientationActive) return true; if (!orientationReady) return false; _hasUnsavedChanges = true; return TrySaveCurrentInspection(); }
+ bool orientationDirty, cleanedAfterSave; int cleanups;
+ // Model monitor polling/save separately from final session cleanup, as production does.
+ bool FinishOrientationEditing(bool leaving = true) {
+  if (!orientationActive) return true;
+  if (!orientationReady) return false;
+  if (orientationDirty) {
+   _hasUnsavedChanges = true;
+   _pdfSaveInProgress = true;
+   try { if (!TrySaveCurrentInspection()) return false; orientationDirty = false; }
+   finally { _pdfSaveInProgress = false; }
+  }
+  if (leaving) {
+   cleanedAfterSave = !_hasUnsavedChanges && !pending && writes > 0;
+   orientationActive = false;
+   cleanups++;
+  }
+  return true;
+ }
  void SyncCurrentItemFromUI() { if (pending) { _hasUnsavedChanges = true; pending = false; } }
  bool ShouldPromptForTradeSummaryOnClose() => summary;
  void GenerateSummaryInternal() { }
@@ -59,9 +76,16 @@ public class LifecycleProbe {
   MessageBox.Result = MessageBoxResult.No;
   p = new LifecycleProbe { orientationActive = true, orientationReady = false }; e = new(); p.MainWindow_Closing(null,e);
   Check(e.Cancel && !p.unlocked && p.writes == 0, "active PDF editor blocks close even when report is clean");
-  p = new LifecycleProbe { orientationActive = true, fail = true }; e = new(); p.MainWindow_Closing(null,e);
+  p = new LifecycleProbe { orientationActive = true, orientationDirty = true, fail = true }; e = new(); p.MainWindow_Closing(null,e);
   Check(e.Cancel && p._hasUnsavedChanges && !p.unlocked, "PDF save failure blocks close and retains dirty state");
-  Console.WriteLine("6 extracted lifecycle checks passed");
+  p = new LifecycleProbe { pending = true, summary = true, orientationActive = true };
+  MessageBox.Result = MessageBoxResult.Cancel; e = new(); p.MainWindow_Closing(null,e);
+  Check(e.Cancel && p.orientationActive && p.cleanups == 0 && p._hasUnsavedChanges && p.writes == 0 && !p.unlocked && p._activityService.Closes == 0,
+   "summary cancellation retains PDF session without cleanup");
+  MessageBox.Result = MessageBoxResult.No; e = new(); p.MainWindow_Closing(null,e);
+  Check(!e.Cancel && !p.orientationActive && p.cleanups == 1 && p.cleanedAfterSave && p.writes == 1 && !p._hasUnsavedChanges && p.unlocked && p._activityService.Closes == 1,
+   "successful close cleans PDF session only after accepted leave and save");
+  Console.WriteLine("8 extracted lifecycle checks passed");
  }
 '''
 code += extract('MainWindow_Closing') + '\n' + extract('TrySaveCurrentInspection') + '\n}}\n'

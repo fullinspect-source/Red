@@ -54,11 +54,11 @@ static class EmbeddedCorrectionProbe
         var json = JObject.Parse("""
         {"InspectionCode":"BWT","Address":"Current address","Contact":"Current buyer","ContactNumber":"555-0100",
         "Project":"Current project","Lot":"10","Block":"20","DateInspected":"2026-09-22",
-        "Sections":[{"Items":[{"ControlName":"DocumentButton","Name":"Orientation","Template":"Exact Orientation.pdf"}]}],
+        "Sections":[{"Items":[{"ItemId":1,"ControlName":"DocumentButton","Name":"Orientation","Template":"Exact Orientation.pdf"}]}],
         "Attachments":[]}
         """);
         byte[] mixed = MixedPdf();
-        json["Attachments"] = new JArray(new JObject { ["Filename"] = "Orientation.pdf", ["FileData"] = Convert.ToBase64String(mixed) });
+        json["Attachments"] = new JArray(new JObject { ["Filename"] = "Exact Orientation.pdf", ["FileData"] = Convert.ToBase64String(mixed) });
         File.WriteAllText(path, json.ToString());
         var saver = new SurgicalSaveService(new FailedSaveRecoveryService(Path.Combine(folder, "recovery")), saveRegistryRoot: folder);
         var model = saver.Load(path); byte[] before = File.ReadAllBytes(path);
@@ -77,14 +77,22 @@ static class EmbeddedCorrectionProbe
             var address = fields.Elements.Select(Dict).Single(f => f.Elements.GetString("/T") == "Address1_HOI");
             check(address.Elements.GetString("/DA") == "/Helv 11 Tf 0 g" && address.Elements.GetInteger("/Ff") == 4096 && pdf.PageCount == 1, "blank-fill preserves formatting, flags and pages");
         }
-        check(model.OrientationEdit == null && Bytes(model.Attachments![0]).SequenceEqual(mixed) && before.SequenceEqual(File.ReadAllBytes(path)), "embedded open changes only working bytes, no source write or staging");
-        check(session.TryFinish(OrientationPdfDecision.Discard, () => throw new Exception()), "embedded blank-fill discard never invokes save");
-        check(before.SequenceEqual(File.ReadAllBytes(path)) && Bytes(model.Attachments![0]).SequenceEqual(mixed), "discard leaves original INS and attachment byte-exact");
+        check(model.AttachmentEdit == null && Bytes(model.Attachments![0]).SequenceEqual(mixed) && before.SequenceEqual(File.ReadAllBytes(path)), "embedded open changes only working bytes, no source write or staging");
+        check(!session.Monitor.Poll(DateTimeOffset.UtcNow, () => throw new Exception()) && session.Monitor.CanLeave(out _), "embedded blank-fill unchanged open never invokes save and can leave");
+        session.Monitor.Cleanup();
+        check(before.SequenceEqual(File.ReadAllBytes(path)) && Bytes(model.Attachments![0]).SequenceEqual(mixed), "unchanged cleanup leaves original INS and attachment byte-exact");
         session = OrientationPdfSession.OpenEmbedded(model, path, 0, folder);
-        filled = File.ReadAllBytes(session.WorkingPath);
-        check(session.TryFinish(OrientationPdfDecision.Save, () => { saver.Save(model); return true; }), "explicit Save embeds autofill without requiring external PDF edit");
-        check(Bytes(saver.Load(path).Attachments![0]).SequenceEqual(filled), "explicit save stores exact filled working bytes");
+        filled = AutofillProbe.EditWorking(session.WorkingPath);
+        check(AutofillProbe.Capture(session.Monitor, () => { saver.Save(model); return true; }), "external editor save captures complete autofilled PDF");
+        session.Monitor.Cleanup();
+        check(Bytes(saver.Load(path).Attachments![0]).SequenceEqual(filled), "automatic capture stores exact edited working bytes");
 
+        void Blocked(Action action, string name)
+        {
+            try { action(); } catch (IOException ex)
+            { check(ex.Message.Contains("Contact Trent") && ex.Message.Contains("will not substitute"), name); return; }
+            throw new Exception("Expected blocking error: " + name);
+        }
         int? Prefer(params string[] names)
         {
             model.Attachments = names.Select(n => (object)new JObject { ["Filename"] = n }).ToList();
@@ -93,37 +101,40 @@ static class EmbeddedCorrectionProbe
         check(Prefer("Orientation.pdf", "Exact Orientation.pdf") == 1, "exact bare template wins over generic");
         check(Prefer("Exact Orientation (House - 20260922).pdf", "Orientation.pdf") == 0, "normal INSPECT suffix wins regardless of attachment order");
         check(Prefer("Orientation.pdf", "EXACT ORIENTATION (House - 20260922).PDF") == 1, "template filename comparison follows Windows case insensitivity");
-        check(Prefer("Orientation.pdf", "Exact Orientation.pdf", "Exact Orientation (House - 20260922).pdf") == null, "two official candidates require explicit selection");
-        check(Prefer("Orientation.pdf", "Exact Orientation (House - 20260922).pdf", "Exact Orientation (House - 20260923).pdf") == null, "multiple official dates require explicit selection, not newest wins");
+        Blocked(() => Prefer("Orientation.pdf", "Exact Orientation.pdf", "Exact Orientation (House - 20260922).pdf"), "two official candidates fail loudly");
+        Blocked(() => Prefer("Orientation.pdf", "Exact Orientation (House - 20260922).pdf", "Exact Orientation (House - 20260923).pdf"), "multiple official dates fail loudly, not newest wins");
         foreach (string name in new[] { "Exact Orientation Other Region.pdf", "Exact Orientation (copy).pdf", "Exact Orientation (House - 20260230).pdf", "Exact Orientation (House - 20260922).pdf.bak", "Exact Orientation (House - 20260922).pdf\n" })
             check(Prefer("Orientation.pdf", "Other Orientation.pdf", name) == null, "no official guess for prefix/arbitrary suffix/malformed date: " + name.Trim());
-        check(Prefer("Orientation.pdf", "Other Orientation.pdf") == null, "zero official candidates require explicit selection");
-        check(Prefer("Orientation.pdf") == 0 && Prefer() == null, "single generic and no-attachment paths remain supported");
+        check(Prefer("Orientation.pdf", "Other Orientation.pdf") == null, "zero official candidates require exact template");
+        check(Prefer("Orientation.pdf") == null && Prefer() == null, "single generic never substitutes for exact template");
         if (args.Length < 3) return;
         byte[] source = File.ReadAllBytes(args[0]);
         var realSaver = new SurgicalSaveService(); var real = realSaver.Load(args[0]);
         string beforeModel = JsonConvert.SerializeObject(real);
         var candidates = OrientationPdfSession.FindCandidates(real);
-        check(candidates.Count == 2, "current real MyList contains exactly two Orientation candidates");
-        var generic = candidates.Single(c => c.Filename == "Orientation.pdf");
+        check(candidates.Count == 1, "current real report has only one eligible official walk candidate");
+        var generic = new OrientationPdfSession.Candidate(real.Attachments!.FindIndex(a => a is JObject j && (string?)j["Filename"] == "Orientation.pdf"), "Orientation.pdf");
+        check(generic.Index >= 0, "real generic attachment retained but excluded from walk candidates");
+        Blocked(() => OrientationPdfSession.OpenEmbedded(real, args[0], generic.Index, folder), "real generic index cannot bypass exact walk contract");
         string stem = Path.GetFileNameWithoutExtension(OrientationPdfSession.TemplateName(real))!;
         var official = candidates.Single(c => c.Filename.StartsWith(stem + " (", StringComparison.Ordinal));
         check(OrientationPdfSession.PreferredCandidateIndex(real, candidates) == official.Index, "actual current MyList automatically selects single exact-template official attachment");
         var ambiguous = Json(args[0]).ToObject<InspectionFile>()!;
         ambiguous.Attachments!.Add(((JObject)ambiguous.Attachments[official.Index]).DeepClone());
-        check(OrientationPdfSession.PreferredCandidateIndex(ambiguous, OrientationPdfSession.FindCandidates(ambiguous)) == null, "actual official duplicate in local model requires explicit selection");
+        Blocked(() => OrientationPdfSession.PreferredCandidateIndex(ambiguous, OrientationPdfSession.FindCandidates(ambiguous)), "actual official duplicate fails loudly");
         var expected = AutofillProbe.Expected(Json(args[0]));
         byte[] genericBytes = Bytes(real.Attachments![generic.Index]);
         byte[] officialBytes = Bytes(real.Attachments[official.Index]);
         var genericValues = Values(genericBytes);
         var mapped = expected.Keys.Where(genericValues.ContainsKey).ToList();
         check(mapped.Count > 0 && mapped.All(k => string.IsNullOrWhiteSpace(genericValues[k])), "actual generic attachment is blank in every recognized mapped field");
-        var genericSession = OrientationPdfSession.OpenEmbedded(real, args[0], generic.Index, folder);
+        var genericSession = new PdfAttachmentService(real).Open(generic.Index, args[0], folder);
         byte[] genericWorking = File.ReadAllBytes(genericSession.WorkingPath);
-        var workingValues = Values(genericWorking);
+        check(genericWorking.SequenceEqual(genericBytes), "general attachment open retains generic bytes exactly without walk autofill");
+        var workingValues = Values(OrientationPdfForm.Fill(genericWorking, real, blankOnly: true));
         foreach (string name in mapped)
             check(workingValues[name] == (expected[name] == "" ? genericValues[name] : expected[name]), "actual embedded working autofill " + name);
-        check(!genericWorking.SequenceEqual(genericBytes) && beforeModel == JsonConvert.SerializeObject(real) && real.OrientationEdit == null, "actual generic working changes without dirtying/staging INS");
+        check(genericWorking.SequenceEqual(genericBytes) && beforeModel == JsonConvert.SerializeObject(real) && real.AttachmentEdit == null, "actual generic open does not change source model or stage INS");
         var officialValues = Values(officialBytes);
         check(officialValues.Any(p => expected.ContainsKey(p.Key) && !string.IsNullOrWhiteSpace(p.Value)), "actual official attachment already has nonblank mapped values");
         var officialSession = OrientationPdfSession.OpenEmbedded(real, args[0], official.Index, folder);
@@ -136,7 +147,7 @@ static class EmbeddedCorrectionProbe
         var changedModelSession = OrientationPdfSession.OpenEmbedded(real, args[0], official.Index, folder);
         var changedValues = Values(File.ReadAllBytes(changedModelSession.WorkingPath));
         check(officialValues.Where(p => !string.IsNullOrWhiteSpace(p.Value)).All(p => changedValues[p.Key] == p.Value), "official prior nonblank edits win even when current INS differs");
-        changedModelSession.Discard();
+        changedModelSession.Monitor.Cleanup();
         if (args.Length >= 4)
         {
             Directory.CreateDirectory(args[3]);
@@ -145,24 +156,25 @@ static class EmbeddedCorrectionProbe
             File.WriteAllBytes(Path.Combine(args[3], "official-embedded-original.pdf"), officialBytes);
             File.Copy(officialSession.WorkingPath, Path.Combine(args[3], "official-embedded-working.pdf"), true);
         }
-        genericSession.Discard(); officialSession.Discard();
-        check(source.SequenceEqual(File.ReadAllBytes(args[0])) && Bytes(real.Attachments[generic.Index]).SequenceEqual(genericBytes) && Bytes(real.Attachments[official.Index]).SequenceEqual(officialBytes), "actual discard preserves original INS and both attachment bytes");
-        // Exercise explicit save only on a local byte-copy with BOTH attachments intact.
+        genericSession.Cleanup(); officialSession.Monitor.Cleanup();
+        check(source.SequenceEqual(File.ReadAllBytes(args[0])) && Bytes(real.Attachments[generic.Index]).SequenceEqual(genericBytes) && Bytes(real.Attachments[official.Index]).SequenceEqual(officialBytes), "actual unchanged cleanup preserves original INS and both attachment bytes");
+        // Exercise an external editor save only on a local byte-copy with BOTH attachments intact.
         File.WriteAllBytes(path, source); model = saver.Load(path); before = File.ReadAllBytes(path);
-        session = OrientationPdfSession.OpenEmbedded(model, path, generic.Index, folder);
-        filled = File.ReadAllBytes(session.WorkingPath);
-        check(before.SequenceEqual(File.ReadAllBytes(path)) && model.OrientationEdit == null, "actual two-attachment local copy unchanged before explicit save");
-        check(session.TryFinish(OrientationPdfDecision.Save, () => { saver.Save(model); return true; }), "actual generic blank-fill explicitly saved to local copy only");
+        var genericCopyMonitor = new PdfAttachmentService(model).Open(generic.Index, path, folder);
+        filled = AutofillProbe.EditWorking(genericCopyMonitor.WorkingPath);
+        check(before.SequenceEqual(File.ReadAllBytes(path)) && model.AttachmentEdit == null, "actual two-attachment local copy unchanged before automatic capture");
+        check(AutofillProbe.Capture(genericCopyMonitor, () => { saver.Save(model); return true; }), "actual generic editor save captured to local copy only");
+        genericCopyMonitor.Cleanup();
         var saved = saver.Load(path);
-        check(Bytes(saved.Attachments![generic.Index]).SequenceEqual(filled) && JToken.DeepEquals((JObject)saved.Attachments[official.Index], (JObject)real.Attachments[official.Index]) && saved.Attachments.Count == real.Attachments.Count, "actual explicit save preserves official attachment and all attachments");
+        check(Bytes(saved.Attachments![generic.Index]).SequenceEqual(filled) && JToken.DeepEquals((JObject)saved.Attachments[official.Index], (JObject)real.Attachments[official.Index]) && saved.Attachments.Count == real.Attachments.Count, "actual automatic capture preserves official attachment and all attachments");
         if (args.Length >= 4)
         {
             string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             File.WriteAllText(Path.Combine(args[3], "embedded-correction.json"), JsonConvert.SerializeObject(new {
                 source = args[0], sourceSha256 = Hash(source), sourceUnchanged = source.SequenceEqual(File.ReadAllBytes(args[0])),
                 mappedBlankFields = mapped.Count, genericSha256 = Hash(genericBytes), genericWorkingSha256 = Hash(genericWorking),
-                officialSha256 = Hash(officialBytes), officialNonblankValuesPreserved = true, explicitSaveUsedLocalCopyOnly = true,
-                preferredFilename = official.Filename, multipleOfficialRequireSelection = true
+                officialSha256 = Hash(officialBytes), officialNonblankValuesPreserved = true, automaticCaptureUsedLocalCopyOnly = true,
+                preferredFilename = official.Filename, multipleOfficialFailLoudly = true
             }, Formatting.Indented));
         }
     }

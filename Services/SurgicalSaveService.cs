@@ -57,6 +57,8 @@ namespace InspectionEditor.Services
             _originalJson = originalJson;
             _filePath = filePath;
             _lastSavedBytes = loadedBytes;
+            inspection.SavedAttachments = originalJson["Attachments"] is JArray loadedAttachments
+                ? (JArray)loadedAttachments.DeepClone() : new JArray();
 
             return inspection;
         }
@@ -117,8 +119,12 @@ namespace InspectionEditor.Services
                 EnsureRequiredTopLevelFields(targetPath);
                 EnsureItemResultIds();
                 PatchInspection(inspection);
-                PatchAddedAttachments(inspection);
-                PatchOrientationAttachment(inspection);
+                if (inspection.AttachmentEdit != null) PatchAttachmentCollection(inspection);
+                else
+                {
+                    PatchAddedAttachments(inspection);
+                    PatchOrientationAttachment(inspection);
+                }
                 PatchPlanCheckMetadata(inspection);
                 string json = _originalJson.ToString(Formatting.None);
                 bool sameTarget = string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(_filePath!),
@@ -149,6 +155,9 @@ namespace InspectionEditor.Services
                 else LastEditTime.RecordSuccessfulSave(targetPath, savedBytes, _saveRegistryRoot);
                 _lastSavedBytes = savedBytes;
                 _filePath = targetPath;
+                inspection.SavedAttachments = _originalJson["Attachments"] is JArray savedAttachments
+                    ? (JArray)savedAttachments.DeepClone() : new JArray();
+                inspection.AttachmentEdit = null;
                 if (inspection.OrientationEdit != null)
                     inspection.OrientationEdit.Expected = (JObject)inspection.OrientationEdit.Replacement.DeepClone();
             }
@@ -163,6 +172,19 @@ namespace InspectionEditor.Services
         /// Append only attachments created during this RED session. Existing attachment JSON
         /// remains represented by the original parsed tokens.
         /// </summary>
+        private void PatchAttachmentCollection(InspectionFile inspection)
+        {
+            var edit = inspection.AttachmentEdit!;
+            var original = _originalJson!["Attachments"];
+            if (original != null && original.Type != JTokenType.Null && original is not JArray)
+                throw new IOException("Unsupported attachment collection; save stopped.");
+            var current = original as JArray ?? new JArray();
+            var model = inspection.Attachments == null ? new JArray() : JArray.FromObject(inspection.Attachments);
+            if (!JToken.DeepEquals(current, edit.Expected) || !JToken.DeepEquals(model, edit.Replacement))
+                throw new IOException("Attachment collection changed concurrently; save stopped to preserve all documents.");
+            _originalJson["Attachments"] = edit.Replacement.DeepClone();
+        }
+
         private void PatchAddedAttachments(InspectionFile inspection)
         {
             if (_originalJson == null || inspection.Attachments == null) return;
