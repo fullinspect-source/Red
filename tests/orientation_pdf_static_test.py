@@ -1,6 +1,8 @@
 """Production wiring complements executable OrientationPdfHarness; not a Windows UI test."""
 import pathlib
 import re
+import subprocess
+import sys
 import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MAIN = (ROOT / 'MainWindow.xaml.cs').read_text()
@@ -16,8 +18,13 @@ def method(name):
         i += 1
     return MAIN[match.start():i]
 class OrientationPdfWiringTests(unittest.TestCase):
+    def test_extracted_lifecycle_probe_matches_production(self):
+        generated = ROOT / 'tests/OrientationPdfHarness/OrientationUiProbe.Generated.cs'
+        before = generated.read_text()
+        subprocess.run([sys.executable, str(ROOT / 'tests/generate_orientation_lifecycle_probe.py')], check=True, capture_output=True)
+        self.assertEqual(before, generated.read_text())
     def test_compact_explicit_controls(self):
-        for label in ['Open Orientation PDF', 'Save PDF to INS', 'Import PDF...']:
+        for label in ['Open Orientation PDF', 'Save PDF to INS']:
             self.assertIn(label, XAML)
         self.assertIn('x:Name="OrientationPdfPanel"', XAML)
         self.assertIn('WrapPanel', XAML)
@@ -25,11 +32,19 @@ class OrientationPdfWiringTests(unittest.TestCase):
         self.assertIn('OrientationPdfSession.IsApplicable(_currentInspection)', UI)
         self.assertIn('!_readOnlyMode', UI)
         self.assertIn('UpdateOrientationPdfControls();', method('LoadInspectionFileAsync'))
-    def test_known_template_and_import_fallback(self):
-        self.assertIn('OrientationPdfSession.FindTemplate', UI)
-        self.assertIn('OpenFileDialog', UI)
-        self.assertIn('No Orientation PDF is embedded', UI)
-        self.assertIn('TemplateName', UI)
+    def test_exact_template_only_no_import_workflow(self):
+        self.assertIn('OrientationPdfSession.OpenTemplate', UI)
+        for removed in ['ImportOrientationPdf', 'PickOrientationPdf', 'OpenFileDialog', 'Save As', 'Import PDF']:
+            self.assertNotIn(removed, UI + XAML)
+    def test_open_does_not_stage_and_autosave_does_not_capture(self):
+        self.assertNotIn('.Capture(', UI)
+        self.assertNotIn('_orientationPdf.Capture', method('SaveCurrentInspectionInPlace'))
+        self.assertIn('SyncCurrentItemFromUI();', UI)
+    def test_leave_has_three_choices_and_explicit_save_no_stays(self):
+        self.assertIn('MessageBoxButton.YesNoCancel', UI)
+        self.assertIn('OrientationPdfDecision.Discard', UI)
+        self.assertIn('OrientationPdfDecision.Cancel', UI)
+        self.assertIn('FinishOrientationEditing(leaving: false)', UI)
     def test_close_and_navigation_guards(self):
         for name in ['MainWindow_Closing', 'LoadInspectionFileAsync', 'DoSave']:
             self.assertIn('FinishOrientationEditing()', method(name))
@@ -39,15 +54,12 @@ class OrientationPdfWiringTests(unittest.TestCase):
         start = MAIN.index('var editorWindows = Application.Current.Windows')
         end = MAIN.index('System.Diagnostics.Process.Start', start)
         self.assertIn('editor.FinishOrientationEditing()', MAIN[start:end])
-    def test_save_captures_before_atomic_save_and_marks_dirty(self):
-        save = method('SaveCurrentInspectionInPlace')
-        self.assertLess(save.index('_orientationPdf.Capture'), save.index('_saveService.Save'))
-        self.assertIn('MarkUnsaved();', save)
-        self.assertIn('TrySaveCurrentInspection()', UI)
-        self.assertLess(UI.index('if (!TrySaveCurrentInspection()) return false;'), UI.index('_orientationPdf.Complete();'))
+    def test_save_uses_production_session_lifecycle(self):
+        self.assertIn('.TryFinish(decision, TrySaveCurrentInspection)', UI)
+        self.assertNotIn('_hasUnsavedChanges = false', UI)
     def test_editor_close_is_explicit_not_process_exit_detection(self):
         self.assertIn('Save and close', UI)
-        self.assertIn('Save As', UI)
+        self.assertNotIn('Save As', UI)
         self.assertIn('Process.Start(_orientationPdf.StartInfo)', UI)
         self.assertNotIn('WaitForExit', UI)
         self.assertIn('WorkingPath', UI)

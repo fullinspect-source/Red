@@ -1262,7 +1262,7 @@ namespace InspectionEditor
                         {
                             editor.SyncCurrentItemFromUI();
                             if (!editor.FinishOrientationEditing())
-                                throw new InvalidOperationException("Update postponed until the Orientation PDF is saved and its editor is closed.");
+                                throw new InvalidOperationException("Update postponed because Orientation PDF editing was not finished. Save or discard the PDF session to continue.");
                             if (editor._hasUnsavedChanges && !editor.TrySaveCurrentInspection())
                                 throw new InvalidOperationException("Update postponed because inspection changes could not be saved.");
                         }
@@ -13898,7 +13898,8 @@ namespace InspectionEditor
             if (_readOnlyMode) throw new InvalidOperationException("This report is read-only.");
 
             SyncCurrentItemFromUI();
-            if (_orientationPdf != null && _orientationPdf.Capture(_currentInspection)) MarkUnsaved();
+            // Orientation bytes are staged only by its explicit save/leave confirmation,
+            // never by ordinary focus-loss/deactivation autosaves.
 
             // Sweep items with PassFail controls: any with [trade] prefix comment should be Fail
             // BUT respect explicit NI values - don't override inspector's choice

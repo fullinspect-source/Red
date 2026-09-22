@@ -10,9 +10,11 @@ using System.Text;
 
 namespace InspectionEditor.Services
 {
+    public enum OrientationPdfDecision { Save, Discard, Cancel }
+
     /// <summary>
     /// Owns one inspection's external PDF editing copy. Never follows INS EditPath/ServerPath,
-    /// never rewrites the import/template, and never infers editor completion from process exit.
+    /// never rewrites the template, and never infers editor completion from process exit.
     /// A caller must capture, save through SurgicalSaveService, then explicitly Complete.
     /// </summary>
     public sealed class OrientationPdfSession
@@ -107,7 +109,7 @@ namespace InspectionEditor.Services
             if (bytes.Length < 8 || bytes.Length > MaxPdfBytes ||
                 !bytes.AsSpan(0, 5).SequenceEqual(Encoding.ASCII.GetBytes("%PDF-")) ||
                 !Encoding.ASCII.GetString(bytes, Math.Max(0, bytes.Length - 2048), Math.Min(bytes.Length, 2048)).Contains("%%EOF"))
-                throw new IOException("Select a complete PDF (up to 100 MB). Save and close it in your PDF editor before trying again.");
+                throw new IOException("The Orientation PDF is incomplete or invalid (100 MB maximum). Save and close it in your PDF editor before trying again.");
         }
 
         private static byte[] ReadPdf(string path)
@@ -129,30 +131,61 @@ namespace InspectionEditor.Services
             if (encoded.Length > MaxPdfBytes * 4L / 3 + 1024) throw new IOException("Embedded Orientation PDF exceeds the limit.");
             byte[] bytes;
             try { bytes = Convert.FromBase64String(encoded); }
-            catch (FormatException ex) { throw new IOException("The embedded Orientation PDF is damaged. Import a correct copy explicitly; the original is preserved.", ex); }
+            catch (FormatException ex) { throw new IOException("The embedded Orientation PDF is damaged. The original is preserved; restore the correct attachment before trying again.", ex); }
             Validate(bytes);
             return new OrientationPdfSession(owner, inspectionPath, index, bytes, workingRoot, true);
         }
 
-        public static OrientationPdfSession Import(InspectionFile owner, string inspectionPath, string source, string workingRoot, int? replaceIndex = null)
+        public static OrientationPdfSession OpenTemplate(InspectionFile owner, string inspectionPath, string workingRoot)
         {
             if (!IsApplicable(owner)) throw new IOException("This inspection does not use an Orientation PDF.");
-            if (replaceIndex.HasValue && !FindCandidates(owner).Any(c => c.Index == replaceIndex))
-                throw new IOException("Only a selected Orientation attachment can be replaced.");
-            return new OrientationPdfSession(owner, inspectionPath, replaceIndex ?? owner.Attachments?.Count ?? 0,
-                ReadPdf(source), workingRoot, false);
+            if (FindCandidates(owner).Count > 0)
+                throw new IOException("Open the existing Orientation attachment instead of replacing it with a blank template.");
+            string source = FindTemplate(owner, inspectionPath) ?? throw new IOException(
+                $"No Orientation PDF is embedded and the exact INS template is missing or unsafe: {TemplateName(owner) ?? "not specified"}. Restore that PDF in Inspections/Documents.");
+            byte[] filled = OrientationPdfForm.Fill(ReadPdf(source), owner);
+            return new OrientationPdfSession(owner, inspectionPath, owner.Attachments?.Count ?? 0, filled, workingRoot, false);
         }
 
-        public void ReplaceWorkingCopy(string source)
+        /// <summary>Only explicit PDF save stages bytes. Failed saves roll back PDF staging,
+        /// not ordinary report edits; the working file remains available for a retry.</summary>
+        public bool TryFinish(OrientationPdfDecision decision, Func<bool> saveInspection)
         {
-            byte[] bytes = ReadPdf(source);
-            string temporary = WorkingPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            if (decision == OrientationPdfDecision.Cancel) return false;
+            if (decision == OrientationPdfDecision.Discard) { Discard(); return true; }
+            if (decision != OrientationPdfDecision.Save) throw new ArgumentOutOfRangeException(nameof(decision));
+            var previousAttachments = _owner.Attachments?.ToList();
+            var previousEdit = _owner.OrientationEdit;
+            var previousSnapshot = _modelSnapshot;
+            var previousCaptured = _captured;
+            bool saved = false;
             try
             {
-                File.WriteAllBytes(temporary, bytes);
-                File.Move(temporary, WorkingPath, overwrite: true);
+                Capture(_owner);
+                saved = saveInspection();
+                if (!saved) return false;
             }
-            finally { try { File.Delete(temporary); } catch { } }
+            finally
+            {
+                if (!saved)
+                {
+                    _owner.Attachments = previousAttachments;
+                    _owner.OrientationEdit = previousEdit;
+                    _modelSnapshot = previousSnapshot;
+                    _captured = previousCaptured;
+                }
+            }
+            Complete(); // Late edits or a failed read still retain the session and block leaving.
+            return true;
+        }
+
+        public void Discard() => Discard(directory => Directory.Delete(directory, true));
+
+        internal void Discard(Action<string> cleanup)
+        {
+            // Never read/lock the working PDF on discard. An external editor may still own it.
+            try { cleanup(Path.GetDirectoryName(WorkingPath)!); }
+            catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
 
         public bool Capture(InspectionFile inspection)
@@ -176,7 +209,7 @@ namespace InspectionEditor.Services
             inspection.Attachments ??= new List<object>();
             if (_index == inspection.Attachments.Count && _modelSnapshot == null) inspection.Attachments.Add(replacement);
             else if (_index < inspection.Attachments.Count && _modelSnapshot != null) inspection.Attachments[_index] = replacement;
-            else throw new IOException("Attachment list changed during import; no unrelated attachment was overwritten.");
+            else throw new IOException("Attachment list changed during PDF editing; no unrelated attachment was overwritten.");
             var expected = inspection.OrientationEdit?.Index == _index
                 ? inspection.OrientationEdit.Expected : _modelSnapshot;
             inspection.OrientationEdit = new OrientationAttachmentEdit

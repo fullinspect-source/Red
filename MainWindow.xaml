@@ -520,8 +520,6 @@
                         <Button x:Name="SaveOrientationPdfButton" Content="Save PDF to INS"
                                 Click="SaveOrientationPdfButton_Click" Padding="9,7" Margin="0,0,6,3"
                                 Background="#26734D" Foreground="White" BorderThickness="0" FontSize="13" IsEnabled="False"/>
-                        <Button x:Name="ImportOrientationPdfButton" Content="Import PDF..."
-                                Click="ImportOrientationPdfButton_Click" Padding="9,7" Margin="0,0,0,3" FontSize="13"/>
                     </WrapPanel>
                     <TextBlock x:Name="OrientationPdfHint" FontSize="11" Foreground="#555" TextWrapping="Wrap"/>
                 </StackPanel>

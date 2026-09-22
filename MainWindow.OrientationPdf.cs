@@ -1,5 +1,4 @@
 using InspectionEditor.Services;
-using Microsoft.Win32;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -20,11 +19,10 @@ namespace InspectionEditor
             bool applicable = OrientationPdfSession.IsApplicable(_currentInspection);
             OrientationPdfPanel.Visibility = applicable ? Visibility.Visible : Visibility.Collapsed;
             OpenOrientationPdfButton.IsEnabled = applicable && !_readOnlyMode;
-            ImportOrientationPdfButton.IsEnabled = applicable && !_readOnlyMode;
             SaveOrientationPdfButton.IsEnabled = applicable && !_readOnlyMode && _orientationPdf != null;
             OrientationPdfHint.Text = _orientationPdf == null
-                ? "Open the embedded PDF or the exact INS template. Import a PDF if the template is unavailable."
-                : "Save and close the PDF editor, then tap Save PDF to INS. If you used Save As, import that saved PDF.";
+                ? "Open the saved Orientation PDF, or prefill the exact INS template with this report's current values."
+                : "Save and close the PDF editor, then tap Save PDF to INS. Leaving the report also lets you discard this PDF session.";
             OrientationPdfHint.ToolTip = _orientationPdf?.WorkingPath;
         }
 
@@ -51,13 +49,6 @@ namespace InspectionEditor
             return true;
         }
 
-        private string? PickOrientationPdf()
-        {
-            var picker = new OpenFileDialog { Title = "Select the correct Orientation PDF (or your edited Save As copy)",
-                Filter = "PDF documents (*.pdf)|*.pdf", CheckFileExists = true, Multiselect = false };
-            return picker.ShowDialog(this) == true ? picker.FileName : null;
-        }
-
         private void OpenOrientationPdfButton_Click(object sender, RoutedEventArgs e)
         {
             if (_readOnlyMode || _currentInspection == null || _currentFilePath == null) return;
@@ -67,24 +58,12 @@ namespace InspectionEditor
             {
                 if (_orientationPdf == null)
                 {
+                    SyncCurrentItemFromUI();
                     if (!SelectOrientationAttachment(out int? index)) return;
                     if (index.HasValue)
                         _orientationPdf = OrientationPdfSession.OpenEmbedded(_currentInspection, _currentFilePath, index.Value, OrientationWorkingRoot);
                     else
-                    {
-                        string? source = OrientationPdfSession.FindTemplate(_currentInspection, _currentFilePath);
-                        if (source == null)
-                        {
-                            MessageBox.Show("No Orientation PDF is embedded and the INS template is not available in the inspection Documents folder.\n\n" +
-                                $"Template: {OrientationPdfSession.TemplateName(_currentInspection) ?? "not specified"}\n\n" +
-                                "Select/import the correct PDF. RED does not manufacture the builder's form.",
-                                "Select Orientation PDF", MessageBoxButton.OK, MessageBoxImage.Information);
-                            source = PickOrientationPdf();
-                            if (source == null) return;
-                        }
-                        _orientationPdf = OrientationPdfSession.Import(_currentInspection, _currentFilePath, source, OrientationWorkingRoot);
-                        if (_orientationPdf.Capture(_currentInspection)) MarkUnsaved();
-                    }
+                        _orientationPdf = OrientationPdfSession.OpenTemplate(_currentInspection, _currentFilePath, OrientationWorkingRoot);
                 }
                 UpdateOrientationPdfControls();
                 // Shell association decides the viewer/editor. Its lifetime is NOT a reliable save signal.
@@ -94,62 +73,33 @@ namespace InspectionEditor
             finally { _orientationPdfUiBusy = false; }
         }
 
-        private void ImportOrientationPdfButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_readOnlyMode || _currentInspection == null || _currentFilePath == null) return;
-            if (_orientationPdfUiBusy) return;
-            _orientationPdfUiBusy = true;
-            try
-            {
-                if (_orientationPdf != null)
-                {
-                    if (MessageBox.Show("Save and close the PDF editor first, then select your edited PDF (including a Save As copy).\n\n" +
-                        "Replace this session's working copy? Your selected original file will not be changed.",
-                        "Import edited Orientation PDF", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                    string? edited = PickOrientationPdf();
-                    if (edited == null) return;
-                    _orientationPdf.ReplaceWorkingCopy(edited);
-                    if (_orientationPdf.Capture(_currentInspection)) MarkUnsaved();
-                    UpdateOrientationPdfControls();
-                    return;
-                }
-                if (!SelectOrientationAttachment(out int? index)) return;
-                string? source = PickOrientationPdf();
-                if (source == null) return;
-                if (index.HasValue && MessageBox.Show("Replace only the selected Orientation PDF with this file? Other attachments and metadata will be preserved.",
-                    "Import Orientation PDF", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                _orientationPdf = OrientationPdfSession.Import(_currentInspection, _currentFilePath, source, OrientationWorkingRoot, index);
-                if (_orientationPdf.Capture(_currentInspection)) MarkUnsaved();
-                UpdateOrientationPdfControls();
-                using var process = Process.Start(_orientationPdf.StartInfo);
-            }
-            catch (Exception ex) { ShowOrientationError(ex); }
-            finally { _orientationPdfUiBusy = false; }
-        }
-
         private void SaveOrientationPdfButton_Click(object sender, RoutedEventArgs e)
         {
-            if (FinishOrientationEditing()) UpdateOrientationPdfControls();
+            if (FinishOrientationEditing(leaving: false)) UpdateOrientationPdfControls();
         }
 
-        private bool FinishOrientationEditing()
+        private bool FinishOrientationEditing(bool leaving = true)
         {
             if (_orientationPdf == null) return true;
             if (_finishingOrientationPdf) return false;
             _finishingOrientationPdf = true;
             try
             {
-                if (MessageBox.Show("Save and close the PDF in your external editor first. RED cannot detect unsaved edits inside another app.\n\n" +
-                    "If you used Save As, choose No and use Import PDF to select your edited file.\n\n" +
-                    "Have you saved and closed the editor? Yes saves this working PDF into the INS; No keeps the report open.\n\n" + _orientationPdf.WorkingPath,
-                    "Save Orientation PDF to INS", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return false;
-                if (!TrySaveCurrentInspection()) return false;
-                _orientationPdf.Complete();
+                string guidance = "Save and close the PDF in your external editor before choosing Yes. RED cannot detect unsaved edits inside another app.\n\n";
+                var result = MessageBox.Show(guidance + (leaving
+                    ? "Yes: Save this working PDF into the INS and continue.\nNo: Don't save this PDF session and continue.\nCancel: Stay in this report. Other report edits keep their normal save safeguards."
+                    : "Have you saved and closed the editor? Yes saves this working PDF into the INS. No cancels this save and keeps the PDF session open.") +
+                    "\n\n" + _orientationPdf.WorkingPath, "Save Orientation PDF to INS",
+                    leaving ? MessageBoxButton.YesNoCancel : MessageBoxButton.YesNo, MessageBoxImage.Question,
+                    leaving ? MessageBoxResult.Cancel : MessageBoxResult.No);
+                var decision = result == MessageBoxResult.Yes ? OrientationPdfDecision.Save
+                    : leaving && result == MessageBoxResult.No ? OrientationPdfDecision.Discard : OrientationPdfDecision.Cancel;
+                if (!_orientationPdf.TryFinish(decision, TrySaveCurrentInspection)) return false;
                 _orientationPdf = null;
                 UpdateOrientationPdfControls();
                 return true;
             }
-            catch (Exception ex) { MarkUnsaved(); ShowOrientationError(ex); return false; }
+            catch (Exception ex) { ShowOrientationError(ex); return false; }
             finally { _finishingOrientationPdf = false; }
         }
 
