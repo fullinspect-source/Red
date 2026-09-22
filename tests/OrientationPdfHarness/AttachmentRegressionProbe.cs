@@ -6,6 +6,8 @@ static class AttachmentRegressionProbe
 {
     public static void Run(string root, Action<bool, string> check)
     {
+        AttachmentDialog.AttachmentsWindow.Run(root, check);
+        CorruptAttachmentProbe.Run(root, check);
         byte[] Pdf(string text) => AutofillProbe.SyntheticPdf(text);
         string path = Path.Combine(root, "regressions.ins");
         var json = JObject.Parse("""

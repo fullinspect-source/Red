@@ -16,6 +16,7 @@ namespace InspectionEditor.Services
         private readonly InspectionFile _owner;
         private readonly string _filename;
         private readonly string _directory;
+        private FileStream? _sessionLease;
         private JObject? _expectedAttachment;
         private byte[] _baseline;
         private byte[]? _observed;
@@ -30,11 +31,14 @@ namespace InspectionEditor.Services
         {
             if (AttachmentIndex.HasValue) AttachmentIndex -= removed.Count(i => i < AttachmentIndex.Value);
         }
-        internal void CompleteDeletion()
+        internal void CompleteDeletion(FileStream lease)
         {
-            _closed = true;
-            try { Directory.Delete(_directory, true); }
+            // The successful INS delete and working-file retirement share one exclusive lease.
+            // An unchanged leftover on a filesystem failure is safer than a recursive delete.
+            try { PdfWorkingSession.DeleteLeasedFile(lease, WorkingPath); }
             catch (IOException) { } catch (UnauthorizedAccessException) { }
+            _closed = true;
+            HasPendingChanges = false;
         }
         public string WorkingPath { get; }
         public ProcessStartInfo StartInfo => new() { FileName = WorkingPath, UseShellExecute = true, Arguments = "" };
@@ -42,6 +46,16 @@ namespace InspectionEditor.Services
         public bool HasPendingChanges { get; private set; }
         public bool OfficialPrepared { get; private set; }
         public bool HasLaunched { get; private set; }
+
+        internal void AbandonFailedPreparation()
+        {
+            // Called only before a newly-created monitor is returned or shell-launched.
+            // Preserve a partially prepared copy but release its lifetime ownership lock.
+            if (HasLaunched) throw new IOException("Cannot abandon a launched PDF session.");
+            try { Cleanup(); }
+            catch (IOException) { } catch (UnauthorizedAccessException) { }
+            finally { _sessionLease?.Dispose(); _sessionLease = null; }
+        }
 
         // Mark before shell dispatch: even a failed/indeterminate shell launch cannot prove
         // that an editor did not retain this path with unsaved in-memory changes.
@@ -116,11 +130,22 @@ namespace InspectionEditor.Services
                 Status = "PDF add pending. Use Retry Save.";
             }
             string identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(inspectionPath).ToUpperInvariant())));
+            PdfWorkingSession.Scavenge(workingRoot, DateTimeOffset.UtcNow);
             _directory = Path.Combine(Path.GetFullPath(workingRoot), identity, Guid.NewGuid().ToString("N"));
+            PdfWorkingSession.RequirePlainPath(_directory);
             Directory.CreateDirectory(_directory);
             WorkingPath = Path.Combine(_directory, "Orientation.pdf");
-            try { File.WriteAllBytes(WorkingPath, bytes); }
-            catch { try { Directory.Delete(_directory, true); } catch { } throw; }
+            try
+            {
+                _sessionLease = PdfWorkingSession.CreateLease(_directory);
+                File.WriteAllBytes(WorkingPath, bytes);
+            }
+            catch
+            {
+                _sessionLease?.Dispose();
+                // No recursive deletion, including on unexpected/reparse-point paths.
+                throw;
+            }
         }
 
         public bool Poll(DateTimeOffset now, Func<bool> save) => Observe(now, save, false);
@@ -204,13 +229,58 @@ namespace InspectionEditor.Services
             HasPendingChanges = true; Status = reason; return false;
         }
 
-        public void Cleanup()
+        internal FileStream LeaseForRetirement()
+        {
+            FileStream? lease = null;
+            try
+            {
+                PdfWorkingSession.RequirePlainPath(_directory);
+                lease = PdfWorkingSession.OpenRetirementLease(WorkingPath);
+                if (IsPendingAdd || lease.Length != _baseline.Length)
+                    throw new IOException("PDF has uncaptured disk changes. Use Retry Save.");
+                using var current = new MemoryStream();
+                lease.CopyTo(current);
+                if (!current.ToArray().SequenceEqual(_baseline))
+                    throw new IOException("PDF has uncaptured disk changes. Use Retry Save.");
+                return lease;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                lease?.Dispose();
+                HasPendingChanges = true;
+                Status = "PDF cleanup blocked; working copy retained. " + ex.Message;
+                throw;
+            }
+        }
+
+        public void Cleanup() => Cleanup(null);
+
+        // Deterministic seam at the exact former TOCTOU boundary. Production uses no callback.
+        internal void Cleanup(Action? afterComparison)
         {
             if (_closed) return;
-            if (!CanLeave(out string reason)) throw new IOException(reason);
-            _closed = true;
-            // Only this instance's unique directory. Never remove inspection roots, templates or sources.
-            try { Directory.Delete(_directory, true); }
+            using (var lease = LeaseForRetirement())
+            {
+                afterComparison?.Invoke();
+                PdfWorkingSession.DeleteLeasedFile(lease, WorkingPath);
+                _closed = true;
+                HasPendingChanges = false;
+            }
+            FinishRetirement();
+        }
+
+        internal void FinishRetirement()
+        {
+            // Retire only our known marker and then the empty session. Never recursively
+            // delete: unexpected editor files and all parent/source directories survive.
+            try
+            {
+                if (_sessionLease != null)
+                    PdfWorkingSession.DeleteLeasedFile(_sessionLease, Path.Combine(_directory, PdfWorkingSession.LockName));
+            }
+            catch (IOException) { } catch (UnauthorizedAccessException) { }
+            finally { _sessionLease?.Dispose(); _sessionLease = null; }
+            try { Directory.Delete(_directory, false); }
             catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }

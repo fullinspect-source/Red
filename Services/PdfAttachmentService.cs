@@ -15,7 +15,7 @@ namespace InspectionEditor.Services
     {
         public const long WarningBytes = 15L * 1024 * 1024;
         public const long MaxPdfBytes = 100L * 1024 * 1024;
-        public sealed record Row(int Index, string Filename, long SizeBytes, string Status, int? PageCount = null);
+        public sealed record Row(int Index, string Filename, long SizeBytes, string Status, int? PageCount = null, bool CanOpen = true);
         private readonly InspectionFile _owner;
         public PdfAttachmentService(InspectionFile owner) => _owner = owner;
 
@@ -83,7 +83,9 @@ namespace InspectionEditor.Services
 
         private static byte[] EmbeddedPdf(JObject attachment, out int pages)
         {
-            string encoded = attachment.Value<string>("FileData") ?? "";
+            if (attachment["FileData"]?.Type != JTokenType.String)
+                throw new IOException("Embedded PDF data is missing or is not a base64 string.");
+            string encoded = attachment.Value<string>("FileData")!;
             const string prefix = "data:application/pdf;base64,";
             if (encoded.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) encoded = encoded[prefix.Length..];
             if (encoded.Length > MaxPdfBytes * 4 / 3 + 1024) throw new IOException("Embedded PDF exceeds the safety limit.");
@@ -97,14 +99,21 @@ namespace InspectionEditor.Services
             for (int i = 0; i < (_owner.Attachments?.Count ?? 0); i++)
             {
                 if (_owner.Attachments![i] is not JObject attachment) continue;
-                string? name = attachment.Value<string>("Filename");
+                string? name = Filename(attachment);
                 if (!SafeFilename(name)) continue;
                 try { var bytes = EmbeddedPdf(attachment, out int pages); rows.Add(new Row(i, name!, bytes.LongLength, "Embedded PDF", pages)); }
-                catch (IOException) { /* Preserve unsupported/damaged tokens without opening them. */ }
-                catch (ArgumentException) { }
+                catch (IOException)
+                {
+                    // Filename identity is enough to list/remove a damaged packet, never to open it.
+                    // A negative size means unknown, not a fabricated zero-byte PDF.
+                    rows.Add(new Row(i, name!, -1, "Damaged / unreadable PDF. Remove or repair; cannot open.", CanOpen: false));
+                }
             }
             return rows;
         }
+
+        internal static string? Filename(JObject attachment) => attachment["Filename"]?.Type == JTokenType.String
+            ? attachment.Value<string>("Filename") : null;
 
         internal static JArray Snapshot(InspectionFile owner) => owner.Attachments == null ? new JArray() : JArray.FromObject(owner.Attachments);
         internal static JObject Create(string name, byte[] bytes) => new()
@@ -160,7 +169,7 @@ namespace InspectionEditor.Services
             if (bytes.LongLength > WarningBytes && !approveLarge(bytes.LongLength)) return false;
             string stem = Path.GetFileNameWithoutExtension(name);
             int suffix = 2;
-            while (expected.OfType<JObject>().Any(a => string.Equals(a.Value<string>("Filename"), name, StringComparison.OrdinalIgnoreCase)))
+            while (expected.OfType<JObject>().Any(a => string.Equals(Filename(a), name, StringComparison.OrdinalIgnoreCase)))
                 name = $"{stem} ({suffix++}).pdf";
             if (!SafeFilename(name)) throw new IOException("The disambiguated PDF filename is too long. Rename the source and retry.");
             var replacement = (JArray)expected.DeepClone(); replacement.Add(Create(name, bytes));
@@ -174,7 +183,7 @@ namespace InspectionEditor.Services
             if (!SafeFilename(name)) throw new IOException("Select a PDF with a safe filename.");
             var bytes = ReadPdf(path);
             if (bytes.LongLength > WarningBytes && !approveLarge(bytes.LongLength)) return null;
-            var names = Snapshot(_owner).OfType<JObject>().Select(a => a.Value<string>("Filename"))
+            var names = Snapshot(_owner).OfType<JObject>().Select(Filename)
                 .Concat(reservedNames ?? Array.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
             string stem = Path.GetFileNameWithoutExtension(name);
             int suffix = 2;
@@ -191,18 +200,18 @@ namespace InspectionEditor.Services
             var locks = new List<FileStream>();
             try
             {
-                // Hold read leases through the transaction so editors cannot change selected bytes
-                // between the pending-change check and successful deletion (Windows sharing rules).
+                // Keep one exclusive lease through comparison, INS commit and file retirement.
+                // There is no close/reopen window for a late save after successful deletion.
                 foreach (var monitor in selected)
                 {
-                    locks.Add(new FileStream(monitor.WorkingPath, FileMode.Open, FileAccess.Read, FileShare.Read));
-                    if (!monitor.CanLeave(out string reason)) throw new IOException(reason);
+                    locks.Add(monitor.LeaseForRetirement());
                 }
                 if (!Delete(indices, save)) return false;
                 foreach (var monitor in active.Except(selected)) monitor.RebaseAfterDeletion(removed);
+                for (int i = 0; i < selected.Length; i++) selected[i].CompleteDeletion(locks[i]);
             }
             finally { foreach (var lease in locks) lease.Dispose(); }
-            foreach (var monitor in selected) monitor.CompleteDeletion();
+            foreach (var monitor in selected) monitor.FinishRetirement();
             return true;
         }
 
@@ -210,7 +219,7 @@ namespace InspectionEditor.Services
         {
             if (indices.Count == 0) return false;
             var valid = Enumerate().Select(r => r.Index).ToHashSet();
-            if (indices.Any(i => !valid.Contains(i))) throw new IOException("Delete only selected valid embedded PDFs. Refresh the attachment list.");
+            if (indices.Any(i => !valid.Contains(i))) throw new IOException("Delete only selected safe-named PDF attachment rows. Refresh the attachment list.");
             var expected = Snapshot(_owner); var replacement = (JArray)expected.DeepClone();
             foreach (int i in indices.Distinct().OrderByDescending(i => i)) replacement.RemoveAt(i);
             return Transact(expected, replacement, save);
@@ -220,6 +229,9 @@ namespace InspectionEditor.Services
         public void PrepareForOpen(PdfEditMonitor monitor)
         {
             if (!monitor.BelongsTo(_owner)) throw new IOException("This PDF belongs to another report.");
+            // Reused monitors must not hide newly damaged embedded data behind a healthy copy.
+            if (monitor.AttachmentIndex is int index)
+                EmbeddedPdf(Attachment(_owner, index));
             if (!OrientationPdfSession.IsApplicable(_owner)) return;
             bool official;
             try
@@ -247,7 +259,7 @@ namespace InspectionEditor.Services
                 if (official) return OrientationPdfSession.OpenEmbedded(_owner, inspectionPath, index, workingRoot).Monitor;
             }
             var attachment = Attachment(_owner, index);
-            string? name = attachment.Value<string>("Filename");
+            string? name = Filename(attachment);
             if (!SafeFilename(name)) throw new IOException("The attachment filename is unsafe; it was not opened.");
             return new PdfEditMonitor(_owner, index, name!, EmbeddedPdf(attachment), inspectionPath, workingRoot);
         }

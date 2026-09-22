@@ -1,10 +1,11 @@
-using Microsoft.Win32;
+// Generated from AttachmentsWindow.xaml.cs; only UI types/namespaces are seams.
+#nullable enable
+using AttachmentDialog.Stubs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
 
-namespace InspectionEditor
+namespace AttachmentDialog
 {
     public partial class AttachmentsWindow : Window
     {

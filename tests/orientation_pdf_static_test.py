@@ -28,6 +28,14 @@ class OrientationPdfWiringTests(unittest.TestCase):
         before = generated.read_text()
         subprocess.run([sys.executable, str(ROOT / 'tests/generate_orientation_lifecycle_probe.py')], check=True, capture_output=True)
         self.assertEqual(before, generated.read_text())
+    def test_extracted_manager_and_confirmation_dialog_match_production(self):
+        paths = [ROOT / 'tests/OrientationPdfHarness' / name for name in (
+            'AttachmentManagerProbe.Generated.cs', 'AttachmentDialogProbe.Generated.cs')]
+        before = [p.read_text() for p in paths]
+        subprocess.run([sys.executable, str(ROOT / 'tests/generate_attachment_manager_probe.py')],
+                       check=True, capture_output=True)
+        self.assertEqual(before, [p.read_text() for p in paths])
+
     def test_cleanup_race_retains_remaining_monitors(self):
         self.assertIn('catch (Exception ex)', UI)
         self.assertIn('if (_pdfSessions.Count > 0) _pdfTimer?.Start()', UI)

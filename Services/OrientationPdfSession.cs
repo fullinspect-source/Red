@@ -38,6 +38,12 @@ namespace InspectionEditor.Services
             $"RED could not use the exact walk document \"{TemplateName(inspection) ?? "Template not specified or ambiguous"}\" in Inspections/Documents. {detail} " +
             "RED will not substitute another region's form. Contact Trent to install the correct walk document.");
 
+        private static IOException DamagedEmbedded(InspectionFile inspection, Exception ex) => new(
+            $"The embedded walk document matching \"{TemplateName(inspection)}\" is damaged or unreadable. " +
+            "Use ATTACHMENTS to remove the damaged row (confirm Delete checked), then reopen the walk document, " +
+            "or contact Trent to repair the attachment. RED will not substitute a template or another PDF while this official attachment exists. " +
+            ex.Message, ex);
+
         private static string RequireTemplate(InspectionFile inspection)
         {
             string? name = TemplateName(inspection);
@@ -74,7 +80,7 @@ namespace InspectionEditor.Services
             for (int i = 0; i < (inspection.Attachments?.Count ?? 0); i++)
             {
                 if (inspection.Attachments![i] is not JObject attachment) continue;
-                string name = attachment.Value<string>("Filename") ?? "";
+                string name = PdfAttachmentService.Filename(attachment) ?? "";
                 if (Official(name, template)) result.Add(new Candidate(i, name));
             }
             return result;
@@ -85,6 +91,11 @@ namespace InspectionEditor.Services
             // Recompute from the authoritative model, never trust a caller-supplied broad candidate list.
             var official = FindCandidates(inspection);
             if (official.Count > 1) throw Blocked(inspection, "Multiple exact official attachments exist. Use ATTACHMENTS to inspect/delete extras.");
+            if (official.Count == 1)
+            {
+                try { PdfAttachmentService.EmbeddedPdf(PdfAttachmentService.Attachment(inspection, official[0].Index)); }
+                catch (IOException ex) { throw DamagedEmbedded(inspection, ex); }
+            }
             return official.Count == 1 ? official[0].Index : null;
         }
 
@@ -98,7 +109,7 @@ namespace InspectionEditor.Services
                 var bytes = PdfAttachmentService.EmbeddedPdf(attachment);
                 var monitor = new PdfEditMonitor(owner, index, attachment.Value<string>("Filename")!, bytes, inspectionPath, workingRoot);
                 try { monitor.PrepareOfficialForOpen(); }
-                catch { monitor.CompleteDeletion(); throw; }
+                catch { monitor.AbandonFailedPreparation(); throw; }
                 return new OrientationPdfSession(monitor);
             }
             catch (Exception ex) when (ex is not OutOfMemoryException) { throw Blocked(owner, "The embedded document could not be opened: " + ex.Message); }
@@ -107,13 +118,13 @@ namespace InspectionEditor.Services
         public static OrientationPdfSession OpenTemplate(InspectionFile owner, string inspectionPath, string workingRoot)
         {
             string name = RequireTemplate(owner);
-            if (FindCandidates(owner).Count > 0) throw Blocked(owner, "Open the existing official attachment; duplicate official attachments must be resolved first.");
+            if (FindCandidates(owner).Count > 0) throw Blocked(owner, "An official attachment already exists. Use ATTACHMENTS to inspect it, remove a damaged row or extras, or contact Trent to repair it before using the exact template.");
             string source = FindTemplate(owner, inspectionPath) ?? throw Blocked(owner, "The exact file was not found.");
             try
             {
                 var monitor = new PdfEditMonitor(owner, null, name, PdfAttachmentService.ReadPdf(source), inspectionPath, workingRoot);
                 try { monitor.PrepareOfficialForOpen(); }
-                catch { monitor.CompleteDeletion(); throw; }
+                catch { monitor.AbandonFailedPreparation(); throw; }
                 return new OrientationPdfSession(monitor);
             }
             catch (Exception ex) when (ex is not OutOfMemoryException) { throw Blocked(owner, "The exact template is not a valid readable PDF: " + ex.Message); }

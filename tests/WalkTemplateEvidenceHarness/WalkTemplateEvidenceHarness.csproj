@@ -8,6 +8,7 @@
     <Compile Include="../../Services/OrientationPdfSession.cs" Link="OrientationPdfSession.cs" />
     <Compile Include="../../Services/OrientationPdfForm.cs" Link="OrientationPdfForm.cs" />
     <Compile Include="../../Services/PdfAttachmentService.cs" Link="PdfAttachmentService.cs" Condition="Exists('../../Services/PdfAttachmentService.cs')" />
+    <Compile Include="../../Services/PdfWorkingSession.cs" Link="PdfWorkingSession.cs" />
     <Compile Include="../../Services/PdfEditMonitor.cs" Link="PdfEditMonitor.cs" Condition="Exists('../../Services/PdfEditMonitor.cs')" />
     <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" />
     <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs" />

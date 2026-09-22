@@ -33,6 +33,7 @@ namespace InspectionEditor
             public string Filename { get; init; } = "";
             public string Size { get; init; } = "";
             public string Status { get; init; } = "";
+            public bool CanOpen { get; init; } = true;
         }
         public static Action<AttachmentsWindow>? OnShow;
         public object? Owner { get; set; }
@@ -74,6 +75,22 @@ namespace InspectionEditor
             AttachmentsWindow.OnShow = window =>
             {
                 window.Open(0); window.Open(1);
+                var officialToken = (JObject)p._currentInspection.Attachments![0];
+                var data = officialToken["FileData"]!.DeepClone();
+                officialToken["FileData"] = "corrupt!";
+                var damaged = window.Rows().Single(r => r.Index == 0);
+                check(!damaged.CanOpen && damaged.Status.Contains("Damaged") && damaged.Size.Contains("Unknown"),
+                    "production manager damaged status wins over existing healthy monitor and size is unknown");
+                bool blocked = false;
+                try { window.Open(0); } catch (IOException) { blocked = true; }
+                check(blocked && p._pdfSessions.Count == 2 && p.SaveCount == 0,
+                    "production manager cannot reopen healthy stale copy over newly corrupt embedded row");
+                try { OrientationPdfSession.PreferredCandidateIndex(p._currentInspection, OrientationPdfSession.FindCandidates(p._currentInspection)); blocked = false; }
+                catch (IOException ex) { blocked = ex.Message.Contains("ATTACHMENTS") && ex.Message.Contains("repair"); }
+                check(blocked, "production walk selection rejects corrupt official even when prepared monitor exists");
+                officialToken["FileData"] = data;
+                check(window.Rows().Single(r => r.Index == 0).CanOpen,
+                    "production manager refresh recovers open eligibility only when embedded data repaired");
                 var selected = p.FindPdfMonitor(0)!; var other = p.FindPdfMonitor(1)!;
                 p._orientationPdf = selected;
                 check(AutofillProbe.Values(File.ReadAllBytes(selected.WorkingPath))["Customer Name_HOI"] == "Manager buyer",

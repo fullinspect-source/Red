@@ -19,6 +19,8 @@
             <TextBlock Text="ATTACHMENTS" FontSize="23" FontWeight="SemiBold" Foreground="#8B0000"/>
             <TextBlock Text="PDFs embedded in this INS, not external job documents. Every page is preserved."
                        TextWrapping="Wrap" Margin="0,5,0,0"/>
+            <TextBlock Text="Damaged PDFs cannot be opened. Check the damaged row and confirm Delete checked to remove it, or contact Trent to repair it."
+                       TextWrapping="Wrap" Margin="0,5,0,0" Foreground="#8B0000"/>
             <TextBlock x:Name="ModeHint" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="#555"/>
         </StackPanel>
         <DataGrid x:Name="PdfList" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False"

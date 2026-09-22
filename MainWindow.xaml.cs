@@ -2441,7 +2441,7 @@ namespace InspectionEditor
             _isLoadingFile = true;
             ShowOpeningInspectionState(filePath);
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-            
+
             try
             {
             // Reset read-only mode for new file
@@ -2521,7 +2521,7 @@ namespace InspectionEditor
                     return;
                 }
             }
-            
+
             // Only end PDF sessions once the new report locks have been acquired.
             if (!FinishOrientationEditing())
             {
@@ -13894,7 +13894,7 @@ namespace InspectionEditor
         {
             if (_currentInspection == null || !_saveService.HasFile) return;
             if (!FinishOrientationEditing(leaving: false)) return;
-            
+
             try
             {
                 if (!TrySaveCurrentInspection()) return;

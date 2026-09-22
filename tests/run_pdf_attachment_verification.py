@@ -36,8 +36,9 @@ def main():
         ('attachment-manager-generator', [sys.executable, 'tests/generate_attachment_manager_probe.py']),
         ('python', [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', '*test.py']),
     ]
-    for name in ('OrientationPdfHarness', 'SaveLossHarness', 'FailedSaveRecoveryHarness',
-                 'ChecklistVisibilityHarness', 'LastEditHarness', 'AppUpdateHarness',
+    for name in ('OrientationPdfHarness', 'PdfCleanupHarness', 'SaveLossHarness', 'FailedSaveRecoveryHarness',
+                 'ChecklistVisibilityHarness', 'PhotoProcessingHarness',
+                 'LastEditHarness', 'AppUpdateHarness',
                  'UpdateUiHarness', 'DataUpdateHarness', 'FramingDesignParserHarness',
                  'EquipmentAirflowHarness', 'EnergySemanticHarness', 'HetMeasuredHarness'):
         commands.append((name, ['dotnet', 'run', '--project', f'tests/{name}']))
@@ -50,7 +51,10 @@ def main():
                                  'win-x64', '--self-contained', 'true', '-o', str(output / 'publish')]),
         ])
     result = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-              'commands': []}
+              'commands': [],
+              'not_run': ['Windows WPF/editor smoke tests require Windows',
+                          'WalkTemplateEvidenceHarness and live Orientation/inventory modes require real INS inputs',
+                          'ItemRequirementHarness requires a real SCI file and at least eight archive SCI files']}
     for name, command in commands:
         log = output / (name + '.log')
         try:

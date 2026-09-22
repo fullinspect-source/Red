@@ -95,7 +95,8 @@ static class EmbeddedCorrectionProbe
         }
         int? Prefer(params string[] names)
         {
-            model.Attachments = names.Select(n => (object)new JObject { ["Filename"] = n }).ToList();
+            model.Attachments = names.Select(n => (object)new JObject { ["Filename"] = n,
+                ["FileData"] = Convert.ToBase64String(mixed) }).ToList();
             return OrientationPdfSession.PreferredCandidateIndex(model, OrientationPdfSession.FindCandidates(model));
         }
         check(Prefer("Orientation.pdf", "Exact Orientation.pdf") == 1, "exact bare template wins over generic");

@@ -84,8 +84,10 @@ namespace InspectionEditor
             _attachmentsWindow = new AttachmentsWindow(_readOnlyMode,
                 () => Current() ? service.Enumerate().Select(row => new AttachmentsWindow.PdfRow
                 {
-                    Index = row.Index, Filename = row.Filename, Size = AttachmentsWindow.ReadableSize(row.SizeBytes),
-                    Status = FindPdfMonitor(row.Index)?.Status ?? row.Status
+                    Index = row.Index, Filename = row.Filename,
+                    Size = row.SizeBytes < 0 ? "Unknown (unreadable)" : AttachmentsWindow.ReadableSize(row.SizeBytes),
+                    CanOpen = row.CanOpen,
+                    Status = row.CanOpen ? FindPdfMonitor(row.Index)?.Status ?? row.Status : row.Status
                 }).Concat(_pdfSessions.Where(e => ReferenceEquals(e.Owner, owner) && e.InspectionPath == path && e.Monitor.IsPendingAdd)
                     .Select(e => new AttachmentsWindow.PdfRow { Index = e.PendingIndex,
                         Filename = e.Monitor.Filename, Size = "Pending add", Status = e.Monitor.Status }))
