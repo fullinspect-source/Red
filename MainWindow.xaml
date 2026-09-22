@@ -846,7 +846,7 @@
 
                             <!-- Photo workspace moved below Saved Comments and Generative AI. -->
                             <!-- Comment Section (moved to left column) -->
-                            <Border Grid.Row="0" BorderBrush="#27AE60" BorderThickness="1" Padding="6" Background="#F8FFF8">
+                            <Border x:Name="CommentEditorBorder" Grid.Row="0" BorderBrush="#27AE60" BorderThickness="1" Padding="6" Background="#F8FFF8">
                                 <StackPanel>
                                     <TextBlock Text="COMMENT (editable)" FontWeight="Bold" FontSize="12" Foreground="#1E8449" Margin="0,0,0,5"/>
                                     <!-- Grid wrapper for CommentsTextBox + Quick Suggestions overlay -->

@@ -4632,9 +4632,8 @@ namespace InspectionEditor
 
             if (_incFilterActive)
             {
-                bool valueIsMissing = string.IsNullOrEmpty(item.Value?.ToString()?.Trim() ?? "");
                 bool picturesAreMissing = item.Pictures.Count == 0;
-                if (!((item.Required && valueIsMissing) || (item.IsPictureRequired && picturesAreMissing)))
+                if (!(ItemRequirementService.IsPrimaryRequirementMissing(item) || (item.IsPictureRequired && picturesAreMissing)))
                     return false;
             }
 
@@ -5019,10 +5018,15 @@ namespace InspectionEditor
             grid.Children.Add(chevron);
 
             string headerValue = item.Value?.ToString() ?? "";
-            bool hasHeaderValue = !string.IsNullOrWhiteSpace(headerValue);
+            bool hasHeaderValue = ItemRequirementService.RequiresComment(item)
+                ? !string.IsNullOrWhiteSpace(item.Comments)
+                : !string.IsNullOrWhiteSpace(headerValue);
+            Brush headerValueBrush = ItemRequirementService.RequiresComment(item)
+                ? new SolidColorBrush(Color.FromRgb(34, 197, 94))
+                : GetStatusBrush(item);
             var numberBadge = CreateInlineBadge(
                 item.Number ?? "",
-                hasHeaderValue ? GetStatusBrush(item) : InlineEmptyNumberBadgeBrush,
+                hasHeaderValue ? headerValueBrush : InlineEmptyNumberBadgeBrush,
                 hasHeaderValue ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85)),
                 FontWeights.Bold);
             numberBadge.Name = "InlineNumberBadge";
@@ -5140,9 +5144,9 @@ namespace InspectionEditor
                 Margin = new Thickness(2, 0, 2, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 Background = new SolidColorBrush(Color.FromRgb(220, 38, 38)),
-                Visibility = item.Required && string.IsNullOrWhiteSpace(value)
+                Visibility = ItemRequirementService.IsPrimaryRequirementMissing(item)
                     ? Visibility.Visible : Visibility.Hidden,
-                ToolTip = "Value required",
+                ToolTip = ItemRequirementService.RequiresComment(item) ? "Comment required" : "Value required",
                 Child = new TextBlock
                 {
                     Text = "REQ",
@@ -5309,6 +5313,29 @@ namespace InspectionEditor
 
         private UIElement CreateInlineStatusHeaderControl(Item item)
         {
+            if (ItemRequirementService.RequiresComment(item))
+            {
+                bool missing = ItemRequirementService.IsPrimaryRequirementMissing(item);
+                return new Border
+                {
+                    Name = "InlineCommentRequirement",
+                    Margin = new Thickness(0, 6, 5, 6),
+                    Padding = new Thickness(10, 6, 10, 6),
+                    Background = new SolidColorBrush(missing ? Color.FromRgb(254, 226, 226) : Color.FromRgb(220, 252, 231)),
+                    BorderBrush = new SolidColorBrush(missing ? Color.FromRgb(220, 38, 38) : Color.FromRgb(34, 197, 94)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    ToolTip = "Inspect2022 stores this answer in Comments, not Value.",
+                    Child = new TextBlock
+                    {
+                        Text = missing ? "COMMENT REQUIRED" : "COMMENT ✓",
+                        Foreground = new SolidColorBrush(missing ? Color.FromRgb(153, 27, 27) : Color.FromRgb(22, 101, 52)),
+                        FontSize = Math.Max(11, _checklistFontSize - 1),
+                        FontWeight = FontWeights.Bold
+                    }
+                };
+            }
+
             string controlName = item.ControlName?.ToLower() ?? "";
             string[]? options = GetInlineStatusOptions(item, controlName);
             var panel = new StackPanel
@@ -9921,14 +9948,12 @@ namespace InspectionEditor
                         if (_incFilterActive)
                         {
                             // Show items that are incomplete:
-                            // 1. Required value but no value entered, OR
+                            // 1. Required answer missing (Memo uses Comments; other controls use Value), OR
                             // 2. Required pictures but no pictures added
-                            bool hasRequiredValue = item.Required;
-                            bool valueIsMissing = string.IsNullOrEmpty(item.Value?.ToString()?.Trim() ?? "");
                             bool requiresPictures = item.IsPictureRequired;
                             bool picturesAreMissing = item.Pictures.Count == 0;
                             
-                            bool isIncomplete = (hasRequiredValue && valueIsMissing) || 
+                            bool isIncomplete = ItemRequirementService.IsPrimaryRequirementMissing(item) ||
                                                (requiresPictures && picturesAreMissing);
                             
                             if (!isIncomplete) continue;
@@ -9973,10 +9998,11 @@ namespace InspectionEditor
                         bool hasEnteredValue = !string.IsNullOrWhiteSpace(item.Value?.ToString());
                         if (isRequired)
                         {
-                            // Text turns black when the VALUE portion is satisfied.
-                            // For picture-only items (no value requirement), text turns black when picture is taken.
+                            // Text turns black when the persisted answer is satisfied.
+                            // Required Memo controls persist in Comments; other controls use Value.
+                            // For picture-only items (no value/comment requirement), text turns black when picture is taken.
                             bool textFulfilled = item.Required
-                                ? hasEnteredValue
+                                ? ItemRequirementService.IsPrimaryRequirementSatisfied(item)
                                 : item.Pictures.Count > 0; // picture-only required
                             var starColor = textFulfilled ? Color.FromRgb(30, 30, 30) : Color.FromRgb(180, 0, 0);
                             var nameColor = textFulfilled ? Color.FromRgb(20, 20, 20) : Color.FromRgb(139, 0, 0);
@@ -11105,7 +11131,21 @@ namespace InspectionEditor
             }
 
             // Determine what type of control to show
-            if (controlName == "yesno")
+            if (ItemRequirementService.RequiresComment(item))
+            {
+                StatusLabel.Text = "COMMENT REQUIRED";
+                StatusPanel.Children.Add(new TextBlock
+                {
+                    Text = "Enter this answer in the green Comment box. Inspect2022 does not use Value for Memo items.",
+                    Foreground = new SolidColorBrush(Color.FromRgb(22, 101, 52)),
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 6, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+                ClearValueButton.Visibility = Visibility.Collapsed;
+            }
+            else if (controlName == "yesno")
             {
                 StatusLabel.Text = "STATUS";
                 var options = new[] { "Yes", "No", "N/A" };
@@ -11232,8 +11272,8 @@ namespace InspectionEditor
 
         private void UpdateRequiredFieldHighlighting(Item item)
         {
-            // Check if VALUE is required and missing
-            bool valueRequired = item.Required;
+            // Memo controls persist their required answer in Comments, not Value.
+            bool valueRequired = ItemRequirementService.RequiresValue(item);
             bool valueMissing = string.IsNullOrWhiteSpace(item.Value?.ToString());
             
             if (valueRequired && valueMissing)
@@ -11244,6 +11284,12 @@ namespace InspectionEditor
             {
                 StatusBorder.Background = new SolidColorBrush(Color.FromRgb(240, 248, 255)); // Light blue when filled/not required
             }
+
+            bool commentMissing = ItemRequirementService.RequiresComment(item) &&
+                string.IsNullOrWhiteSpace(item.Comments);
+            CommentEditorBorder.Background = new SolidColorBrush(commentMissing
+                ? Color.FromRgb(255, 214, 221)
+                : Color.FromRgb(248, 255, 248));
             
             // Check if PICTURE is required and missing
             bool pictureRequired = item.IsPictureRequired;
@@ -13943,6 +13989,9 @@ namespace InspectionEditor
                 try { CommentsTextBox.Text = text; }
                 finally { _isLoadingEditor = loading; }
             }
+            if (ReferenceEquals(item, _editorLoadedItem))
+                UpdateRequiredFieldHighlighting(item);
+            UpdateInlinePrimaryRequirementVisuals(item);
         }
 
         private void CaptureValueEdit(Item item, string text)
@@ -13964,12 +14013,8 @@ namespace InspectionEditor
                 }
                 finally { _isLoadingEditor = wasLoading; }
             }
-            // Hide/show the reserved requirement marker without rebuilding the active editor.
-            if (_inlineItemRows.TryGetValue(item, out var requiredRow))
-                foreach (var marker in FindVisualChildren<Border>(requiredRow.Row))
-                    if (marker.Name == "InlineValueRequirement")
-                        marker.Visibility = item.Required && string.IsNullOrWhiteSpace(text)
-                            ? Visibility.Visible : Visibility.Hidden;
+            // Update reserved requirement visuals without rebuilding the active editor.
+            UpdateInlinePrimaryRequirementVisuals(item);
             if (_currentEcInfo != null && EnergyComplianceService.NormalizeCode(_currentInspection?.InspectionCode) == "HET" &&
                 item.Number?.StartsWith("1.", StringComparison.Ordinal) == true)
             {
@@ -14011,6 +14056,53 @@ namespace InspectionEditor
                             combo.Text = text;
             }
             finally { _isLoadingEditor = loading; }
+        }
+
+        private void UpdateInlinePrimaryRequirementVisuals(Item item)
+        {
+            if (!_inlineItemRows.TryGetValue(item, out var entry)) return;
+
+            bool missing = ItemRequirementService.IsPrimaryRequirementMissing(item);
+            bool requiresComment = ItemRequirementService.RequiresComment(item);
+            bool hasAnswer = requiresComment
+                ? !string.IsNullOrWhiteSpace(item.Comments)
+                : !string.IsNullOrWhiteSpace(item.Value?.ToString());
+
+            foreach (var border in FindVisualChildren<Border>(entry.Row))
+            {
+                if (border.Name == "InlineValueRequirement")
+                {
+                    border.Visibility = missing ? Visibility.Visible : Visibility.Hidden;
+                }
+                else if (border.Name == "InlineCommentRequirement")
+                {
+                    border.Background = new SolidColorBrush(missing
+                        ? Color.FromRgb(254, 226, 226)
+                        : Color.FromRgb(220, 252, 231));
+                    border.BorderBrush = new SolidColorBrush(missing
+                        ? Color.FromRgb(220, 38, 38)
+                        : Color.FromRgb(34, 197, 94));
+                    if (border.Child is TextBlock label)
+                    {
+                        label.Text = missing ? "COMMENT REQUIRED" : "COMMENT ✓";
+                        label.Foreground = new SolidColorBrush(missing
+                            ? Color.FromRgb(153, 27, 27)
+                            : Color.FromRgb(22, 101, 52));
+                    }
+                }
+                else if (border.Name == "InlineNumberBadge")
+                {
+                    border.Background = hasAnswer
+                        ? (requiresComment
+                            ? new SolidColorBrush(Color.FromRgb(34, 197, 94))
+                            : GetStatusBrush(item))
+                        : InlineEmptyNumberBadgeBrush;
+                    if (border.Child is TextBlock number)
+                        number.Foreground = hasAnswer
+                            ? Brushes.White
+                            : new SolidColorBrush(Color.FromRgb(51, 65, 85));
+                }
+            }
         }
 
         private void InlineValueBox_TextChanged(object sender, TextChangedEventArgs e)

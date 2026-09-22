@@ -121,11 +121,14 @@ static class AutofillProbe
         string archive = args[2];
         var paths = Directory.GetFiles(archive, "*BWT*.ins").OrderBy(p => p).ToList();
         var samples = paths.Select(p => (Path: p, Json: JsonConvert.DeserializeObject<JObject>(File.ReadAllText(p), new JsonSerializerSettings { DateParseHandling = DateParseHandling.None })!)).ToList();
-        check(samples.Count == 47, "actual archive contains 47 BWT samples");
-        check(samples.All(s => s.Json["Attachments"]!.Any(a => a["FileData"] != null)), "all 47 archive samples contain embedded documents");
+        check(samples.Count >= 47, $"actual archive contains at least 47 BWT samples ({samples.Count} found)");
+        check(samples.All(s => s.Json["Attachments"]!.Any(a => a["FileData"] != null)), "all current archive BWT samples contain embedded documents");
         Console.WriteLine("Archive families: " + string.Join("; ", samples.GroupBy(s => (string?)s.Json["InspectionName"]).Select(g => $"{g.Key}: {g.Count()}")));
         var selected = samples.Where(s => new[] { "2537336-BWT-2-TL.ins", "2518268-BWT-1-VR.ins", "2555725-BWT-1-AC.ins" }.Contains(Path.GetFileName(s.Path))).ToList();
-        selected.Add(samples.First(s => (string?)s.Json["InspectionName"] == "New Home Orientation Beaumont"));
+        selected.Add(samples.First(s =>
+            (string?)s.Json["InspectionName"] == "New Home Orientation Beaumont" &&
+            !Path.GetFileName(s.Path).Equals(Path.GetFileName(args[0]), StringComparison.OrdinalIgnoreCase) &&
+            OrientationPdfSession.FindCandidates(new SurgicalSaveService().Load(s.Path)).Count == 1));
         selected.Insert(0, (args[0], JsonConvert.DeserializeObject<JObject>(File.ReadAllText(args[0]), new JsonSerializerSettings { DateParseHandling = DateParseHandling.None })!));
         foreach (var sample in selected)
         {

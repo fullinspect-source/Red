@@ -36,14 +36,15 @@ class RequirementLaneTests(unittest.TestCase):
         self.assertIn('Grid.SetColumn(valueRequiredBadge, 8);', self.header)
         self.assertIn('new Thickness(2, 0, 2, 1)', method('private Border CreateInlineItemRow'))
 
-    def test_equal_squares_hidden_not_collapsed_with_original_predicates(self):
+    def test_equal_squares_hidden_not_collapsed_with_semantic_predicates(self):
         badges = self.header[self.header.index('var photoRequiredButton'):]
         self.assertEqual(badges.count('Width = 34'), 2)
         self.assertEqual(badges.count('Height = 34'), 2)
         self.assertEqual(badges.count('? Visibility.Visible : Visibility.Hidden'), 2)
         self.assertNotIn('Visibility.Collapsed', badges)
         self.assertIn('Visibility = item.IsPictureRequired && item.Pictures.Count == 0', badges)
-        self.assertIn('Visibility = item.Required && string.IsNullOrWhiteSpace(value)', badges)
+        self.assertIn('Visibility = ItemRequirementService.IsPrimaryRequirementMissing(item)', badges)
+        self.assertIn('ItemRequirementService.RequiresComment(item) ? "Comment required" : "Value required"', badges)
         self.assertIn('Content = "PIC"', badges)
         self.assertIn('Text = "REQ"', badges)
         self.assertIn('Color.FromRgb(126, 34, 206)', badges)
@@ -63,8 +64,10 @@ class RequirementLaneTests(unittest.TestCase):
 
     def test_value_marker_updates_without_rebuilding_typing_row(self):
         capture = method('private void CaptureValueEdit')
-        self.assertIn('marker.Name == "InlineValueRequirement"', capture)
-        self.assertIn('? Visibility.Visible : Visibility.Hidden', capture)
+        self.assertIn('UpdateInlinePrimaryRequirementVisuals(item);', capture)
+        helper = method('private void UpdateInlinePrimaryRequirementVisuals')
+        self.assertIn('border.Name == "InlineValueRequirement"', helper)
+        self.assertIn('? Visibility.Visible : Visibility.Hidden', helper)
         self.assertNotIn('RefreshInlineItemRow(item)', capture)
 
     def test_filter_visuals_derive_from_real_state(self):
