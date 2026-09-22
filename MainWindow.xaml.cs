@@ -4592,7 +4592,7 @@ namespace InspectionEditor
                        item.Value?.ToString()?.ToLower().Contains(filterLower) == true;
             }
 
-            if (item.HidePicturesButton && item.HideCommentsButton)
+            if (!ChecklistItemVisibility.ShouldShow(item))
                 return false;
 
             if (!string.IsNullOrWhiteSpace(filter))
@@ -9878,7 +9878,7 @@ namespace InspectionEditor
                         continue;
                     }
 
-                    if (!item.HidePicturesButton || !item.HideCommentsButton)
+                    if (ChecklistItemVisibility.ShouldShow(item))
                     {
                         // Apply text filter if present
                         if (hasFilter)
@@ -10974,7 +10974,7 @@ namespace InspectionEditor
                 {
                     // Locked items (proper names) are visible in the tree but excluded from prev/next nav
                     if (!isSCI && IsProperNameItem(item)) continue;
-                    if (!item.HidePicturesButton || !item.HideCommentsButton)
+                    if (ChecklistItemVisibility.ShouldShow(item))
                         items.Add(item);
                 }
             }

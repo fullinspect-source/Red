@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Models/InspectionModels.cs" Link="InspectionModels.cs" />
+    <Compile Include="../../Services/ChecklistItemVisibility.cs" Link="ChecklistItemVisibility.cs" />
+    <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" />
+    <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs" />
+    <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs" />
+    <Compile Include="../../Services/LastEditTime.cs" Link="LastEditTime.cs" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>
