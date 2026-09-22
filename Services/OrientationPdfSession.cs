@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace InspectionEditor.Services
 {
@@ -29,13 +30,15 @@ namespace InspectionEditor.Services
         private const int MaxPdfBytes = 100 * 1024 * 1024;
 
         private OrientationPdfSession(InspectionFile owner, string inspectionPath, int index,
-            byte[] bytes, string workingRoot, bool embedded)
+            byte[] bytes, string workingRoot, byte[]? originalEmbedded = null)
         {
             _owner = owner;
             _index = index;
             _modelSnapshot = index < (owner.Attachments?.Count ?? 0)
                 ? (JObject)Attachment(owner, index).DeepClone() : null;
-            _captured = embedded ? bytes : null;
+            // The baseline is the SOURCE attachment, not the potentially blank-filled working copy.
+            // Otherwise explicit Save would mistake autofill alone for an unchanged attachment.
+            _captured = originalEmbedded;
             string identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
                 Path.GetFullPath(inspectionPath).ToUpperInvariant())));
             // Fixed basename also protects Windows shell execution from extensions/arguments in INS metadata.
@@ -97,6 +100,27 @@ namespace InspectionEditor.Services
             return result;
         }
 
+        /// <summary>Prefer exactly one exact-template candidate; never guess among official duplicates.</summary>
+        public static int? PreferredCandidateIndex(InspectionFile inspection, IReadOnlyList<Candidate> candidates)
+        {
+            if (candidates.Count == 1) return candidates[0].Index;
+            string? template = TemplateName(inspection);
+            if (string.IsNullOrWhiteSpace(template) || template != Basename(template) ||
+                !template.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) return null;
+            string stem = Path.GetFileNameWithoutExtension(template);
+            // Only the exact stem, optionally followed by INSPECT's normal (address - yyyyMMdd).
+            // Prefixes, other regions, arbitrary parenthetical labels and malformed dates are not official.
+            string pattern = @"\A" + Regex.Escape(stem) + @"(?: \([^\r\n]+ - (?<date>[0-9]{8})\))?\.pdf\z";
+            var official = candidates.Where(c =>
+            {
+                var match = Regex.Match(c.Filename, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                return match.Success && (!match.Groups["date"].Success ||
+                    DateTime.TryParseExact(match.Groups["date"].Value, "yyyyMMdd",
+                        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _));
+            }).ToList();
+            return official.Count == 1 ? official[0].Index : null;
+        }
+
         private static JObject Attachment(InspectionFile owner, int index)
         {
             if (index < 0 || index >= (owner.Attachments?.Count ?? 0) || owner.Attachments![index] is not JObject attachment)
@@ -133,7 +157,8 @@ namespace InspectionEditor.Services
             try { bytes = Convert.FromBase64String(encoded); }
             catch (FormatException ex) { throw new IOException("The embedded Orientation PDF is damaged. The original is preserved; restore the correct attachment before trying again.", ex); }
             Validate(bytes);
-            return new OrientationPdfSession(owner, inspectionPath, index, bytes, workingRoot, true);
+            byte[] filled = OrientationPdfForm.Fill(bytes, owner, blankOnly: true);
+            return new OrientationPdfSession(owner, inspectionPath, index, filled, workingRoot, bytes);
         }
 
         public static OrientationPdfSession OpenTemplate(InspectionFile owner, string inspectionPath, string workingRoot)
@@ -144,7 +169,7 @@ namespace InspectionEditor.Services
             string source = FindTemplate(owner, inspectionPath) ?? throw new IOException(
                 $"No Orientation PDF is embedded and the exact INS template is missing or unsafe: {TemplateName(owner) ?? "not specified"}. Restore that PDF in Inspections/Documents.");
             byte[] filled = OrientationPdfForm.Fill(ReadPdf(source), owner);
-            return new OrientationPdfSession(owner, inspectionPath, owner.Attachments?.Count ?? 0, filled, workingRoot, false);
+            return new OrientationPdfSession(owner, inspectionPath, owner.Attachments?.Count ?? 0, filled, workingRoot);
         }
 
         /// <summary>Only explicit PDF save stages bytes. Failed saves roll back PDF staging,

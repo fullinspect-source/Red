@@ -29,7 +29,7 @@ static class AutofillProbe
             .GroupBy(f => f.Elements.GetString("/T")).ToDictionary(g => g.Key, g => g.First().Elements.GetString("/V"));
     }
     // Independent expected mapping from the four observed archive families, not production's map.
-    static Dictionary<string, string> Expected(JObject ins)
+    internal static Dictionary<string, string> Expected(JObject ins)
     {
         string Clean(string? text) => string.IsNullOrWhiteSpace(text) || text.Trim().Equals("None", StringComparison.OrdinalIgnoreCase) ? "" : text.Trim();
         var items = ins["Sections"]!.SelectMany(s => s["Items"]!).ToList();
@@ -100,7 +100,7 @@ static class AutofillProbe
         model = saver.Load(path);
         session = OrientationPdfSession.OpenEmbedded(model, path, 0, root);
         model.Sections[0].Items[1].Value = "later buyer";
-        check(Values(File.ReadAllBytes(session.WorkingPath))["Customer Name_HOI"] == "Current buyer", "embedded prior edits not autofilled");
+        check(Values(File.ReadAllBytes(session.WorkingPath))["Customer Name_HOI"] == "Current buyer", "embedded nonblank prior edits not overwritten");
         model.Sections[0].Items[1].Comments = "ordinary unsaved edit";
         using (var open = new FileStream(session.WorkingPath, FileMode.Open, FileAccess.Read, FileShare.None))
             check(session.TryFinish(OrientationPdfDecision.Discard, () => throw new Exception()), "leave No continues with external file open");
@@ -144,7 +144,12 @@ static class AutofillProbe
                 foreach (var pair in expected.Where(p => archiveValues.ContainsKey(p.Key)))
                     check(archiveValues[pair.Key].Trim() == pair.Value, Path.GetFileName(sample.Path) + " archive mapping " + pair.Key);
                 var extracted = OrientationPdfSession.OpenEmbedded(real, sample.Path, match.Index, root);
-                check(File.ReadAllBytes(extracted.WorkingPath).SequenceEqual(embedded), "archived embedded bytes never re-autofilled");
+                var workingValues = Values(File.ReadAllBytes(extracted.WorkingPath));
+                check(archiveValues.All(p => workingValues[p.Key] ==
+                    (string.IsNullOrWhiteSpace(p.Value) && expected.TryGetValue(p.Key, out var value) && value != "" ? value : p.Value)),
+                    "archived working copy fills only mapped blanks and preserves prior values");
+                check(Convert.FromBase64String(((JObject)real.Attachments![match.Index])["FileData"]!.Value<string>()!).SequenceEqual(embedded),
+                    "archived source attachment bytes exact until explicit save");
                 extracted.Discard();
                 string copyPath = Path.Combine(folder, "MyList", Path.GetFileName(sample.Path));
                 var copyJson = (JObject)sample.Json.DeepClone();
@@ -182,7 +187,7 @@ static class AutofillProbe
                 foreach (var candidate in OrientationPdfSession.FindCandidates(real))
                 {
                     var existing = OrientationPdfSession.OpenEmbedded(real, sample.Path, candidate.Index, root);
-                    check(File.ReadAllBytes(existing.WorkingPath).SequenceEqual(Convert.FromBase64String(((JObject)real.Attachments![candidate.Index])["FileData"]!.Value<string>()!)), "current MyList embedded attachment unchanged");
+                    check(beforeModel == JsonConvert.SerializeObject(real) && real.OrientationEdit == null, "current MyList source attachment unchanged while owned working copy may fill blanks");
                     existing.Discard();
                 }
                 // The live MyList can acquire attachments while Trent tests. Simulate the blank

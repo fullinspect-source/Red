@@ -107,6 +107,7 @@ try
     invalid.Attachments.Add(((JObject)invalid.Attachments[0]).DeepClone());
     Check(OrientationPdfSession.FindCandidates(invalid).Count == 2, "ambiguous orientation attachments exposed rather than first-wins");
 
+    EmbeddedCorrectionProbe.Run(root, args, Check);
     AutofillProbe.Run(root, args, Check, Fails);
     OrientationControlFlow.OrientationUiProbe.Run(root, Check);
     Console.WriteLine($"{passed} orientation PDF checks passed");

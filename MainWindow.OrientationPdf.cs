@@ -32,8 +32,8 @@ namespace InspectionEditor
             index = null;
             if (_currentInspection == null) return false;
             var candidates = OrientationPdfSession.FindCandidates(_currentInspection);
-            if (candidates.Count == 1) index = candidates[0].Index;
-            if (candidates.Count > 1)
+            index = OrientationPdfSession.PreferredCandidateIndex(_currentInspection, candidates);
+            if (candidates.Count > 1 && !index.HasValue)
             {
                 var list = new ComboBox { ItemsSource = candidates, DisplayMemberPath = "Filename", Margin = new Thickness(8), MinWidth = 300 };
                 var open = new Button { Content = "Use selected PDF", Margin = new Thickness(8), Padding = new Thickness(12, 8, 12, 8), IsDefault = true };

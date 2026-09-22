@@ -64,7 +64,13 @@ class OrientationPdfWiringTests(unittest.TestCase):
         self.assertNotIn('WaitForExit', UI)
         self.assertIn('WorkingPath', UI)
     def test_selection_not_first_wins(self):
-        self.assertIn('candidates.Count > 1', UI)
+        self.assertIn('index = OrientationPdfSession.PreferredCandidateIndex(_currentInspection, candidates);', UI)
+        self.assertIn('candidates.Count > 1 && !index.HasValue', UI)
         self.assertIn('ComboBox', UI)
         self.assertIn('SelectedItem', UI)
+    def test_embedded_blank_only_and_source_baseline(self):
+        session = (ROOT / 'Services/OrientationPdfSession.cs').read_text()
+        self.assertIn('OrientationPdfForm.Fill(bytes, owner, blankOnly: true)', session)
+        self.assertIn('_captured = originalEmbedded;', session)
+        self.assertIn('index, filled, workingRoot, bytes)', session)
 if __name__ == '__main__': unittest.main()

@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace InspectionEditor.Services
 {
-    /// <summary>Prefills only known text fields in a fresh, exact builder template. Never flattens a form.</summary>
+    /// <summary>Fills known text fields; embedded forms permit only missing/blank values. Never flattens.</summary>
     public static class OrientationPdfForm
     {
         private static string? Clean(object? value)
@@ -54,7 +54,19 @@ namespace InspectionEditor.Services
             return values;
         }
 
-        public static byte[] Fill(byte[] template, InspectionFile inspection)
+        private static bool IsBlank(PdfItem? value)
+        {
+            if (value is PdfReference reference) value = reference.Value;
+            return value switch
+            {
+                null or PdfNull => true,
+                PdfString text => string.IsNullOrWhiteSpace(text.Value),
+                PdfStringObject text => string.IsNullOrWhiteSpace(text.Value),
+                _ => false // Unrecognized value types are prior data, not permission to replace them.
+            };
+        }
+
+        public static byte[] Fill(byte[] template, InspectionFile inspection, bool blankOnly = false)
         {
             try
             {
@@ -67,7 +79,8 @@ namespace InspectionEditor.Services
                 var values = Mappings(inspection);
                 bool changed = false;
                 var visited = new HashSet<PdfDictionary>();
-                void Visit(PdfArray? fields, string parentName, string parentType, string? inheritedValue, int depth)
+                void Visit(PdfArray? fields, string parentName, string parentType,
+                    PdfItem? inheritedValue, bool parentFilled, int depth)
                 {
                     if (fields == null) return;
                     if (depth > 64) throw new IOException("The Orientation template field hierarchy is invalid.");
@@ -79,21 +92,30 @@ namespace InspectionEditor.Services
                         string name = localName.Length == 0 ? parentName : parentName.Length == 0 ? localName : parentName + "." + localName;
                         string type = field.Elements.GetName("/FT");
                         if (type.Length == 0) type = parentType;
-                        string? value = localName.Length == 0 ? inheritedValue : null;
-                        if (type == "/Tx" && values.TryGetValue(name, out var mapped)) value = mapped;
-                        if (type == "/Tx" && value != null)
+                        PdfItem? current = field.Elements.ContainsKey("/V") ? field.Elements["/V"] : inheritedValue;
+                        bool filled = false;
+                        if (localName.Length > 0 && type == "/Tx" && values.TryGetValue(name, out var mapped) &&
+                            (!blankOnly || IsBlank(current)))
                         {
-                            // /V lives on the field; unnamed widget children inherit it.
-                            if (localName.Length > 0) field.Elements.SetString("/V", value);
+                            field.Elements.SetString("/V", mapped);
+                            current = field.Elements["/V"];
+                            filled = true;
+                        }
+                        // Unnamed widget children inherit their field's value; clear their appearance
+                        // only when that field was filled and the widget has no conflicting prior value.
+                        bool filledWidget = localName.Length == 0 && parentFilled && type == "/Tx" &&
+                            (!field.Elements.ContainsKey("/V") || IsBlank(field.Elements["/V"]));
+                        if (filled || filledWidget)
+                        {
                             // Remove only stale text appearances for fields we fill. Standard PDF
                             // editors regenerate them using the template's original font/format.
                             field.Elements.Remove("/AP");
                             changed = true;
                         }
-                        Visit(field.Elements.GetArray("/Kids"), name, type, value, depth + 1);
+                        Visit(field.Elements.GetArray("/Kids"), name, type, current, filled || filledWidget, depth + 1);
                     }
                 }
-                Visit(form?.Elements.GetArray("/Fields"), "", "", null, 0);
+                Visit(form?.Elements.GetArray("/Fields"), "", "", null, false, 0);
                 if (!changed) return template;
                 form!.Elements.SetBoolean("/NeedAppearances", true);
                 using var output = new MemoryStream();
