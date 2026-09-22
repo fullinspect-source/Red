@@ -482,6 +482,7 @@ namespace InspectionEditor
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
             SyncCurrentItemFromUI();
+            if (!FinishOrientationEditing()) { e.Cancel = true; return; }
             // Before close, offer the same trade-summary generation that the Save button provides.
             if (_hasUnsavedChanges && _currentInspection != null && ShouldPromptForTradeSummaryOnClose())
             {
@@ -982,6 +983,7 @@ namespace InspectionEditor
         internal bool TryPrepareForAppUpdate()
         {
             SyncCurrentItemFromUI();
+            if (!FinishOrientationEditing()) return false;
             return !_hasUnsavedChanges || TrySaveCurrentInspection();
         }
 
@@ -1259,6 +1261,8 @@ namespace InspectionEditor
                         foreach (var editor in editorWindows)
                         {
                             editor.SyncCurrentItemFromUI();
+                            if (!editor.FinishOrientationEditing())
+                                throw new InvalidOperationException("Update postponed until the Orientation PDF is saved and its editor is closed.");
                             if (editor._hasUnsavedChanges && !editor.TrySaveCurrentInspection())
                                 throw new InvalidOperationException("Update postponed because inspection changes could not be saved.");
                         }
@@ -2431,6 +2435,8 @@ namespace InspectionEditor
         {
             // Prevent double-loading
             if (_isLoadingFile) return;
+            if (!FinishOrientationEditing()) return;
+            if (_hasUnsavedChanges && _currentInspection != null && !TrySaveCurrentInspection()) return;
             _isLoadingFile = true;
             ShowOpeningInspectionState(filePath);
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
@@ -2583,6 +2589,7 @@ namespace InspectionEditor
             
             UpdateSeeDocsButton(filePath);
             UpdatePlanCheckButton();
+            UpdateOrientationPdfControls();
             SaveTemplateButton.IsEnabled = true;
             ApplyTemplateButton.IsEnabled =
                 _templateService.HasTemplatesForForm(_currentInspection.FormId) ||
@@ -13830,6 +13837,7 @@ namespace InspectionEditor
         private void DoSave()
         {
             if (_currentInspection == null || !_saveService.HasFile) return;
+            if (!FinishOrientationEditing()) return;
             
             try
             {
@@ -13846,6 +13854,7 @@ namespace InspectionEditor
                 
                 // Reset state — return to welcome/splash screen
                 _currentInspection = null;
+                UpdateOrientationPdfControls();
                 _currentItem = null;
                 _editorLoadedItem = null;
                 _currentFilePath = null;
@@ -13889,6 +13898,7 @@ namespace InspectionEditor
             if (_readOnlyMode) throw new InvalidOperationException("This report is read-only.");
 
             SyncCurrentItemFromUI();
+            if (_orientationPdf != null && _orientationPdf.Capture(_currentInspection)) MarkUnsaved();
 
             // Sweep items with PassFail controls: any with [trade] prefix comment should be Fail
             // BUT respect explicit NI values - don't override inspector's choice
@@ -14023,7 +14033,7 @@ namespace InspectionEditor
 
         private void PersistEditorChanges()
         {
-            if (_isLoadingEditor || _isLoadingFile || _readOnlyMode || !_hasUnsavedChanges || _currentInspection == null)
+            if (_isLoadingEditor || _isLoadingFile || _readOnlyMode || _finishingOrientationPdf || _orientationPdfUiBusy || !_hasUnsavedChanges || _currentInspection == null)
                 return;
             TrySaveCurrentInspection();
         }

@@ -45,7 +45,8 @@ namespace InspectionEditor.Services
             var originalJson = JObject.Load(jsonReader);
 
             // Deserialize to model for UI
-            var inspection = JsonConvert.DeserializeObject<InspectionFile>(jsonText);
+            var inspection = JsonConvert.DeserializeObject<InspectionFile>(jsonText,
+                new JsonSerializerSettings { DateParseHandling = DateParseHandling.None });
             if (inspection == null)
             {
                 throw new Exception("Failed to parse inspection file");
@@ -117,6 +118,7 @@ namespace InspectionEditor.Services
                 EnsureItemResultIds();
                 PatchInspection(inspection);
                 PatchAddedAttachments(inspection);
+                PatchOrientationAttachment(inspection);
                 PatchPlanCheckMetadata(inspection);
                 string json = _originalJson.ToString(Formatting.None);
                 bool sameTarget = string.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(_filePath!),
@@ -147,6 +149,8 @@ namespace InspectionEditor.Services
                 else LastEditTime.RecordSuccessfulSave(targetPath, savedBytes, _saveRegistryRoot);
                 _lastSavedBytes = savedBytes;
                 _filePath = targetPath;
+                if (inspection.OrientationEdit != null)
+                    inspection.OrientationEdit.Expected = (JObject)inspection.OrientationEdit.Replacement.DeepClone();
             }
             catch
             {
@@ -181,6 +185,28 @@ namespace InspectionEditor.Services
                     ? token.DeepClone()
                     : JToken.FromObject(attachment));
             }
+        }
+
+        private void PatchOrientationAttachment(InspectionFile inspection)
+        {
+            var edit = inspection.OrientationEdit;
+            if (edit == null) return;
+            var attachments = _originalJson!["Attachments"] as JArray;
+            if (attachments == null)
+            {
+                if (_originalJson["Attachments"] != null && _originalJson["Attachments"]!.Type != JTokenType.Null)
+                    throw new IOException("Unsupported attachment collection; original data was not replaced.");
+                attachments = new JArray();
+                _originalJson["Attachments"] = attachments;
+            }
+            if (edit.Index == attachments.Count && edit.Expected == null)
+                attachments.Add(edit.Replacement.DeepClone());
+            else if (edit.Index >= 0 && edit.Index < attachments.Count &&
+                (JToken.DeepEquals(attachments[edit.Index], edit.Expected) ||
+                 JToken.DeepEquals(attachments[edit.Index], edit.Replacement)))
+                attachments[edit.Index] = edit.Replacement.DeepClone();
+            else
+                throw new IOException("Orientation attachment changed unexpectedly; save stopped to preserve other documents.");
         }
 
         private void PatchPlanCheckMetadata(InspectionFile inspection)

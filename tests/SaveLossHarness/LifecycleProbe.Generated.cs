@@ -17,7 +17,8 @@ public class LifecycleProbe {
  bool _hasUnsavedChanges, _savingEditorChanges, _skipResultCheck;
  InspectionFile? _currentInspection = new();
  Activity _activityService = new(); Camera _cameraService = new();
- bool pending, fail, summary, unlocked; int writes;
+ bool pending, fail, summary, unlocked, orientationActive, orientationReady = true; int writes;
+ bool FinishOrientationEditing() { if (!orientationActive) return true; if (!orientationReady) return false; _hasUnsavedChanges = true; return TrySaveCurrentInspection(); }
  void SyncCurrentItemFromUI() { if (pending) { _hasUnsavedChanges = true; pending = false; } }
  bool ShouldPromptForTradeSummaryOnClose() => summary;
  void GenerateSummaryInternal() { }
@@ -41,11 +42,16 @@ public class LifecycleProbe {
   e = new(); p.MainWindow_Closing(null,e);
   Check(e.Cancel && p._hasUnsavedChanges && !p.unlocked && p.writes == 0, "summary cancellation retains captured edits");
   MessageBox.Result = MessageBoxResult.No;
-  Console.WriteLine("4 extracted lifecycle checks passed");
+  p = new LifecycleProbe { orientationActive = true, orientationReady = false }; e = new(); p.MainWindow_Closing(null,e);
+  Check(e.Cancel && !p.unlocked && p.writes == 0, "active PDF editor blocks close even when report is clean");
+  p = new LifecycleProbe { orientationActive = true, fail = true }; e = new(); p.MainWindow_Closing(null,e);
+  Check(e.Cancel && p._hasUnsavedChanges && !p.unlocked, "PDF save failure blocks close and retains dirty state");
+  Console.WriteLine("6 extracted lifecycle checks passed");
  }
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
             SyncCurrentItemFromUI();
+            if (!FinishOrientationEditing()) { e.Cancel = true; return; }
             // Before close, offer the same trade-summary generation that the Save button provides.
             if (_hasUnsavedChanges && _currentInspection != null && ShouldPromptForTradeSummaryOnClose())
             {

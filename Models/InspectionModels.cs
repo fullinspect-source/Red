@@ -57,9 +57,20 @@ namespace InspectionEditor.Models
         [JsonProperty("Attachments")]
         public List<object>? Attachments { get; set; }
 
+        // Explicit session-owned payload patch, never serialized as INS metadata.
+        [JsonIgnore]
+        public OrientationAttachmentEdit? OrientationEdit { get; set; }
+
         // Keep all other properties as dynamic to preserve them
         [JsonExtensionData]
         public Dictionary<string, object>? ExtensionData { get; set; }
+    }
+
+    public sealed class OrientationAttachmentEdit
+    {
+        public int Index { get; set; }
+        public Newtonsoft.Json.Linq.JObject? Expected { get; set; }
+        public Newtonsoft.Json.Linq.JObject Replacement { get; set; } = new();
     }
 
     public class Section
