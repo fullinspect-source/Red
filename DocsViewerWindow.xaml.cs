@@ -50,7 +50,7 @@ namespace InspectionEditor
             {"BC", "Builder Confirmation"},
             {"BF", "BMEP Final"},
             {"BWT", "New Home Orientation"},
-            {"COH", "BMEP Rough"},
+            {"COH", "Flashing Sheathing Framing (COH)"},
             {"CPP", "Concrete Pre Pour"},
             {"CPR", "Concrete Pour"},
             {"FS", "Structural Frame"},
