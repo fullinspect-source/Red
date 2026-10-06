@@ -41,7 +41,15 @@ class Probe {
   Console.WriteLine($"PASS {checks} actual OCR distribution checks");
  }
 '''
-        code+='\n'.join(method(n) for n in ['ApplyTranscriptionSuggestion','TranscriptionUnit','ParseTranscriptionPairs','TranscriptionKeyMatchesItem'])+'\n}'
+        code+='\n'.join(method(n) for n in ['ApplyTranscriptionSuggestion','IsCompositeWindowRatingItem','CompositeWindowRating','WindowRatingKind','OfferWindowRatingShare','TranscriptionUnit','ParseTranscriptionPairs','TranscriptionKeyMatchesItem'])+'\n}'
+        code+='''
+namespace System.Windows {
+ enum MessageBoxButton {YesNo} enum MessageBoxImage {Question} enum MessageBoxResult {Yes,No,Cancel}
+ static class MessageBox {
+  public static MessageBoxResult Show(string text,string title,MessageBoxButton buttons,MessageBoxImage icon,MessageBoxResult defaultResult)=>MessageBoxResult.No;
+ }
+}
+'''
         with tempfile.TemporaryDirectory() as t:
             d=Path(t);(d/'Program.cs').write_text(code)
             (d/'Probe.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><RollForward>Major</RollForward><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>')

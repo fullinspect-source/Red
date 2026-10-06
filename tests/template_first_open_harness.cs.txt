@@ -1,0 +1,78 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using InspectionEditor.Models;
+using InspectionEditor.Services;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using InspectionEditor;
+
+class Probe {
+ InspectionFile? _currentInspection; string? _currentInspectionCode;
+ TemplateService _templateService = new(); UserDataService? _userDataService = new();
+ int Dirty,Refresh;
+ void MarkUnsaved(){Dirty++;} void RefreshAfterTemplateChange(){Refresh++;} void AutoApplyCurrentItem(){}
+ static int Checks;
+ static void Check(bool ok,string name){Checks++;if(!ok)throw new Exception("FAIL: "+name);Console.WriteLine("PASS: "+name);}
+ static Item I(string n,string control="PassFail",object? value=null,int id=2)=>new(){Name=n,Number="2.1",ItemId=id,ControlName=control,Value=value};
+ static InspectionFile Blank()=>new(){FormId=265,InspectionCode="IER",InspectionNumber="100-IER-1-TF",Sections=new(){new(){Number="1",Name="Administrative",Items=new(){I("Superintendent","SearchLookup","Kevin",1)}},new(){Number="2",Name="Windows",Items=new(){I("Window rating","Text",null,2),I("Window compliance","PassFail",null,3)}}}};
+ void Load(InspectionFile i,bool first=true){_currentInspection=i;_currentInspectionCode=i.InspectionCode;OfferSavedTemplateForBlankReport(first);}
+ static void Store(params InspectionTemplate[] templates){Directory.CreateDirectory(AppIdentity.LocalAppDataPath);File.WriteAllText(Path.Combine(AppIdentity.LocalAppDataPath,"templates.json"),JsonConvert.SerializeObject(new TemplateStore{Templates=templates.ToList()}));}
+ static InspectionTemplate Template(int form=265,string name="Windows")=>new(){FormId=form,Name=name,ItemValues=new(){{3,"Pass"}}};
+ static Probe Fresh(params InspectionTemplate[] templates){Store(templates);File.Delete(Path.Combine(AppIdentity.LocalAppDataPath,"template_IER.json"));MessageBox.Reset();Window.Reset();return new();}
+ public static void Main(){
+ try {
+  var p=Fresh(Template());var i=Blank();i.Sections[0].Items.Add(I("Architectural plans on site","YesNo","Yes",4));i.Sections[0].Items.Add(I("IECC code","Lookup","2015",5));
+  var before=JsonConvert.SerializeObject(i);p.Load(i);Check(MessageBox.Calls==1,"administrative auto-populated YesNo/Lookup defaults do not suppress blank checklist offer");Check(JsonConvert.SerializeObject(i)==before&&p.Dirty==0,"No changes no values comments photos or dirty state");
+  p.Load(i);Check(MessageBox.Calls==2,"declined blank report offered again on reopen");
+  MessageBox.Answer=MessageBoxResult.Cancel;p.Load(i);Check(MessageBox.Calls==3&&JsonConvert.SerializeObject(i)==before,"closed offer preserves answers and remains eligible");
+  MessageBox.Answer=MessageBoxResult.Yes;p.Load(i);Check((string?)i.Sections[1].Items[1].Value=="Pass"&&p.Dirty==1,"explicit Yes applies production template");
+  var calls=MessageBox.Calls;p.Load(i);Check(MessageBox.Calls==calls,"manually applied after-state is filled not proof of original load contents");
+  p=Fresh(Template());i=Blank();p.Load(i);p.Load(i);Check(MessageBox.Calls==2,"truly blank repeated loads prompt every time with matching form");
+  var other=Blank();other.InspectionNumber="101-IER-1-TF";p.Load(other);Check(MessageBox.Calls==3,"separate report same form offered");
+  p=Fresh(Template());p.Load(Blank(),false);Check(MessageBox.Calls==0,"reinspection never auto offered");
+  p=Fresh();p.Load(Blank());Check(MessageBox.Calls==0,"no saved template no prompt not a blank detector failure");
+  p=Fresh(Template(999));p.Load(Blank());Check(MessageBox.Calls==0,"different FormId not auto reused");
+  p=Fresh(Template(999));p._userDataService!.Available=true;p.Load(Blank());Check(MessageBox.Calls==1,"legacy code fallback offered when FormId missing");Check(p.Dirty==0,"legacy No does not apply");MessageBox.Answer=MessageBoxResult.Yes;p.Load(Blank());Check(p.Dirty==1,"legacy applies only Yes");
+  p=Fresh(Template());p._userDataService!.Available=true;p.Load(Blank());Check(MessageBox.Calls==1&&MessageBox.Text.Contains("Windows"),"matching FormId preferred over legacy");
+  foreach(var control in new[]{"Text","Numberpad","PassFail","Lookup","YesNo"}){p=Fresh(Template());i=Blank();i.Sections[1].Items[0].ControlName=control;i.Sections[1].Items[0].Value=control=="PassFail"?"Fail":"0.29";before=JsonConvert.SerializeObject(i);p.Load(i);Check(MessageBox.Calls==0&&JsonConvert.SerializeObject(i)==before,"nonadmin "+control+" finding/measurement blocks auto offer");}
+  p=Fresh(Template());i=Blank();i.Sections[0].Items.Add(I("Measured area","Numberpad","1500",7));p.Load(i);Check(MessageBox.Calls==0,"admin measurement is not harmless header");
+  p=Fresh(Template());i=Blank();i.Sections[0].Items.Add(I("Plan discrepancy","PassFail","Fail",7));p.Load(i);Check(MessageBox.Calls==0,"admin failed finding blocks offer");
+  foreach(var admin in new[]{true,false}){p=Fresh(Template());i=Blank();i.Sections[admin?0:1].Items[0].Comments="finding";p.Load(i);Check(MessageBox.Calls==0,"comments preserved including admin/contact "+admin);p=Fresh(Template());i=Blank();i.Sections[admin?0:1].Items[0].Pictures.Add(new(){Data="photo"});p.Load(i);Check(MessageBox.Calls==0,"photos preserved including admin/contact "+admin);}
+  p=Fresh(Template());i=Blank();i.InspectionCode="SCI";p.Load(i);Check(MessageBox.Calls==0,"SCI section1 real content no header exemption");
+  p=Fresh(Template());i=Blank();i.Sections[0].Name="Foundation";i.Sections[0].Items=new(){I("Concrete thickness","Lookup","4",8)};p.Load(i);Check(MessageBox.Calls==0,"section number1 alone is not administrative");
+  p=Fresh(Template());i=Blank();i.Sections[0].Items[0].Value="   ";i.Sections[1].Items[0].Value=" \t";p.Load(i);Check(MessageBox.Calls==1,"whitespace blank is eligible");
+  p=Fresh(Template());i=Blank();i.Sections[1].Items[0].Value="0.40";p._currentInspection=i;p._currentInspectionCode="IER";before=JsonConvert.SerializeObject(i);p.ApplyTemplateButton_Click(p,new());Check(MessageBox.Calls==1&&JsonConvert.SerializeObject(i)==before,"manual Apply remains offered on filled report No preserves all fields");
+  p=Fresh(Template(),Template(265,"Other"));i=Blank();before=JsonConvert.SerializeObject(i);p.Load(i);Check(Window.Calls==1&&JsonConvert.SerializeObject(i)==before,"multiple template cancel does not mutate");p.Load(i);Check(Window.Calls==2,"multiple template cancel can offer again");Window.Answer=true;Window.Index=1;p.Load(i);Check(p.Dirty==1,"multiple template explicit selection applies");
+  p=Fresh(Template(),Template(265,"Other"));Window.Answer=true;Window.Index=0;i=Blank();before=JsonConvert.SerializeObject(i);p.Load(i);Check(p.Dirty==0&&JsonConvert.SerializeObject(i)==before,"do not apply selection does not mutate");
+  p=Fresh(Template());i=Blank();p._currentInspection=i;p._currentInspectionCode="IER";MessageBox.Answer=MessageBoxResult.Yes;p.ApplyTemplateButton_Click(p,new());Check((string?)i.Sections[1].Items[1].Value=="Pass","explicit manual button applies template");calls=MessageBox.Calls;p.Load(i);Check(MessageBox.Calls==calls,"manual application after-state cannot diagnose earlier load gate");
+  p=Fresh(Template());i=Blank();i.Sections[0].Items.Add(I("Plans on site","YesNo","Yes",4));
+  var file=Path.Combine(AppIdentity.LocalAppDataPath,"100-IER-1-TF.ins");File.WriteAllText(file,JsonConvert.SerializeObject(i));var bytes=File.ReadAllBytes(file);var loader=new LoadProbe();
+  p.Load(loader.Load(file));p.Load(loader.Load(file));Check(MessageBox.Calls==2,"actual SurgicalSaveService.Load repeated disk reads reach offer despite admin defaults");Check(File.ReadAllBytes(file).SequenceEqual(bytes),"actual load and declined offer do not write INS");
+  Check(MessageBox.Default==MessageBoxResult.No&&MessageBox.Text.Contains("may be replaced"),"form prompt safe No default and overwrite disclosure");
+  p=Fresh(Template(999));p._userDataService!.Available=true;p.Load(Blank());Check(MessageBox.Default==MessageBoxResult.No&&MessageBox.Text.Contains("may be replaced"),"legacy prompt safe No default and overwrite disclosure");
+  Console.WriteLine($"{Checks} production C# template checks passed");
+ } finally {Directory.Delete(AppIdentity.LocalAppDataPath,true);}
+ }
+ /*PRODUCTION_METHODS*/
+}
+class LoadProbe {private JObject? _originalJson;private string? _filePath;private byte[]? _lastSavedBytes;/*PRODUCTION_LOAD_METHODS*/}
+namespace InspectionEditor {static class AppIdentity {public static string AppDataFolderName {get;}=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".hermes/cache/scratch","red-template-test-"+Guid.NewGuid().ToString("N"));public static string LocalAppDataPath=>AppDataFolderName;}}
+namespace InspectionEditor.Services {class UserDataService {private string _userDataPath=AppIdentity.LocalAppDataPath;public bool Available {set {string f=Path.Combine(_userDataPath,"template_IER.json");if(value)File.WriteAllText(f,"{\"2.1\":\"Pass\"}");else File.Delete(f);}} /*PRODUCTION_LEGACY_METHODS*/}}
+namespace System.Windows {
+ enum MessageBoxButton {YesNo,OK} enum MessageBoxImage {Question,Information} enum MessageBoxResult {Yes,No,Cancel}
+ static class MessageBox {public static int Calls;public static string Text="";public static MessageBoxResult Answer=MessageBoxResult.No,Default;public static void Reset(){Calls=0;Text="";Answer=MessageBoxResult.No;}public static MessageBoxResult Show(string text,string title,MessageBoxButton buttons,MessageBoxImage image,MessageBoxResult defaultResult=MessageBoxResult.Yes){Calls++;Text=text;Default=defaultResult;return Answer;}}
+ class RoutedEventArgs:EventArgs{} enum WindowStartupLocation {CenterOwner} enum ResizeMode {NoResize} enum TextWrapping {Wrap} enum HorizontalAlignment {Right}
+ class Thickness {public Thickness(int a){}public Thickness(int a,int b,int c,int d){}}
+ class Window {public string? Title;public int Width,Height;public object? Owner,Content;public WindowStartupLocation WindowStartupLocation;public ResizeMode ResizeMode;public bool? DialogResult;public static int Calls,Index;public static bool? Answer;public static void Reset(){Calls=0;Index=0;Answer=null;}public bool? ShowDialog(){Calls++;Controls.ComboBox.Last!.SelectedIndex=Index;return Answer;}public void Close(){}}
+}
+namespace System.Windows.Controls {
+ enum Orientation {Horizontal}
+ class StackPanel {public Thickness? Margin;public List<object> Children=new();public Orientation Orientation;public HorizontalAlignment HorizontalAlignment;}
+ class TextBlock {public string? Text;public TextWrapping TextWrapping;public Thickness? Margin;}
+ class ComboBox {public static ComboBox? Last;public ComboBox(){Last=this;}public Thickness? Margin;public List<string> Items=new();public int SelectedIndex;}
+ class Button {public object? Content;public int Width;public Thickness? Margin;public bool IsDefault,IsCancel;public event EventHandler? Click;}
+}

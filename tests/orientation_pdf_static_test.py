@@ -135,8 +135,8 @@ class OrientationPdfWiringTests(unittest.TestCase):
         self.assertEqual(choices['RED PDF program (coming later)'].attrib['IsEnabled'], 'False')
     def test_version_and_markup(self):
         project = ET.parse(ROOT / 'InspectionEditor.csproj')
-        self.assertEqual(project.findtext('./PropertyGroup/Version'), '2.1.41')
-        self.assertEqual(project.findtext('./PropertyGroup/ReleaseDate'), '2026-09-30')
+        self.assertEqual(project.findtext('./PropertyGroup/Version'), '2.1.42')
+        self.assertEqual(project.findtext('./PropertyGroup/ReleaseDate'), '2026-10-06')
         for filename in ['AttachmentsWindow.xaml', 'MainWindow.xaml', 'InspectionPickerWindow.xaml']:
             ET.parse(ROOT / filename)
 

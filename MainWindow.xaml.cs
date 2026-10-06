@@ -2632,30 +2632,9 @@ namespace InspectionEditor
             _ = Dispatcher.BeginInvoke(new Action(LoadMegaStats),
                 System.Windows.Threading.DispatcherPriority.Background);
 
-            // Check the loaded checklist content instead of file size. Blank INS files
-            // can be large, and photos make size an unreliable signal.
-            bool reportAlreadyFilled = InspectionHasTemplateRelevantData();
-
-            if (isFirstTrip && !reportAlreadyFilled)
-            {
-                var formTemplates = _templateService.GetTemplatesForForm(_currentInspection.FormId);
-                if (formTemplates.Count > 0)
-                {
-                    PromptApplyTemplate(formTemplates);
-                }
-                // Fallback: Check for legacy InspectionCode-based template
-                else if (_userDataService != null && _userDataService.HasTemplate(_currentInspectionCode ?? ""))
-                {
-                    var result = MessageBox.Show(
-                        $"A saved template exists for {_currentInspectionCode} inspections.\n\nApply default values?",
-                        "Apply Template?",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question);
-
-                    if (result == MessageBoxResult.Yes)
-                        ApplyInspectionTemplate();
-                }
-            }
+            // Offer on every eligible blank load, including after a declined offer.
+            // Administrative defaults are not evidence that the checklist was filled.
+            OfferSavedTemplateForBlankReport(isFirstTrip);
 
             // Reset filter state and visuals together on new file load.
             _reqFilterActive = false;
@@ -2785,6 +2764,43 @@ namespace InspectionEditor
 
         #region FormId-Based Templates
 
+        // Content-based, not once-only: a declined/closed offer leaves a blank
+        // report eligible on its next load. No report identity or settings marker.
+        private void OfferSavedTemplateForBlankReport(bool isFirstTrip)
+        {
+            if (_currentInspection == null || !isFirstTrip || InspectionHasTemplateRelevantData())
+                return;
+
+            var templates = _templateService.GetTemplatesForForm(_currentInspection.FormId);
+            if (templates.Count > 0)
+            {
+                PromptApplyTemplate(templates);
+            }
+            else if (_userDataService?.HasTemplate(_currentInspectionCode ?? "") == true)
+            {
+                var result = MessageBox.Show(
+                    $"A saved template exists for {_currentInspectionCode} inspections.\n\n" +
+                    "Apply default values? Existing eligible values may be replaced.",
+                    "Apply Template?", MessageBoxButton.YesNo, MessageBoxImage.Question,
+                    MessageBoxResult.No);
+                if (result == MessageBoxResult.Yes)
+                    ApplyInspectionTemplate();
+            }
+        }
+
+        // Only explicit Administrative sections qualify. Section 1 in other forms
+        // (especially SCI) can contain real findings and must not be ignored.
+        private static bool IsAdministrativeTemplateDefault(Section section, Item item)
+        {
+            if (section.Name?.Trim().Equals("Administrative", StringComparison.OrdinalIgnoreCase) != true)
+                return false;
+
+            // Plans-on-site/code/contact selectors can arrive prepopulated. Do not
+            // exempt measurements/free text or PassFail findings, even in Admin.
+            return (item.ControlName ?? "").Trim().ToLowerInvariant() is
+                "yesno" or "yesnonani" or "lookup" or "lookupnani" or "searchlookup";
+        }
+
         private bool InspectionHasTemplateRelevantData()
         {
             if (_currentInspection?.Sections == null)
@@ -2796,14 +2812,16 @@ namespace InspectionEditor
             {
                 foreach (var item in section.Items)
                 {
-                    if (!isSCI && IsProperNameItem(item))
-                        continue;
-
+                    // A finding or photo is meaningful wherever it is recorded,
+                    // including Administrative/contact rows.
                     if (!string.IsNullOrWhiteSpace(item.Comments))
                         return true;
 
                     if (item.Pictures.Count > 0)
                         return true;
+
+                    if (!isSCI && (IsProperNameItem(item) || IsAdministrativeTemplateDefault(section, item)))
+                        continue;
 
                     var value = item.Value?.ToString()?.Trim();
                     if (!string.IsNullOrWhiteSpace(value))
@@ -2833,10 +2851,12 @@ namespace InspectionEditor
                 // Single template - simple yes/no
                 var template = templates[0];
                 var result = MessageBox.Show(
-                    $"A saved template exists for this form type:\n\n\"{template.Name}\"\n\nApply default values?",
+                    $"A saved template exists for this form type:\n\n\"{template.Name}\"\n\n" +
+                    "Apply default values? Existing eligible values may be replaced.",
                     "Apply Template?",
                     MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
+                    MessageBoxImage.Question,
+                    MessageBoxResult.No);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -2866,7 +2886,7 @@ namespace InspectionEditor
                 var stack = new StackPanel { Margin = new Thickness(15) };
                 stack.Children.Add(new TextBlock 
                 { 
-                    Text = $"Multiple templates exist for this form type.\nSelect one to apply:", 
+                    Text = "Multiple templates exist for this form type.\nSelect one to apply. Existing eligible values may be replaced.",
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 0, 0, 10) 
                 });
@@ -12985,6 +13005,19 @@ namespace InspectionEditor
 
             var pairs = ParseTranscriptionPairs(bestTranscription);
             string anchorValue = transcription;
+            // A combined window field is one composite value, not the first matching scalar.
+            // A sticker on one window is not evidence that the other window type is identical.
+            if (IsCompositeWindowRatingItem(anchor))
+            {
+                string? completeRating = CompositeWindowRating(pairs, anchor);
+                anchorValue = completeRating ?? transcription;
+                anchor.Value = anchorValue;
+                MarkUnsaved();
+                if (completeRating != null)
+                    OfferWindowRatingShare(anchor, completeRating);
+                return anchorValue;
+            }
+
             var matchingAnchorPair = pairs.FirstOrDefault(pair =>
                 !string.IsNullOrWhiteSpace(pair.val) && TranscriptionKeyMatchesItem(pair.key, anchor));
             if (!string.IsNullOrWhiteSpace(matchingAnchorPair.val))
@@ -13041,6 +13074,69 @@ namespace InspectionEditor
             }
 
             return anchorValue;
+        }
+
+        private static bool IsCompositeWindowRatingItem(Item item)
+        {
+            string name = $"{item.Name} {item.DisplayLabel}";
+            return Regex.IsMatch(name, @"\bwindows?\b", RegexOptions.IgnoreCase) &&
+                Regex.IsMatch(name, @"\bSHGC\b", RegexOptions.IgnoreCase) &&
+                Regex.IsMatch(name, @"\bU[- ]?(?:Factor|Value)\b", RegexOptions.IgnoreCase);
+        }
+
+        private static string? CompositeWindowRating(List<(string key, string val)> pairs, Item anchor)
+        {
+            // Require exactly one explicitly labeled value of each kind. Preserve incomplete
+            // or conflicting selected OCR verbatim rather than inventing a missing rating.
+            var u = pairs.Where(p => Regex.IsMatch(p.key.Trim(), @"^U[- ]?(?:Factor|Value)$", RegexOptions.IgnoreCase)
+                && !string.IsNullOrWhiteSpace(p.val)).ToList();
+            var shgc = pairs.Where(p => string.Equals(p.key.Trim(), "SHGC", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(p.val)).ToList();
+            return u.Count == 1 && shgc.Count == 1 && TranscriptionUnit(anchor) > 0
+                ? $"U-Factor: {u[0].val} / SHGC: {shgc[0].val}" : null;
+        }
+
+        private static string WindowRatingKind(Item item)
+        {
+            string name = $"{item.Name} {item.DisplayLabel}";
+            bool operable = Regex.IsMatch(name, @"\boperable\b", RegexOptions.IgnoreCase);
+            bool fixedWindow = Regex.IsMatch(name, @"\bfixed\b", RegexOptions.IgnoreCase);
+            return operable == fixedWindow ? "" : operable ? "operable" : "fixed";
+        }
+
+        private void OfferWindowRatingShare(Item anchor, string rating)
+        {
+            var inspection = _currentInspection;
+            var section = inspection?.Sections?.FirstOrDefault(s => s.Items.Contains(anchor));
+            string kind = WindowRatingKind(anchor);
+            int unit = TranscriptionUnit(anchor);
+            if (section == null || kind.Length == 0 || unit < 1) return;
+            string partnerKind = kind == "operable" ? "fixed" : "operable";
+            var partners = section.Items.Where(item => item != anchor && IsCompositeWindowRatingItem(item)
+                && WindowRatingKind(item) == partnerKind && TranscriptionUnit(item) == unit).ToList();
+            if (partners.Count != 1) return; // Never guess which repeated field the inspector intended.
+            var partner = partners[0];
+            string oldValue = partner.Value?.ToString() ?? "";
+            if (string.Equals(oldValue, rating, StringComparison.Ordinal)) return;
+            string label = (string.IsNullOrWhiteSpace(partner.DisplayLabel) ? partner.Name : partner.DisplayLabel) ?? "window ratings";
+            string shownOld = string.IsNullOrWhiteSpace(oldValue) ? "(blank)" : oldValue;
+            var choice = MessageBox.Show(
+                $"The selected {kind}-window field now contains:\n{rating}\n\n" +
+                $"This sticker does not prove the {partnerKind} windows have the same ratings. " +
+                "Choose Yes only if you have confirmed both window types use these ratings.\n\n" +
+                $"Other field: {label}\nCurrent value: {shownOld}\nProposed value: {rating}\n\n" +
+                "Yes: replace the other field with the proposed value.\nNo: keep the other field unchanged.",
+                "Confirm window ratings for both types", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            // A modal dialog can pump events. Recheck the exact owner and previewed value.
+            if (choice != MessageBoxResult.Yes || _readOnlyMode || _currentInspection != inspection ||
+                !EditorEditService.Owns(inspection, anchor) || !EditorEditService.Owns(inspection, partner) ||
+                !section.Items.Contains(anchor) || !section.Items.Contains(partner) ||
+                !IsCompositeWindowRatingItem(partner) || WindowRatingKind(partner) != partnerKind ||
+                TranscriptionUnit(anchor) != unit || TranscriptionUnit(partner) != unit ||
+                !string.Equals(partner.Value?.ToString() ?? "", oldValue, StringComparison.Ordinal) ||
+                !string.Equals(anchor.Value?.ToString(), rating, StringComparison.Ordinal)) return;
+            partner.Value = rating;
+            MarkUnsaved();
         }
 
         private static int TranscriptionUnit(Item item)
