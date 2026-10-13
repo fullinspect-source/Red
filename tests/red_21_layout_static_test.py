@@ -117,8 +117,10 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("return panel;", CODE)
         self.assertNotIn("MinWidth = 180, MaxWidth = 520", CODE)
 
-    def test_selected_item_comment_preview_hides_and_both_surfaces_share_neon_highlight(self):
-        self.assertIn("!ReferenceEquals(item, _editorLoadedItem)", CODE)
+    def test_selected_item_comment_snippet_remains_and_both_surfaces_share_neon_highlight(self):
+        header = CODE[CODE.index("private Grid CreateInlineItemHeader"):CODE.index("private Grid CreateInlineItemHeader") + 10000]
+        self.assertIn("ChecklistCommentSnippet.Create(item, _checklistFontSize)", header)
+        self.assertNotIn("!ReferenceEquals(item, _editorLoadedItem)", header)
         self.assertIn("SelectedItemHighlightColor", CODE)
         self.assertIn("EditorScrollViewer.Background = new SolidColorBrush(SelectedItemHighlightColor);", CODE)
         handler_start = CODE.index("private void InlineItemRow_PreviewMouseLeftButtonDown")

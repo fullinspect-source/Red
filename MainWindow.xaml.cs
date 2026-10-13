@@ -4995,11 +4995,13 @@ namespace InspectionEditor
         {
             var grid = new Grid
             {
-                MinHeight = 48,
                 Background = ReferenceEquals(item, _editorLoadedItem)
                     ? new SolidColorBrush(SelectedItemHighlightColor)
                     : isExpanded ? new SolidColorBrush(Color.FromRgb(235, 243, 248)) : Brushes.Transparent
             };
+            // Keep the original compact header in its own lane; comments never size actions.
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 48 });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -5088,24 +5090,11 @@ namespace InspectionEditor
                 Margin = new Thickness(8, 8, 12, 8)
             };
             Grid.SetColumn(prompt, 0);
+            Grid.SetColumnSpan(prompt, IsSpecialInlineDrawerRemembered(item, InlineNumberpadDrawer) ? 1 : 2);
             center.Children.Add(prompt);
 
             UIElement? middleContent = null;
-            if (!string.IsNullOrWhiteSpace(item.Comments) && !ReferenceEquals(item, _editorLoadedItem))
-            {
-                middleContent = new TextBlock
-                {
-                    Text = item.Comments.Trim(),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    TextWrapping = TextWrapping.NoWrap,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
-                    FontSize = Math.Max(11, _checklistFontSize - 1),
-                    Margin = new Thickness(4, 8, 12, 8),
-                    ToolTip = item.Comments.Trim()
-                };
-            }
-            else if (IsSpecialInlineDrawerRemembered(item, InlineNumberpadDrawer))
+            if (IsSpecialInlineDrawerRemembered(item, InlineNumberpadDrawer))
             {
                 middleContent = CreateCollapsedInlineNumberpadSlider(item);
             }
@@ -5118,6 +5107,10 @@ namespace InspectionEditor
 
             Grid.SetColumn(center, 4);
             grid.Children.Add(center);
+            var snippet = ChecklistCommentSnippet.Create(item, _checklistFontSize);
+            Grid.SetColumn(snippet, 4);
+            Grid.SetRow(snippet, 1);
+            grid.Children.Add(snippet);
 
             var chips = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 10, 6) };
             string value = item.Value?.ToString() ?? "";
@@ -10217,7 +10210,10 @@ namespace InspectionEditor
                         }
                         
                         // Add nameText LAST so it fills remaining space and wraps
-                        itemPanel.Children.Add(nameText);
+                        var titleAndComment = new StackPanel();
+                        titleAndComment.Children.Add(nameText);
+                        titleAndComment.Children.Add(ChecklistCommentSnippet.Create(item, _checklistFontSize));
+                        itemPanel.Children.Add(titleAndComment);
                         
                         var itemNode = new TreeViewItem
                         {
@@ -12232,7 +12228,7 @@ namespace InspectionEditor
                         numberText.Foreground = new SolidColorBrush(Color.FromRgb(0, 51, 102)); // Dark blue text
                         
                         // Also underline the name (last child in DockPanel)
-                        if (panel.Children[panel.Children.Count - 1] is TextBlock nameText)
+                        if (panel.Children[panel.Children.Count - 1] is StackPanel titleAndComment && titleAndComment.Children[0] is TextBlock nameText)
                             nameText.TextDecorations = TextDecorations.Underline;
                     }
                     else
@@ -12241,7 +12237,7 @@ namespace InspectionEditor
                         numberBorder.Background = null;
                         numberText.Foreground = new SolidColorBrush(Colors.Black);
                         
-                        if (panel.Children[panel.Children.Count - 1] is TextBlock nameText)
+                        if (panel.Children[panel.Children.Count - 1] is StackPanel titleAndComment && titleAndComment.Children[0] is TextBlock nameText)
                             nameText.TextDecorations = null;
                     }
                 }

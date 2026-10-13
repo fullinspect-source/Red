@@ -107,7 +107,7 @@ namespace InspectionEditor.Models
         public int SortOrder { get; set; }
     }
 
-    public class Item
+    public class Item : System.ComponentModel.INotifyPropertyChanged
     {
         [JsonProperty("ItemId")]
         public int ItemId { get; set; }
@@ -128,7 +128,18 @@ namespace InspectionEditor.Models
         public object? Value { get; set; }
 
         [JsonProperty("Comments")]
-        public string? Comments { get; set; }
+        public string? Comments
+        {
+            get => _comments;
+            set
+            {
+                if (string.Equals(_comments, value, StringComparison.Ordinal)) return;
+                _comments = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Comments)));
+            }
+        }
+        private string? _comments;
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
         [JsonProperty("ValueList")]
         public List<string>? ValueList { get; set; }
