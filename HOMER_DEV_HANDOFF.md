@@ -53,7 +53,11 @@ This file is the concise cross-session source of development context for work pe
   - F-004 corpus run on a sandbox copy: no-edit open/close wrote nothing 1704/1704, and 0 values outside their set
     across 76 FormIds.
   - In the Dropbox copy: an isolated dev-build UI click-through with a synthetic report covering every control.
-- **Deployment:** pending.
+- **Deployment:** published 2026-10-18 (04:39 UTC 2026-10-19) as GitHub release `v2.2.3` (commit `b6004fe`, assets
+  `Red-v2.2.3.zip` 89.2 MB with 502 entries, and `update_red.bat`), marked Latest.
+  - `releases/latest` returns v2.2.3, the zip size matches the local build, and the download answers HTTP 200.
+  - The packaged Red.exe (2.2.3+b6004fe) was started once on the build PC: "RED v2.2.3 - My List".
+  - Installed copies update on their next start, at most one check per 24 hours.
 
 ### 2026-10-18 — RED 2.2.2 — F-003 rest: Archive retention row, one profile guard, O8 folder helper
 
