@@ -61,9 +61,21 @@ This file is the concise cross-session source of development context for work pe
     and PdfCleanup need the real INSPECT config or real files.
   - Python: 35/45 (PYTHONUTF8=1); the other 10 are the known environment failures.
   - The official autofill reuse probe: 66 checks.
+  - Corpus round trip on a temporary copy outside Dropbox (owner-approved; deleted afterwards), 1731 files: forced save
+    byte-identical 1731/1731, no-edit save wrote nothing 1731/1731, V3 18/18, V4 2/2, V5 1731/1731, fees 1731/1731,
+    0 load errors.
   - Hands-on pass in the Dropbox copy: every feature driven in an isolated dev build on synthetic reports, with all
     HTTP(S) to a dead loopback proxy (Buyer Walk and ORDERS against a loopback mock).
-- **Deployment:** pending.
+- **Deployment:** published 2026-10-19 (15:48 UTC) as GitHub release `v2.3.0` (commit `71fa8e7`, assets
+  `Red-v2.3.0.zip` 89.4 MB with 502 entries, and `update_red.bat`), marked Latest.
+  - `releases/latest` returns v2.3.0, the zip size matches the local build, the download answers HTTP 200, and the
+    downloaded zip's SHA-256 equals the local build's.
+  - The packaged Red.exe (2.3.0+71fa8e7) starts: "RED v2.3.0 - My List", all HTTP(S) to a dead loopback proxy.
+    - Note: setting LOCALAPPDATA does not redirect .NET 8's known-folder lookup, so these starts used this PC's real RED
+      profile and Inspections folder.
+    - They wrote RED launch/exit lines to today's INSPECT-format log and its `{IF}\Logs` copy.
+    - They ran the F-020 one-time bootstrap. Nothing was deleted or saved.
+  - Installed copies update on their next start, at most one check per 24 hours.
 
 - **Base:** 2.2.2 (`34162d2`). F-004 was built in the Dropbox copy (`Dropbox\P\PL`) and merged here file by file.
   - MainWindow.xaml.cs, Services/SurgicalSaveService.cs and tests/InsRoundTripHarness/Program.cs were three-way
