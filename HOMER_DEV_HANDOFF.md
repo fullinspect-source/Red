@@ -19,11 +19,13 @@ This file is the concise cross-session source of development context for work pe
   - Start-up lock (owner decisions 2026-10-18): required = two-word full name, Strand username with @, saved Strand password, default state, non-blank user type, existing Inspections folder (INSPECT's IsFormConfigValid). While any is missing RED opens on Settings with "Please insert missing profile information before anything else." and disables My List and ORDERS; a file argument opens the home window instead of the editor. The user type has no picker in RED. Add to My List uses the profile (folder, user type, initials) and refuses an incomplete one before any server call. My List follows the profile's Inspections folder (O7). The user kind is logged once per launch (O10).
 - **Verification:**
   - Debug build: 0 errors.
-  - 34 of 45 Python tests pass. The other 11 fail identically on untouched 2.1.43 for environmental reasons: no pymupdf, Mac-only fixture paths, temporary harness builds.
+  - 35 of 45 Python tests pass (run with PYTHONUTF8=1). The other 10 fail identically on untouched 2.1.43 for environmental reasons: no pymupdf, Mac-only fixture paths, temporary harness builds.
   - `tests/FeeTokenHarness`: ALL PASS.
-  - `tests/InspectUserTypeHarness`: ALL PASS (69 checks: user type, blank UserType, Preinspector with no RequestFiles PUT, INSPECT config reading, full import, required items, changes list, profile store).
-  - Multiple multi-agent review and verify rounds; all confirmed findings fixed.
-- **Deployment:** pending. The owner live-tests the release candidate first; this entry will be updated after the GitHub release.
+  - `tests/InspectUserTypeHarness`: ALL PASS (73 checks: user type, blank UserType, Preinspector with no RequestFiles PUT, INSPECT config reading, full import, required items, changes list, profile store, single "[Unassigned]").
+  - Multiple multi-agent review and verify rounds; all confirmed findings fixed. The packaged Red.exe was started once on the build PC: "RED v2.2.0 - My List", profile complete.
+- **Assigned To:** a single "[Unassigned]" row. The server's own row is kept, with its username, as INSPECT's GetInspectorList does; RED adds one only when the server sends none (owner report, 2026-10-18).
+- **Known gap:** survey requests (ServiceTypeId 7) should list crew chiefs (`Inspect/User/CrewChiefs`) as in INSPECT; RED lists inspectors.
+- **Deployment:** published 2026-10-18 as GitHub release `v2.2.0` (commit `15fcbd2`, assets `Red-v2.2.0.zip` and `update_red.bat`), marked latest. Installed copies update on their next start, at most one check per 24 hours.
 
 ### 2026-09-01 — RED 2.1.23 — enforce one selected checklist row
 
