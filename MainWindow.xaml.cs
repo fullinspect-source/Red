@@ -204,6 +204,11 @@ namespace InspectionEditor
         public MainWindow()
         {
             InitializeComponent();
+            CprRules.Install(_saveService); // F-008: the cylinder switch runs before every save
+            InstallCompletionCheckButton(); // F-012
+            InstallSubmitButton();          // F-013
+            InstallPrintButton();           // F-022
+            InstallHistoryButton();         // F-026
             Title = GetDefaultWindowTitle();
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
@@ -544,6 +549,7 @@ namespace InspectionEditor
 
             if (!FinishOrientationEditing()) { e.Cancel = true; return; }
             // Log activity: inspection closed
+            LogInspectClose();
             _activityService.LogClose();
             SavePreferences();
 
@@ -661,7 +667,8 @@ namespace InspectionEditor
                 }
             }
 
-            var picker = new ResultPickerWindow(code, answered, failed, config, expirationStageDone)
+            // F-007 E5: offer only the statuses in the file's own StatusList.
+            var picker = new ResultPickerWindow(code, answered, failed, config, expirationStageDone, CurrentStatusListIds())
             {
                 Owner = this
             };
@@ -1940,6 +1947,7 @@ namespace InspectionEditor
         {
             _hasUnsavedChanges = false;
             Title = Title.TrimEnd('*', ' ');
+            AfterSaveCompletionCheck(); // F-012 W1: validate silently after every save; BWT lock (§4b)
         }
 
         private void WriteOpenInspectionLockMetadata(string filePath, string inspectionType)
@@ -2200,8 +2208,9 @@ namespace InspectionEditor
         private void AddPhotoToCurrentItem(byte[] photoData)
         {
             // Use _editorLoadedItem (not _currentItem) to avoid touch-drift issues
-            if (_editorLoadedItem == null) return;
-            
+            if (_editorLoadedItem == null || _readOnlyMode) return; // F-012 L1 / F-014 R1
+            if (RefuseOrdinaryPictureForInk(_editorLoadedItem)) return; // F-006 C1: one picture, from the drawing window
+
             // Validate image data before processing — reject corrupt/truncated photos
             if (photoData == null || photoData.Length < 1024)
             {
@@ -2213,7 +2222,7 @@ namespace InspectionEditor
             // Log activity: first photo taken
             _activityService.LogPhotoTaken();
             
-            // Auto-enhance: 25% lift + 50% sharpness
+            // F-023 T1: orient, halve to INSPECT's size, brighten x1.25, 72 dpi, JPEG 85 (no sharpening).
             byte[] enhancedData = ApplyAutoEnhancement(photoData);
             
             string base64Image = Convert.ToBase64String(enhancedData);
@@ -2248,7 +2257,7 @@ namespace InspectionEditor
         {
             try
             {
-                return PhotoProcessingService.Process(photoData, ResizePhotoWithWpf);
+                return PhotoProcessingService.Process(photoData, WpfPhotoFallback.Process); // F-023 T1
             }
             catch (Exception ex)
             {
@@ -2256,68 +2265,6 @@ namespace InspectionEditor
                     "Photo could not be processed. The data may be corrupt or an image component unavailable. " +
                     "If the photo is in your Camera Roll, try adding it manually with the 📎 button.", ex);
             }
-        }
-
-        // Independent of ImageSharp: still decode/validate, constrain size, and store real JPEG.
-        // Enhancement is optional; invalid image data is never returned as a successful photo.
-        private static byte[] ResizePhotoWithWpf(byte[] photoData)
-        {
-            using var input = new MemoryStream(photoData, writable: false);
-            var decoder = BitmapDecoder.Create(input, BitmapCreateOptions.PreservePixelFormat,
-                BitmapCacheOption.OnLoad);
-            var frame = decoder.Frames[0];
-            BitmapSource bitmap = frame;
-            ushort orientation = 1;
-            if (frame.Metadata is BitmapMetadata metadata)
-            {
-                // JPEG and TIFF metadata expose orientation under different query paths.
-                foreach (string query in new[] { "/app1/ifd/{ushort=274}", "/ifd/{ushort=274}" })
-                {
-                    try
-                    {
-                        if (metadata.GetQuery(query) is ushort value)
-                        {
-                            orientation = value;
-                            break;
-                        }
-                    }
-                    catch (NotSupportedException) { }
-                }
-            }
-
-            var transform = new TransformGroup();
-            switch (orientation)
-            {
-                case 2: transform.Children.Add(new ScaleTransform(-1, 1)); break;
-                case 3: transform.Children.Add(new RotateTransform(180)); break;
-                case 4: transform.Children.Add(new ScaleTransform(1, -1)); break;
-                case 5:
-                    transform.Children.Add(new ScaleTransform(-1, 1));
-                    transform.Children.Add(new RotateTransform(270));
-                    break;
-                case 6: transform.Children.Add(new RotateTransform(90)); break;
-                case 7:
-                    transform.Children.Add(new ScaleTransform(-1, 1));
-                    transform.Children.Add(new RotateTransform(90));
-                    break;
-                case 8: transform.Children.Add(new RotateTransform(270)); break;
-            }
-            if (transform.Children.Count > 0)
-                bitmap = new TransformedBitmap(bitmap, transform);
-
-            double scale = Math.Min(1.0, Math.Min(
-                (double)PhotoProcessingService.MaxPhotoWidth / bitmap.PixelWidth,
-                (double)PhotoProcessingService.MaxPhotoHeight / bitmap.PixelHeight));
-            if (scale < 1.0)
-                bitmap = new TransformedBitmap(bitmap, new ScaleTransform(scale, scale));
-
-            // Do not copy source metadata: pixels are already oriented, so copying the old
-            // orientation tag would rotate them again in downstream viewers.
-            var encoder = new JpegBitmapEncoder { QualityLevel = 85 };
-            encoder.Frames.Add(BitmapFrame.Create(bitmap, null, null, null));
-            using var output = new MemoryStream();
-            encoder.Save(output);
-            return output.ToArray();
         }
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)
@@ -2461,7 +2408,7 @@ namespace InspectionEditor
             }
 
             // Reset read-only mode for new file
-            _readOnlyMode = false;
+            _readOnlyMode = IsReadOnlyFolder(filePath); // F-014 R1: Outbox and Archive copies are read-only
             TripNumberBadge.Visibility = Visibility.Collapsed;
             
             // --- Multi-instance locking ---
@@ -2571,6 +2518,9 @@ namespace InspectionEditor
             // --- End multi-instance locking ---
             
             _currentInspection = await Task.Run(() => _saveService.Load(filePath));
+            // F-009 W1/W2: FormId 129 second walk drops "Scheduling" and swaps the Sign control, in memory; written at
+            // the next save (never by opening alone).
+            BuyerWalkRules.ApplyFormId129Swap(_currentInspection, _saveService);
             _inlineUnlockedNumberpadSliderItems.Clear();
             _inlineDrawerClosingItems.Clear();
             _transcriptionOptionsByItem.Clear();
@@ -2652,6 +2602,9 @@ namespace InspectionEditor
             
             // Log activity: inspection loaded
             _activityService.StartSession(filePath, _currentInspectorName ?? "unknown", _currentInspectionCode ?? "unknown");
+            // F-019 L7 "Opening inspection" with its detail block, then the L5 log copy that INSPECT runs at each open.
+            InspectFormatLog.Opening(_saveService.GetHeaderValue, _currentInspection!);
+            App.CopyLogsOnEditorOpen();
 
             // Check for FormId-based templates (only on first trip, not reinspections)
             // Filename format: {jobID}-{inspType}-{tripCount}-{initials}.ins
@@ -2693,6 +2646,8 @@ namespace InspectionEditor
             EditorScrollViewer.Background = Brushes.Transparent;
 
             PopulateTreeView();
+            AfterOpenCompletionCheck(); // F-012: validity on open drives the BWT read-only lock
+            ApplyReadOnlyUi();          // F-014 R1-R4
             }
             catch (Exception ex) when (ex is InspectionFileBusyException || ex is InspectionFileDamagedException)
             {
@@ -2705,6 +2660,7 @@ namespace InspectionEditor
             catch (Exception ex)
             {
                 if (isReload) _diskConflictPending = true;
+                InspectFormatLog.LoadFailed(filePath, ex); // F-019 L7
                 MessageBox.Show($"Error loading inspection:\n\n{ex.Message}\n\n{ex.StackTrace}",
                     "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -3512,9 +3468,7 @@ namespace InspectionEditor
         private void SeeDocsButton_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(_currentFilePath)) return;
-
-            var docsWindow = new DocsViewerWindow(_currentFilePath) { Owner = this };
-            docsWindow.ShowDialog();
+            ShowJobFiles(); // F-016
         }
 
         private void UpdatePlanCheckButton()
@@ -3561,7 +3515,7 @@ namespace InspectionEditor
                     return;
                 }
 
-                Item? targetItem = _currentItem;
+                Item? targetItem = InkItemService.IsInk(_currentItem) ? null : _currentItem; // F-006 C1
                 var window = new PlanCheckWindow(attachments, targetItem != null) { Owner = this };
                 if (window.ShowDialog() != true || window.Result == null) return;
 
@@ -3731,9 +3685,10 @@ namespace InspectionEditor
 
         private void ClearValueButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentItem == null) return;
+            if (_currentItem == null || _readOnlyMode) return;
             _currentItem.Value = null;
             _hasUnsavedChanges = true;
+            OnItemGroupValueChanged(_currentItem); // F-005: grid cell and drainage Result
             LoadStatusControls(_currentItem);
             RefreshEngDataPanel();
             RefreshEcDataPanel();
@@ -4640,17 +4595,19 @@ namespace InspectionEditor
             InlineChecklistPanel.Children.Clear();
             _inlineItemRows.Clear();
             _inlineNumberpadSliders.Clear();
+            ClearInlineItemGroupCells();
+            ClearHeaderSectionState();
             if (!_inlineEditorMode || _currentInspection?.Sections == null)
                 return;
 
             bool isSCI = (_currentInspectionCode ?? "").Equals("SCI", StringComparison.OrdinalIgnoreCase);
             bool hasAnyRows = false;
+            AddInlineHeaderSection(top: true); // F-007: T. Top
 
             foreach (var section in _currentInspection.Sections)
             {
-                var visibleItems = section.Items
-                    .Where(item => ShouldShowInlineItem(item, filter, isSCI))
-                    .ToList();
+                // F-005: drawn item-group grids are shown whole (or not at all) under the filters.
+                var visibleItems = GetInlineSectionVisibleItems(section, filter, isSCI);
 
                 if (visibleItems.Count == 0)
                     continue;
@@ -4659,10 +4616,7 @@ namespace InspectionEditor
                 hasAnyRows = true;
 
                 if (!_collapsedInlineSectionKeys.Contains(GetInlineSectionKey(section)))
-                {
-                    foreach (var item in visibleItems)
-                        InlineChecklistPanel.Children.Add(CreateInlineItemRow(section, item));
-                }
+                    AddInlineSectionItems(section, visibleItems);
             }
 
             if (!hasAnyRows)
@@ -4676,6 +4630,8 @@ namespace InspectionEditor
                     TextWrapping = TextWrapping.Wrap
                 });
             }
+            AddInlineHeaderSection(top: false); // F-007: E. End (status, next action, notes)
+            ApplyInlineReadOnly(); // F-014 R1: rows rebuilt above take the read-only state again
         }
 
         private bool ShouldShowInlineItem(Item item, string? filter, bool isSCI)
@@ -4722,15 +4678,12 @@ namespace InspectionEditor
                     return false;
             }
 
-            if (_reqFilterActive && !item.Required && !item.IsPictureRequired)
+            // F-012 W5: REQ and INC use INSPECT's item rules.
+            if (_reqFilterActive && !IsCheckedByCompletionRules(item))
                 return false;
 
-            if (_incFilterActive)
-            {
-                bool picturesAreMissing = item.Pictures.Count == 0;
-                if (!(ItemRequirementService.IsPrimaryRequirementMissing(item) || (item.IsPictureRequired && picturesAreMissing)))
-                    return false;
-            }
+            if (_incFilterActive && !IsIncompleteByCompletionRules(item))
+                return false;
 
             return true;
         }
@@ -4855,14 +4808,15 @@ namespace InspectionEditor
         }
 
         // INSPECT's ClickLabel_SelectAllCheckboxes sets Value directly, with no comment popup or Item Fixed question.
-        // Item 1615 (CPR "Test cylinders included") is left alone until F-008 applies its ServiceId rule on every path
-        // (owner Q-14 default); hidden items and grid cells are not INSPECT checkbox rows.
+        // Item 1615 (CPR "Test cylinders included") is included again: F-008's ServiceId rule runs at every save
+        // (CprRules via SurgicalSaveService.BeforeSave), so a bulk change still sets ServiceId (owner Q-14). Hidden items
+        // and grid cells are not INSPECT checkbox rows.
         private void SectionAllLabelButton_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
             if (sender is not Button { Tag: SectionAllLabelAction action } || _readOnlyMode || _currentInspection == null) return;
             var changed = ItemControls.ApplySectionAllLabel(action.Section, action.Label,
-                item => item.ItemId == 1615 || ItemControls.IsHidden(item) || ItemControls.IsGroupMember(item));
+                item => ItemControls.IsHidden(item) || ItemControls.IsGroupMember(item));
             if (changed.Count == 0) return;
             MarkUnsaved();
             if (_editorLoadedItem != null && changed.Contains(_editorLoadedItem))
@@ -4956,12 +4910,16 @@ namespace InspectionEditor
                 new MouseButtonEventHandler(InlineItemRow_PreviewMouseLeftButtonDown),
                 true);
             StretchInlineWidth(row);
+            if (_readOnlyMode)
+                DisableEditControls(row); // F-014 R1: a rebuilt row stays view-only
             _inlineItemRows[item] = (section, row);
             return row;
         }
 
         private void RefreshInlineItemRow(Item? item)
         {
+            if (RefreshItemGroupCell(item))
+                return; // F-005: the item is a grid cell, not a row.
             if (item == null || !_inlineItemRows.TryGetValue(item, out var entry))
                 return;
 
@@ -5167,6 +5125,8 @@ namespace InspectionEditor
                 Visibility = ItemControls.CanCopy(item) ? Visibility.Visible : Visibility.Hidden
             };
             duplicateButton.Click += InlineDuplicateButton_Click;
+            if (!ItemControls.CanCopy(item) || (InkItemService.IsInk(item) && item.HideAddButton()))
+                duplicateButton.Visibility = Visibility.Hidden; // F-004 K4 / F-005 G4 grids; F-006 S6 ink HideAddButton.
             Grid.SetColumn(duplicateButton, 0);
             grid.Children.Add(duplicateButton);
 
@@ -5486,6 +5446,9 @@ namespace InspectionEditor
 
         private UIElement CreateInlineStatusHeaderControl(Item item)
         {
+            if (InkItemService.IsInk(item))
+                return CreateInlineInkControl(item); // F-006: Signature / Sketch / FoundationSketch
+
             var control = ItemControls.For(item);
             if (control.Kind == ItemControlKind.Memo)
             {
@@ -5512,7 +5475,8 @@ namespace InspectionEditor
                 };
             }
 
-            string controlName = item.ControlName?.ToLower() ?? "";
+            // F-005 G2: inside a known item group the per-item ControlName is ignored (truck cells say PassFail).
+            string controlName = ItemControls.IsGroupMember(item) ? "text" : item.ControlName?.ToLower() ?? "";
             string[]? options = GetInlineStatusOptions(item, controlName);
             var panel = new StackPanel
             {
@@ -6704,6 +6668,7 @@ namespace InspectionEditor
                 foreach (string comment in saved)
                     list.Children.Add(CreateInlineSavedCommentRow(item, comment));
             }
+            AddInspectCommentSections(list, item); // F-024
 
             var scroller = new ScrollViewer
             {
@@ -10023,6 +9988,9 @@ namespace InspectionEditor
             // SCI (Special Consult) uses Section 1 as actual content — no locking for SCI
             bool isSCI = (_currentInspectionCode ?? "").Equals("SCI", StringComparison.OrdinalIgnoreCase);
 
+            if (HeaderSectionsAvailable)
+                SectionsTreeView.Items.Add(CreateHeaderTreeNode(top: true)); // F-007: T. Top
+
             foreach (var section in _currentInspection.Sections)
             {
                 // Create section header with bulk action buttons
@@ -10144,6 +10112,27 @@ namespace InspectionEditor
 
                 foreach (var item in section.Items)
                 {
+                    // F-005: a drawn item-group grid is one node (its first item), edited in the right pane.
+                    var gridRun = ItemGroupLayout.Detect(section).FirstOrDefault(run => run.Recognized && run.CellFor(item) != null);
+                    if (gridRun != null)
+                    {
+                        bool anyTreeFilter = hasFilter || _ofiFilterActive || _reqFilterActive || _incFilterActive;
+                        if (ReferenceEquals(gridRun.Items[0], item) &&
+                            (!anyTreeFilter || gridRun.Items.Any(cellItem => GridCellMatchesFilter(cellItem, filter))))
+                            sectionNode.Items.Add(CreateItemGroupTreeNode(gridRun));
+                        continue;
+                    }
+                    // F-005 A-005-08: an unrecognised grid says so in the classic tree too, above its plain rows.
+                    var unrecognisedRun = ItemGroupLayout.Detect(section).FirstOrDefault(run => !run.Recognized && run.Problem != null && ReferenceEquals(run.Items[0], item));
+                    if (unrecognisedRun != null)
+                        sectionNode.Items.Add(new TreeViewItem
+                        {
+                            Header = "⚠ " + ItemGroupLayout.NotRecognisedText,
+                            Foreground = new SolidColorBrush(Color.FromRgb(146, 64, 14)),
+                            Focusable = false,
+                            ToolTip = $"{unrecognisedRun.GroupControlName}: {unrecognisedRun.Problem}. The items are shown as normal rows."
+                        });
+
                     bool isLocked = !isSCI && IsProperNameItem(item);
 
                     // Locked items (proper names) — show greyed read-only row regardless of HidePic/HideCmt
@@ -10216,26 +10205,11 @@ namespace InspectionEditor
                         }
                         
                         // Apply REQ (Required Items Only) filter if active
-                        if (_reqFilterActive)
-                        {
-                            // Show items that require value OR require pictures
-                            if (!item.Required && !item.IsPictureRequired) continue;
-                        }
-                        
+                        // F-012 W5: REQ shows the items INSPECT's item rules check; INC the ones they reject.
+                        if (_reqFilterActive && !IsCheckedByCompletionRules(item)) continue;
+
                         // Apply INC (Incomplete Required Items) filter if active
-                        if (_incFilterActive)
-                        {
-                            // Show items that are incomplete:
-                            // 1. Required answer missing (Memo uses Comments; other controls use Value), OR
-                            // 2. Required pictures but no pictures added
-                            bool requiresPictures = item.IsPictureRequired;
-                            bool picturesAreMissing = item.Pictures.Count == 0;
-                            
-                            bool isIncomplete = ItemRequirementService.IsPrimaryRequirementMissing(item) ||
-                                               (requiresPictures && picturesAreMissing);
-                            
-                            if (!isIncomplete) continue;
-                        }
+                        if (_incFilterActive && !IsIncompleteByCompletionRules(item)) continue;
 
                         string indicator = "";
                         // For non-required items with photos: show 📷 in the number badge
@@ -10524,6 +10498,8 @@ namespace InspectionEditor
                     SectionsTreeView.Items.Add(sectionNode);
                 }
             }
+            if (HeaderSectionsAvailable)
+                SectionsTreeView.Items.Add(CreateHeaderTreeNode(top: false)); // F-007: E. End
 
             // ── Update inspection-wide fail counter next to "Inspection Items" header ──
             UpdateInspectionTotalCounter();
@@ -10872,7 +10848,7 @@ namespace InspectionEditor
             return section.Items.Any(item =>
             {
                 string controlName = item.ControlName?.ToLowerInvariant() ?? "";
-                if (!controlName.Contains("passfail"))
+                if (!controlName.Contains("passfail") || ItemControls.IsGroupMember(item)) // one group rule with F-004
                     return false;
 
                 string value = item.Value?.ToString()?.Trim().ToLowerInvariant() ?? "";
@@ -10917,8 +10893,10 @@ namespace InspectionEditor
         {
             // Use _editorLoadedItem - this is set ONLY when LoadItemEditor is called
             // and won't change due to accidental touch/scroll events
-            if (_currentInspection?.Sections == null || _editorLoadedItem == null) return;
+            if (_currentInspection?.Sections == null || _editorLoadedItem == null || _readOnlyMode) return; // F-012 L1 / F-014 R1
             if (!ItemControls.CanCopy(_editorLoadedItem)) return; // F-004 K4: grid counts stay fixed
+            // F-006 S6: ink items honor HideAddButton.
+            if (InkItemService.IsInk(_editorLoadedItem) && _editorLoadedItem.HideAddButton()) return;
 
             // Persist whatever is currently in the UI (comment text, value) to the original item
             // before switching the editor to the new blank duplicate.
@@ -10978,7 +10956,7 @@ namespace InspectionEditor
         private void RemoveDuplicateButton_Click(object sender, RoutedEventArgs e)
         {
             // F-004 K3: only when another item in the same section shares this ItemId (as INSPECT)
-            if (_editorLoadedItem == null || _currentInspection?.Sections == null) return;
+            if (_editorLoadedItem == null || _currentInspection?.Sections == null || _readOnlyMode) return; // F-012 L1 / F-014 R1
             if (!ItemControls.CanRemove(_currentInspection.Sections.FirstOrDefault(s => s.Items.Contains(_editorLoadedItem)), _editorLoadedItem))
                 return;
 
@@ -11195,6 +11173,9 @@ namespace InspectionEditor
         {
             string controlName = (item.ControlName ?? "").ToLower();
 
+            // F-006: ink items (e.g. a "Superintendent signature" Signature item) are drawings, never locked names.
+            if (InkItemService.IsInk(item)) return false;
+
             // F-004 V6 (owner Q-16 default): SearchLookup items (e.g. Superintendent) are editable: pick or "Add New".
             if (ItemControls.For(item).Kind == ItemControlKind.SearchLookup) return false;
 
@@ -11346,6 +11327,15 @@ namespace InspectionEditor
             _isLookupMode = false;
             _statusNumberKeyboardMode = false;
             int statusTabIndex = 20; // Status buttons get TabIndex 20-24
+
+            // F-005: grid cells get the grid's own editor (time box, number pad or calculated result).
+            // F-006 S6: an ink item flagged HideCommentsButton has no comment editor; every other item keeps it.
+            CommentEditorBorder.Visibility = InkItemService.IsInk(item) && item.HideCommentsButton ? Visibility.Collapsed : Visibility.Visible;
+            if (TryLoadItemGroupCellEditor(item))
+                return;
+            // F-006: ink items open the drawing window.
+            if (TryLoadInkItemEditor(item))
+                return;
 
             var control = ItemControls.For(item);
             // F-004 V1: a stored "NA" is already "NI" in the model (SurgicalSaveService.Load); other values show as stored.
@@ -12718,6 +12708,8 @@ namespace InspectionEditor
                 }
                 if (outcome == NumberPadOutcome.Unchanged) return;
                 _currentItem.Value = value;
+                // F-005: a grid cell's drawn text and a drainage Result follow the pad.
+                OnItemGroupValueChanged(_currentItem);
 
                 // Update the display (N6: mask N2)
                 SetStatusTextSilently(ItemControls.FormatNumberDisplay(value));
@@ -13112,6 +13104,14 @@ namespace InspectionEditor
                 return;
             }
             
+            // F-012 L1 / F-014 R1 and F-006 C1: checked once, before the dialog (not once per selected file).
+            if (_readOnlyMode)
+            {
+                MessageBox.Show("This report is read-only. Photos cannot be added.", "Add Photo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (RefuseOrdinaryPictureForInk(_editorLoadedItem)) return;
+
             // Use last browsed directory if available, otherwise default to Camera Roll
             string initialDir;
             if (!string.IsNullOrEmpty(_lastPhotoDirectory) && Directory.Exists(_lastPhotoDirectory))
@@ -13120,19 +13120,16 @@ namespace InspectionEditor
             }
             else
             {
-                string cameraRollPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
-                    "Camera Roll"
-                );
-                initialDir = Directory.Exists(cameraRollPath) ? cameraRollPath : 
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                // F-023 T3: INSPECT 2026's resolved camera roll, else Pictures.
+                initialDir = CameraService.ResolveCameraRoll() ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
             }
 
             var dialog = new OpenFileDialog
             {
                 Filter = "Image Files (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png|All Files (*.*)|*.*",
                 Title = "Select Photo",
-                InitialDirectory = initialDir
+                InitialDirectory = initialDir,
+                Multiselect = true // F-023 T4 (RED improvement; INSPECT imports one file)
             };
 
             if (dialog.ShowDialog() == true)
@@ -13140,31 +13137,52 @@ namespace InspectionEditor
                 // Remember the directory for next time (persisted to preferences.txt)
                 _lastPhotoDirectory = Path.GetDirectoryName(dialog.FileName);
                 SavePreferences();
-                
-                try
+
+                // One picture per selected file, in the dialog's order; a failed file does not stop the others.
+                int before = _editorLoadedItem.Pictures.Count;
+                var failed = new List<string>();
+                byte[]? lastAdded = null;
+                foreach (string file in dialog.FileNames)
                 {
-                    byte[] imageData = File.ReadAllBytes(dialog.FileName);
-                    
-                    // Add photo immediately to Pictures array
-                    AddPhotoToCurrentItem(imageData);
-                    
-                    DisplayImage(imageData);
-                    _currentPhotoData = imageData;
+                    try
+                    {
+                        byte[] imageData = File.ReadAllBytes(file);
+                        if (imageData.Length < 1024)
+                        {
+                            failed.Add($"{Path.GetFileName(file)}: the photo data appears invalid or too small");
+                            continue;
+                        }
+                        int count = _editorLoadedItem.Pictures.Count;
+                        AddPhotoToCurrentItem(imageData);
+                        if (_editorLoadedItem.Pictures.Count > count)
+                            lastAdded = imageData;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed.Add($"{Path.GetFileName(file)}: {ex.Message}");
+                    }
+                }
+
+                if (lastAdded != null)
+                {
+                    DisplayImage(lastAdded);
+                    _currentPhotoData = lastAdded;
                     GetSuggestionsButton.IsEnabled = true;
                     TranscribeButton.IsEnabled = true;
-                    
-                    // Update photo navigation to show new photo
+
+                    // Update photo navigation to show the last new photo
                     _currentPhotoIndex = _editorLoadedItem.Pictures.Count - 1;
                     LoadCurrentPhoto();
-                    
+
                     MarkUnsaved();
-                    
+
                     // Update required field highlighting
                     UpdateRequiredFieldHighlighting(_editorLoadedItem);
                 }
-                catch (Exception ex)
+                if (failed.Count > 0)
                 {
-                    MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show((_editorLoadedItem.Pictures.Count > before ? "Some photos were not added:\n\n" : "Error loading image:\n\n") + string.Join("\n", failed),
+                        "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -13261,6 +13279,11 @@ namespace InspectionEditor
             if (_editorLoadedItem == null || _editorLoadedItem.Pictures.Count == 0) return;
             if (_currentPhotoIndex < 0 || _currentPhotoIndex >= _editorLoadedItem.Pictures.Count) return;
             
+            if (InkItemService.KindOf(_editorLoadedItem) != InkControlKind.None)
+            {
+                OpenInkEditor(_editorLoadedItem); // F-006 C1 / F-023: drawings are not photos
+                return;
+            }
             var currentPicture = _editorLoadedItem.Pictures[_currentPhotoIndex];
             if (string.IsNullOrEmpty(currentPicture.Data)) return;
             
@@ -13271,7 +13294,8 @@ namespace InspectionEditor
                 
                 // Open image editor
                 var editor = new ImageEditorWindow(imageBytes) { Owner = this };
-                if (editor.ShowDialog() == true && editor.ImageWasEdited)
+                // F-012 L1 / F-014 R1: a read-only report can view a photo but never takes the edit back.
+                if (editor.ShowDialog() == true && editor.ImageWasEdited && !_readOnlyMode)
                 {
                     // Save edited image back to the picture
                     currentPicture.Data = Convert.ToBase64String(editor.EditedImageBytes);
@@ -13309,9 +13333,16 @@ namespace InspectionEditor
 
         private void DeletePhotoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_editorLoadedItem == null || _editorLoadedItem.Pictures.Count == 0) return;
+            if (_editorLoadedItem == null || _editorLoadedItem.Pictures.Count == 0 || _readOnlyMode) return; // F-012 L1 / F-014 R1
             if (_currentPhotoIndex < 0 || _currentPhotoIndex >= _editorLoadedItem.Pictures.Count) return;
-            
+            if (InkItemService.IsInk(_editorLoadedItem))
+            {
+                // F-006 S4: deleting an ink item's picture is its Clear (Pictures [] and Value null).
+                InkItemService.ClearInk(_editorLoadedItem);
+                OnInkItemChanged(_editorLoadedItem);
+                return;
+            }
+
             // Remove the current photo
             _editorLoadedItem.Pictures.RemoveAt(_currentPhotoIndex);
             // F-004: a PictureUpload item with no picture left stores "" (RTC B46).
@@ -14310,9 +14341,15 @@ namespace InspectionEditor
         private void SaveFileButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentInspection == null || !_saveService.HasFile) return;
+            // F-012 L1 / F-014 R1: a locked BWT or an Outbox/Archive copy is never written; Save just closes it.
+            if (_readOnlyMode)
+            {
+                CloseReportWithoutSaving();
+                return;
+            }
 
             SyncCurrentItemFromUI();
-            
+
             // Auto-fix: Set all passfail items with comments/photos to Fail
             AutoFixPassFailItems();
             
@@ -14563,6 +14600,7 @@ namespace InspectionEditor
 
                 // DoSave exits this report after the result picker; only now end PDF monitoring.
                 if (!FinishOrientationEditing()) return;
+                LogInspectClose();
                 _activityService.LogClose();
                 ReleaseInspectionLocks();
                 
@@ -14618,9 +14656,26 @@ namespace InspectionEditor
             // BUT respect explicit NI values - don't override inspector's choice (F-004 V5d, owner Q-15)
             ItemAutoFailRules.ApplyAutoSaveSweep(_currentInspection);
 
+            string savePath = _saveService.FilePath ?? _currentFilePath ?? "";
+            DateTime writtenBefore = SafeLastWriteUtc(savePath);
             _saveService.Save(_currentInspection);
+            // F-019 L7 save lines; "Creating file"/"File created" only when the save actually wrote the file.
+            InspectFormatLog.Saving(_saveService.GetHeaderValue, _currentInspection, savePath, SafeLastWriteUtc(savePath) != writtenBefore);
             _activityService.LogSave();
             MarkSaved();
+        }
+
+        private static DateTime SafeLastWriteUtc(string path)
+        {
+            try { return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue; }
+            catch (Exception) { return DateTime.MinValue; }
+        }
+
+        // F-019 L7 "Closing Inspection {num}", written just before RED forgets the report.
+        private void LogInspectClose()
+        {
+            if (_currentInspection == null || !_saveService.HasFile) return;
+            InspectFormatLog.Closing(HeaderRules.Text(_saveService.GetHeaderValue("InspectionNumber")) ?? "");
         }
 
         private bool _savingEditorChanges;
@@ -14632,8 +14687,14 @@ namespace InspectionEditor
         {
             if (!EditorEditService.SetComment(_currentInspection, item, text)) return;
             MarkUnsaved();
-            // Preserve the existing photo-caption behavior without replaying stale UI on save.
-            if (ReferenceEquals(item, _editorLoadedItem) && _currentPhotoIndex >= 0 && _currentPhotoIndex < item.Pictures.Count)
+            // F-004 B33 / F-012 rule 4: a Memo's Value follows its text as it is typed, as INSPECT's editor does, so the
+            // completion check and the REQ/INC filters agree before a save. Only an edit sets it (F-010 N10).
+            if (ItemControls.For(item).Kind == ItemControlKind.Memo)
+                item.Value = ItemControls.MemoValueFor(text);
+            // Preserve the existing photo-caption behavior without replaying stale UI on save. F-006 S1: never into an
+            // ink item's drawing (its Description stays null).
+            if (ReferenceEquals(item, _editorLoadedItem) && _currentPhotoIndex >= 0 && _currentPhotoIndex < item.Pictures.Count &&
+                !InkItemService.IsInk(item))
                 item.Pictures[_currentPhotoIndex].Comment = text;
             MirrorInlineEdit(item, text, isComment: true);
             if (ReferenceEquals(item, _editorLoadedItem) && CommentsTextBox.Text != text)
@@ -14651,7 +14712,11 @@ namespace InspectionEditor
         // source: the editor the text came from; it keeps what the user typed when the stored form differs (F-004 N7).
         private void CaptureValueEdit(Item item, string text, object? source = null)
         {
-            if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
+            bool changed = EditorEditService.SetValue(_currentInspection, item, text);
+            // F-005: mirror into grid cells and recompute a drainage Result. The number pad writes Value before
+            // this call, so this runs even when SetValue found nothing new.
+            OnItemGroupValueChanged(item);
+            if (!changed) return;
             MarkUnsaved();
             MirrorInlineEdit(item, text, isComment: false, source);
             RefreshEcMismatchVisuals(item);
@@ -14852,6 +14917,7 @@ namespace InspectionEditor
             {
                 // Keep both the model and dirty state available for retry. Never reset/close on failure.
                 DiagnosticLogService.Log("Report save failed; edits retained", ex);
+                InspectFormatLog.SaveFailed(_saveService.FilePath ?? _currentFilePath ?? "", ex); // F-019 L7
                 MarkUnsaved();
                 if (!_pdfSaveInProgress) MessageBox.Show($"Your changes could not be saved. The report is still open with your edits.\n\n{ex.Message}",
                     "Report not saved", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -15194,6 +15260,7 @@ namespace InspectionEditor
             }
             if (_hasUnsavedChanges && !PreserveEditsBeforeDiscard(model)) return;
             _diskConflictPending = false;
+            LogInspectClose();
             _activityService.LogClose();
             ReleaseInspectionLocks();
 

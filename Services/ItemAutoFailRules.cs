@@ -10,7 +10,10 @@ namespace InspectionEditor.Services
     /// </summary>
     public static class ItemAutoFailRules
     {
-        public static bool IsPassFailControl(Item item) => (item.ControlName?.ToLower() ?? "").Contains("passfail");
+        // F-005 G2: grid cells ignore their per-item ControlName (CPR truck cells carry "PassFail"), so none of the four
+        // rules ever touches them.
+        public static bool IsPassFailControl(Item item) =>
+            (item.ControlName?.ToLower() ?? "").Contains("passfail") && !ItemControls.IsGroupMember(item);
 
         /// <summary>V5a: a non-blank comment sets Fail unless the value already equals "fail" (any case, not trimmed).</summary>
         public static bool ApplyCommentRule(Item item, string? commentText)

@@ -92,16 +92,21 @@ namespace InspectionEditor
             return true;
         }
 
-        private static bool MatchesOrderFilter(StrandScheduleRequest request, string column, string value, OrderColumnFilter filter)
+        private static bool MatchesOrderFilter(StrandScheduleRequest request, string column, string value, OrderColumnFilter filter) =>
+            MatchesColumnFilter(value, filter, column == ScheduleDateColumn, request.LocalDate);
+
+        // One column's test, shared by ORDERS and the F-025 Buyer Walk filter row (OC §6). isDate: the column shows a
+        // date, so Equals/Not equals and the comparisons use the underlying date value.
+        private static bool MatchesColumnFilter(string value, OrderColumnFilter filter, bool isDate, DateTime? date)
         {
             string text = filter.Text.Trim();
             const StringComparison ignoreCase = StringComparison.CurrentCultureIgnoreCase;
 
             // A typed date equals every request on that day, timed or not (the same day rule as > and <).
-            if (column == ScheduleDateColumn && filter.Op is OrderFilterOp.Equals or OrderFilterOp.NotEquals)
+            if (isDate && filter.Op is OrderFilterOp.Equals or OrderFilterOp.NotEquals)
             {
                 bool same = string.Equals(value, text, ignoreCase) ||
-                            CompareForOrderFilter(request, column, value, text) == 0;
+                            CompareForColumnFilter(value, text, isDate, date) == 0;
                 return filter.Op == OrderFilterOp.Equals ? same : !same;
             }
 
@@ -118,7 +123,7 @@ namespace InspectionEditor
             }
 
             // Greater / less: dates compare as dates, numbers as numbers, anything else as text. Blank never matches.
-            int? comparison = CompareForOrderFilter(request, column, value, text);
+            int? comparison = CompareForColumnFilter(value, text, isDate, date);
             if (comparison is not int c)
                 return false;
             return filter.Op switch
@@ -131,18 +136,18 @@ namespace InspectionEditor
             };
         }
 
-        private static int? CompareForOrderFilter(StrandScheduleRequest request, string column, string value, string text)
+        private static int? CompareForColumnFilter(string value, string text, bool isDate, DateTime? date)
         {
-            if (column == ScheduleDateColumn)
+            if (isDate)
             {
-                if (request.LocalDate is not DateTime date ||
+                if (date is not DateTime when ||
                     !DateTime.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out var wanted))
                 {
                     return null;
                 }
                 // A date without a time compares by day, so "> 10/20/2026" means after that day.
                 bool dayOnly = wanted.TimeOfDay == TimeSpan.Zero && !text.Contains(':');
-                return dayOnly ? date.Date.CompareTo(wanted.Date) : date.CompareTo(wanted);
+                return dayOnly ? when.Date.CompareTo(wanted.Date) : when.CompareTo(wanted);
             }
 
             if (value.Length == 0)
@@ -154,7 +159,6 @@ namespace InspectionEditor
             }
             return string.Compare(value, text, CultureInfo.CurrentCulture, CompareOptions.IgnoreCase);
         }
-
         // "Is like": % matches any run of characters, _ matches one; the whole value must match.
         private static Regex LikeRegex(string pattern) =>
             new("^" + Regex.Escape(pattern).Replace("%", ".*").Replace("_", ".") + "$",
@@ -246,7 +250,7 @@ namespace InspectionEditor
             {
                 var item = new MenuItem
                 {
-                    Header = name,
+                    Header = name.Replace("_", "__"), // a single "_" is an access key and would hide the "_" wildcard
                     Icon = new TextBlock { Text = glyph, Width = 22, TextAlignment = TextAlignment.Center },
                     IsCheckable = true,
                     IsChecked = op == filter.Op

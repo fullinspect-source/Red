@@ -5,6 +5,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MAIN = (ROOT / "MainWindow.xaml.cs").read_text()
 XAML = (ROOT / "MainWindow.xaml").read_text()
 SERVICE = (ROOT / "Services" / "ItemRequirementService.cs").read_text()
+CHECK = (ROOT / "MainWindow.CompletionCheck.cs").read_text()
 
 
 class ItemRequirementStaticTests(unittest.TestCase):
@@ -14,7 +15,10 @@ class ItemRequirementStaticTests(unittest.TestCase):
         self.assertIn(': string.IsNullOrWhiteSpace(item.Value?.ToString())', SERVICE)
 
     def test_incomplete_filters_use_semantic_requirement(self):
-        self.assertGreaterEqual(MAIN.count("ItemRequirementService.IsPrimaryRequirementMissing(item)"), 5)
+        self.assertGreaterEqual(MAIN.count("ItemRequirementService.IsPrimaryRequirementMissing(item)"), 3)
+        # F-012 W5: the INC filters (inline and tree) use the completion check's item rules.
+        self.assertGreaterEqual(MAIN.count("_incFilterActive && !IsIncompleteByCompletionRules(item)"), 2)
+        self.assertIn("InspectionValidator.ItemProblem(item, _currentInspection) != null", CHECK)
 
     def test_memo_value_editor_is_replaced_with_comment_guidance(self):
         # F-004: every Memo (required or not) is edited in the Comment box; Value follows it at save.

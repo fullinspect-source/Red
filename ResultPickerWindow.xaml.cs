@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -59,9 +60,11 @@ namespace InspectionEditor
             int answeredItems,
             int failedItems,
             InspectionEditor.Services.InspectionTypeConfig? config = null,
-            bool expirationStageDone = false)
+            bool expirationStageDone = false,
+            IReadOnlyCollection<int>? allowedStatusIds = null)
         {
             InitializeComponent();
+            _allowedStatusIds = allowedStatusIds;
 
             string typeName = TypeNames.TryGetValue(inspectionCode.ToUpper(), out var n) ? n : inspectionCode;
             InspTypeText.Text = typeName;
@@ -167,6 +170,9 @@ namespace InspectionEditor
                 }
             }
 
+            // F-007 E5: only statuses present in the file's StatusList (no filter when the file has no list).
+            options = FilterByStatusList(options, _allowedStatusIds);
+
             foreach (var (choice, grayed, reason) in options)
             {
                 if (grayed && !string.IsNullOrEmpty(reason))
@@ -191,6 +197,14 @@ namespace InspectionEditor
                 }
             }
         }
+
+        private readonly IReadOnlyCollection<int>? _allowedStatusIds;
+
+        public static List<(ResultChoice choice, bool grayed, string grayReason)> FilterByStatusList(
+            List<(ResultChoice choice, bool grayed, string grayReason)> options, IReadOnlyCollection<int>? allowedStatusIds) =>
+            allowedStatusIds == null || allowedStatusIds.Count == 0
+                ? options
+                : options.Where(o => allowedStatusIds.Contains(o.choice.StatusId)).ToList();
 
         private Button MakeButton(ResultChoice choice, bool grayed = false)
         {

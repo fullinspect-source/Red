@@ -41,9 +41,14 @@ namespace System.Windows { public enum Visibility { Visible, Collapsed } }
     (temp / "Stubs.cs").write_text(stubs)
     for filename, expression in [("MainWindow.Attachments.cs", "monitor"), ("MainWindow.OrientationPdf.cs", "_orientationPdf")]:
         source = (ROOT / filename).read_text()
-        original = f"using var process = Process.Start({expression}.StartInfo);"
+        # F-017 A1: the PDF app from Settings.
+        original = f"using var process = Process.Start(PdfAppLauncher.StartInfoFor({expression}.WorkingPath));"
         assert source.count(original) == 1, "Shell seam changed: " + filename
         source = source.replace(original, f"_ = {expression}.StartInfo; LaunchCount++;")
+        # F-017 U1 reads the RED profile; the probe never does.
+        blocked = "if (JobFilesService.IsBlockedFor(InspectorProfileService.Load()?.UserType))"
+        assert source.count(blocked) == (1 if filename == "MainWindow.Attachments.cs" else 0), "Profile seam changed: " + filename
+        source = source.replace(blocked, "if (false)")
         source = source.replace('Path.Combine(AppIdentity.LocalAppDataPath, "PdfAttachments")', "ProbeRoot")
         (temp / filename).write_text(source)
     (temp / "Program.cs").write_text('''

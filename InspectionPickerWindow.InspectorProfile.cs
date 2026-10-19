@@ -46,9 +46,11 @@ namespace InspectionEditor
 
             MyListTabButton.IsEnabled = !_profileLocked;
             OrdersTabButton.IsEnabled = !_profileLocked;
+            BuyerWalkTabButton.IsEnabled = !_profileLocked; // F-025: Add to My List needs the profile too
             object? tip = _profileLocked ? InspectorProfileService.MissingProfileMessage : null;
             MyListTabButton.ToolTip = tip;
             OrdersTabButton.ToolTip = tip;
+            BuyerWalkTabButton.ToolTip = tip;
 
             if (_profileLocked)
             {
@@ -76,7 +78,7 @@ namespace InspectionEditor
                 ProfileBanner.Visibility = Visibility.Collapsed;
             }
 
-            if (_profileLocked && (MyListPanel.Visibility == Visibility.Visible || OrdersPanel.Visibility == Visibility.Visible))
+            if (_profileLocked && (MyListPanel.Visibility == Visibility.Visible || OrdersPanel.Visibility == Visibility.Visible || BuyerWalkPanel.Visibility == Visibility.Visible))
                 ShowSettingsTab();
         }
 
@@ -141,6 +143,7 @@ namespace InspectionEditor
                 $"signature {(profile.Signature.Length > 0 ? "saved" : "none")}.";
 
             static string YesNo(bool value) => value ? "yes" : "no";
+            UpdateSignatureButton(); // F-011 G3
         }
 
         // F-015 N1/N4: INSPECT's Archive retention, read live from the folder's config.json (never imported or stored),
@@ -152,6 +155,7 @@ namespace InspectionEditor
             string? refusal = InspectLiveSettings.ArchiveRetentionRefusal(days);
             ArchiveRetentionRefusalText.Text = refusal ?? "";
             ArchiveRetentionRefusalText.Visibility = refusal == null ? Visibility.Collapsed : Visibility.Visible;
+            EnsureHousekeepingControls(inspectionsFolder); // F-015 N3 switch and V1 dry run, F-019 purge switch
         }
 
         internal bool IsHomeWindow => _stayOpenHome;
@@ -336,7 +340,7 @@ namespace InspectionEditor
                 // The next ORDERS visit signs in with the imported login.
                 EndStrandSession(OrdersSignInPrompt);
                 _ordersSignedOutManually = false;
-                _ordersLoadedOnce = false;
+                _ordersLoadedOnce = false; _buyerWalksLoadedOnce = false;
                 _lastStrandUsername = "";
             }
 

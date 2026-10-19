@@ -54,6 +54,40 @@ namespace InspectionEditor.Services
             return values;
         }
 
+        // F-009 D4: INSPECT's mapping (Attachment::FillOutForm). key = the field name up to the first '_'; an item whose
+        // Number equals key, else whose Name equals key (case-insensitive), gives the value; otherwise the special keys.
+        // The date comes from DateInspected (RED rule; INSPECT uses today). Blank values are never written.
+        internal static Func<string, string?> GenericResolver(InspectionFile inspection)
+        {
+            var items = inspection.Sections.SelectMany(s => s.Items).Where(i => i != null).ToList();
+            string? Extra(string key) => inspection.ExtensionData?.TryGetValue(key, out var value) == true ? Clean(value) : null;
+            DateTimeOffset? date = DateTimeOffset.TryParse(inspection.DateInspected, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+                ? parsed : null;
+            return fieldName =>
+            {
+                int underscore = fieldName.IndexOf('_');
+                string key = underscore >= 0 ? fieldName.Substring(0, underscore) : fieldName;
+                if (key.Length == 0) return null;
+                var byNumber = items.FirstOrDefault(i => string.Equals(i.Number, key, StringComparison.Ordinal));
+                var item = byNumber ?? items.FirstOrDefault(i => string.Equals(i.Name, key, StringComparison.OrdinalIgnoreCase));
+                if (item != null) return Clean(item.Value);
+                return key switch
+                {
+                    "InspectionLot" => Extra("Lot"),
+                    "InspectionBlock" => Extra("Block"),
+                    "Address1" => Clean(inspection.Address),
+                    "City" => Clean(inspection.City),
+                    "State" => Clean(inspection.State),
+                    "Subdivision" => Clean(inspection.Project) ?? Extra("Project"),
+                    "Date" => date?.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture),
+                    "InspectionDay" => date?.Day.ToString(CultureInfo.InvariantCulture),
+                    "InspectionMonth" => date?.ToString("MMMM", CultureInfo.InvariantCulture),
+                    "InspectionYear" => date?.ToString("yy", CultureInfo.InvariantCulture),
+                    _ => null
+                };
+            };
+        }
+
         private static bool IsBlank(PdfItem? value)
         {
             if (value is PdfReference reference) value = reference.Value;
@@ -77,6 +111,14 @@ namespace InspectionEditor.Services
                 // Courier on save. Preserve original /DA, /DR, /Q, flags, widgets and unknown fields.
                 var form = document.Internals.Catalog.Elements.GetDictionary("/AcroForm");
                 var values = Mappings(inspection);
+                var generic = GenericResolver(inspection);
+                bool TryValue(string fieldName, out string mapped)
+                {
+                    // RED's explicit map first (it keeps RED's fallbacks), then INSPECT's general rule (D4).
+                    if (values.TryGetValue(fieldName, out mapped!)) return true;
+                    mapped = generic(fieldName)!;
+                    return mapped != null;
+                }
                 bool changed = false;
                 var visited = new HashSet<PdfDictionary>();
                 void Visit(PdfArray? fields, string parentName, string parentType,
@@ -94,7 +136,7 @@ namespace InspectionEditor.Services
                         if (type.Length == 0) type = parentType;
                         PdfItem? current = field.Elements.ContainsKey("/V") ? field.Elements["/V"] : inheritedValue;
                         bool filled = false;
-                        if (localName.Length > 0 && type == "/Tx" && values.TryGetValue(name, out var mapped) &&
+                        if (localName.Length > 0 && type == "/Tx" && TryValue(name, out var mapped) &&
                             (!blankOnly || IsBlank(current)))
                         {
                             field.Elements.SetString("/V", mapped);

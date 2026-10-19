@@ -116,13 +116,50 @@ namespace InspectionEditor.Services
             ? attachment.Value<string>("Filename") : null;
 
         internal static JArray Snapshot(InspectionFile owner) => owner.Attachments == null ? new JArray() : JArray.FromObject(owner.Attachments);
-        internal static JObject Create(string name, byte[] bytes) => new()
+        // F-017 D2 (F-009 D3, F-002 B1): INSPECT's eleven attachment keys in its order. EditPath is null (F-016 O7),
+        // AnnotatedPages is computed (S2), LastWriteTime is the working file time (or now for a file added directly).
+        internal static JObject Create(string name, byte[] bytes, DateTime? lastWriteTime = null) => new()
         {
-            ["Id"] = Guid.NewGuid().ToString(), ["Filename"] = name, ["EditPath"] = name,
-            ["FileType"] = "pdf", ["FileData"] = Convert.ToBase64String(bytes), ["ReducedFileData"] = null,
-            ["AnnotatedPages"] = new JArray(), ["IncludedPages"] = new JArray(), ["ReferenceOnly"] = false,
-            ["CanExcludePages"] = false, ["ServerPath"] = null
+            ["InspectVersion"] = null,
+            ["Id"] = Guid.NewGuid().ToString(),
+            ["EditPath"] = null,
+            ["FileData"] = Convert.ToBase64String(bytes),
+            ["FileType"] = "pdf",
+            ["Filename"] = name,
+            ["AnnotatedPages"] = new JArray(AnnotatedPages(bytes).Cast<object>().ToArray()),
+            ["IncludedPages"] = new JArray(),
+            ["ReferenceOnly"] = false,
+            ["LastWriteTime"] = FormatTime(lastWriteTime ?? DateTime.Now),
+            ["CanExcludePages"] = false
         };
+
+        public static string FormatTime(DateTime local) =>
+            local.ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// F-017 S2: sorted 0-based indices of the pages whose /Annots array holds at least one annotation of any subtype
+        /// (Link and Widget included, as INSPECT counts Pages[i].Annotations.Count > 0). Unreadable PDFs give none.
+        /// </summary>
+        public static int[] AnnotatedPages(byte[] bytes)
+        {
+            try
+            {
+                using var input = new MemoryStream(bytes, writable: false);
+                using var document = PdfReader.Open(input, PdfDocumentOpenMode.Import);
+                var pages = new List<int>();
+                for (int i = 0; i < document.PageCount; i++)
+                {
+                    var annots = document.Pages[i].Elements.GetArray("/Annots");
+                    if (annots != null && annots.Elements.Count > 0)
+                        pages.Add(i);
+                }
+                return pages.ToArray();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return Array.Empty<int>();
+            }
+        }
 
         internal bool Transact(JArray expectedModel, JArray replacement, Func<bool> save)
         {

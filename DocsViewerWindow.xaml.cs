@@ -9,13 +9,27 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using InspectionEditor.Services;
 
 namespace InspectionEditor
 {
+    // F-016: what the Docs viewer needs from the open report to list Job Files and open them as reference attachments.
+    public sealed class JobFilesHost
+    {
+        public string? JobNumber { get; init; }
+        public string? InspectionsFolder { get; init; }
+        public Func<IReadOnlyList<object>?> Attachments { get; init; } = () => null;
+        // O1-O5 run in the editor; the viewer only passes the chosen file.
+        public Action<JobFile> Open { get; init; } = _ => { };
+        public Func<System.Threading.Tasks.Task<string>>? RequestFiles { get; init; }
+    }
+
     public partial class DocsViewerWindow : Window
     {
         private readonly string _jobId;
         private readonly string _jobsFolder;
+        private readonly JobFilesHost? _host;
+        private Dictionary<string, JobFile> _jobFiles = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<DocFile> _engineeringDocs = new List<DocFile>();
         private readonly List<DocFile> _inspectionDocs = new List<DocFile>();
         private readonly List<int> _availableRevisions = new List<int>();
@@ -77,18 +91,27 @@ namespace InspectionEditor
             {"TRSI", "TDI Shingles"}
         };
 
-        public DocsViewerWindow(string insFilePath)
+        public DocsViewerWindow(string insFilePath, JobFilesHost? host = null)
         {
             InitializeComponent();
-            
+            _host = host;
+
             // Parse job ID from filename: {jobID}-{inspType}-{tripCount}-{initials}.ins
             string filename = Path.GetFileNameWithoutExtension(insFilePath);
             var parts = filename.Split('-');
             _jobId = parts.Length > 0 ? parts[0] : "";
-            
+            // F-016 J1: {IF}\Jobs\{first 7 characters of JobNumber} when the report says.
+            string job7 = JobFilesService.Job7(host?.JobNumber);
+            if (job7.Length == 7)
+                _jobId = job7;
+
             // Find the Jobs folder (sibling to MyList)
             string? insFolder = Path.GetDirectoryName(insFilePath);
-            if (insFolder != null)
+            if (!string.IsNullOrWhiteSpace(host?.InspectionsFolder))
+            {
+                _jobsFolder = Path.Combine(host.InspectionsFolder, "Jobs");
+            }
+            else if (insFolder != null)
             {
                 string? inspectionsFolder = Path.GetDirectoryName(insFolder); // Go up from MyList
                 _jobsFolder = inspectionsFolder != null ? Path.Combine(inspectionsFolder, "Jobs") : "";
@@ -97,16 +120,31 @@ namespace InspectionEditor
             {
                 _jobsFolder = "";
             }
-            
+
             JobIdText.Text = $"Job ID: {_jobId}";
-            
+            RefreshButton.Visibility = host?.RequestFiles != null ? Visibility.Visible : Visibility.Collapsed;
+
             LoadDocuments();
             BuildRevisionButtons();
             RefreshDocsList();
         }
 
+        // F-016 J2: INSPECT's FileType, Version and Attached marker per file.
+        private void LoadJobFileDetails()
+        {
+            string? inspections = string.IsNullOrEmpty(_jobsFolder) ? null : Path.GetDirectoryName(_jobsFolder);
+            _jobFiles = inspections == null
+                ? new Dictionary<string, JobFile>(StringComparer.OrdinalIgnoreCase)
+                : JobFilesService.List(inspections, _jobId, _host?.Attachments())
+                    .ToDictionary(f => f.FullPath, StringComparer.OrdinalIgnoreCase);
+        }
+
         private void LoadDocuments()
         {
+            _engineeringDocs.Clear();
+            _inspectionDocs.Clear();
+            _availableRevisions.Clear();
+            LoadJobFileDetails();
             if (string.IsNullOrEmpty(_jobId) || string.IsNullOrEmpty(_jobsFolder))
                 return;
 
@@ -281,6 +319,8 @@ namespace InspectionEditor
         private void RefreshDocsList()
         {
             DocsListPanel.Children.Clear();
+            // F-016 J3: RED keeps its newest-revision default and says which revision it shows.
+            RevisionNoteText.Text = $"Showing revision R{_selectedRevision}";
 
             // ENGINEERING SECTION
             var filteredEngDocs = FilterEngineeringDocs();
@@ -391,11 +431,33 @@ namespace InspectionEditor
             Grid.SetColumn(filenameBtn, 0);
             grid.Children.Add(filenameBtn);
 
-            if (!string.IsNullOrEmpty(doc.Description))
+            // F-016 J2/R3: version and the Attached marker (only attachments that are not reference-only).
+            string detail = doc.Description;
+            if (_jobFiles.TryGetValue(doc.FullPath, out var jobFile))
+            {
+                filenameBtn.ToolTip = _host == null
+                    ? "Opens a read-only copy; the shared job file is never changed"
+                    : "Opens a working copy attached to this report; the shared job file is never changed";
+                if (jobFile.Attached)
+                {
+                    filenameBtn.Content = new TextBlock
+                    {
+                        Inlines =
+                        {
+                            new System.Windows.Documents.Run(doc.Filename),
+                            new System.Windows.Documents.Run("   📎 Attached") { Foreground = new SolidColorBrush(Color.FromRgb(21, 128, 61)), FontWeight = FontWeights.SemiBold }
+                        }
+                    };
+                }
+                string version = jobFile.FileType == "Engineering" && jobFile.Version != "0" ? $"R{jobFile.Version}" : "";
+                detail = string.Join("  ·  ", new[] { doc.Description, version }.Where(s => !string.IsNullOrEmpty(s)));
+            }
+
+            if (!string.IsNullOrEmpty(detail))
             {
                 var descText = new TextBlock
                 {
-                    Text = doc.Description,
+                    Text = detail,
                     Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
                     FontSize = 11,
                     VerticalAlignment = VerticalAlignment.Center,
@@ -414,18 +476,66 @@ namespace InspectionEditor
             {
                 try
                 {
-                    Process.Start(new ProcessStartInfo
+                    // F-016 O1-O5: the editor attaches a reference copy and opens a working copy. C3: the shared job
+                    // file itself is never opened for editing; without a report, a read-only copy opens instead.
+                    if (_host != null && _jobFiles.TryGetValue(filePath, out var jobFile))
                     {
-                        FileName = filePath,
-                        UseShellExecute = true
-                    });
+                        _host.Open(jobFile);
+                        LoadJobFileDetails();
+                        RefreshDocsList();
+                    }
+                    else
+                    {
+                        OpenReadOnlyCopy(filePath);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Could not open file: {ex.Message}", "Error", 
+                    MessageBox.Show($"Could not open file: {ex.Message}", "Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        // A throwaway read-only copy under %TEMP%, so a PDF app can never save over the shared job file.
+        internal static void OpenReadOnlyCopy(string filePath)
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "RED-JobFiles", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            string copy = Path.Combine(folder, Path.GetFileName(filePath));
+            File.Copy(filePath, copy);
+            File.SetAttributes(copy, File.GetAttributes(copy) | FileAttributes.ReadOnly);
+            Process.Start(new ProcessStartInfo { FileName = copy, UseShellExecute = true });
+        }
+
+        // F-016 F1: RequestFiles on the website session; files arrive later through Dropbox (F2).
+        private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_host?.RequestFiles == null) return;
+            RefreshButton.IsEnabled = false;
+            try
+            {
+                string message = await _host.RequestFiles();
+                MessageBox.Show(this, message, "Job Files", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            finally { RefreshButton.IsEnabled = true; }
+        }
+
+        // F-016 F3: rescan both folders and say whether anything changed.
+        private void UpdateListButton_Click(object sender, RoutedEventArgs e)
+        {
+            var before = _jobFiles.Values.ToList();
+            int selected = _selectedRevision;
+            int previousNewest = _availableRevisions.Count > 0 ? _availableRevisions.Max() : 0;
+            LoadDocuments();
+            // A newly arrived higher revision is shown (J3 newest default); otherwise the user's choice stays.
+            bool newerArrived = _availableRevisions.Count > 0 && _availableRevisions.Max() > previousNewest;
+            if (!newerArrived && _availableRevisions.Contains(selected)) _selectedRevision = selected;
+            BuildRevisionButtons();
+            RefreshDocsList();
+            bool changed = JobFilesService.ListChanged(before, _jobFiles.Values.ToList());
+            MessageBox.Show(this, changed ? JobFilesService.ListUpdatedMessage : JobFilesService.NoUpdatesMessage, "Job Files",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         // Keyboard handler - Esc closes the dialog

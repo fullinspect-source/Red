@@ -241,6 +241,9 @@ namespace InspectionEditor.Services
         private void SaveCore(InspectionFile inspection, string targetPath, bool sameTarget, bool bindToTarget,
             byte[]? expectedOnDisk = null, JObject? feesFrom = null)
         {
+            // Form rules that depend on what changed since the last load or save (F-008 cylinder switch).
+            BeforeSave?.Invoke(inspection);
+
             // The bytes the target must still hold: what RED loaded or last saved, or (overwrite) what it just read.
             byte[]? baseline = expectedOnDisk ?? _lastSavedBytes;
             // Patch a candidate, not the last successfully saved JSON. Failed writes are retryable.
@@ -409,6 +412,21 @@ namespace InspectionEditor.Services
 
         private static string SafeFileName(string path) =>
             new string(Path.GetFileName(path).Select(c => char.IsControl(c) ? '_' : c).ToArray());
+
+        /// <summary>
+        /// F-013 step 11: replaces the open report with its projected (INSPECT-dialect) bytes, after the external-change
+        /// check, and makes them the baseline. The editor must reload the report before any further edit.
+        /// </summary>
+        public void WriteFinalBytes(byte[] bytes)
+        {
+            if (_originalJson == null || _filePath == null)
+                throw new InvalidOperationException("No file has been loaded. Call Load() first.");
+            EnsureUnchangedOnDisk(_filePath, _lastSavedBytes);
+            byte[] written = _write(_filePath, new UTF8Encoding(false).GetString(bytes), _lastSavedBytes);
+            if (_saveRegistryRoot == null) LastEditTime.RecordSuccessfulSave(_filePath, written);
+            else LastEditTime.RecordSuccessfulSave(_filePath, written, _saveRegistryRoot);
+            _lastSavedBytes = written;
+        }
 
         /// <summary>
         /// SPEC Mode B: INSPECT's own bytes for the report as last loaded or saved. Callers save first (Mode A), then
@@ -917,8 +935,102 @@ namespace InspectionEditor.Services
 
             _originalJson["StatusId"] = statusId;
             _originalJson["NextActionId"] = nextActionId;
-            _originalJson["NextActionText"] = nextActionText != null ? (JToken)nextActionText : JValue.CreateNull();
+            // F-007 E5: the text exactly as in the E2 table; index 0 is " ".
+            string? text = nextActionText ?? (nextActionId == 0 ? " " : null);
+            _originalJson["NextActionText"] = text != null ? (JToken)text : JValue.CreateNull();
         }
+
+        /// <summary>
+        /// F-007 header edits (Top and End sections). Like <see cref="SetResult"/>, the value goes straight into the
+        /// loaded document, so the next Save writes it and nothing else changes (C1). F-002 A2: a key the file lacks is
+        /// not added (returns false), except with <paramref name="allowAdd"/> for Submit, whose output is INSPECT's full
+        /// projection anyway; then it goes just before "Sections" (a null value adds nothing). Fee keys and "Sections"
+        /// are refused: RED never edits fees (owner Q-21). Returns true when the document changed.
+        /// </summary>
+        public bool HasHeaderKey(string key) => _originalJson?.ContainsKey(key) == true;
+
+        /// <summary>
+        /// Puts a top-level key back as <see cref="GetHeaderValue"/> returned it before a change: the value, or no key at
+        /// all when it returned null (F-018 A1: a refused approve takes its stamp back). Fee keys are refused.
+        /// </summary>
+        public void RestoreHeaderValue(string key, JToken? previous)
+        {
+            if (_originalJson == null)
+                throw new InvalidOperationException("No file has been loaded. Call Load() first.");
+            if (string.IsNullOrEmpty(key) || key == "Sections" || Array.IndexOf(FeeKeys, key) >= 0)
+                throw new InvalidOperationException($"RED does not edit the header key '{key}'.");
+            if (previous == null) _originalJson.Remove(key);
+            else _originalJson[key] = previous.DeepClone();
+        }
+
+        public bool SetHeaderValue(string key, JToken? value, bool allowAdd = false)
+        {
+            if (_originalJson == null)
+                throw new InvalidOperationException("No file has been loaded. Call Load() first.");
+            if (string.IsNullOrEmpty(key) || key == "Sections" || Array.IndexOf(FeeKeys, key) >= 0)
+                throw new InvalidOperationException($"RED does not edit the header key '{key}'.");
+
+            JToken token = value?.DeepClone() ?? JValue.CreateNull();
+            if (_originalJson.TryGetValue(key, out JToken? existing))
+            {
+                if (JToken.DeepEquals(existing, token)) return false;
+                _originalJson[key] = token;
+                return true;
+            }
+            if (token.Type == JTokenType.Null || !allowAdd) return false;
+            var sections = _originalJson.Property("Sections");
+            if (sections != null) sections.AddBeforeSelf(new JProperty(key, token));
+            else _originalJson.Add(key, token);
+            return true;
+        }
+
+        /// <summary>
+        /// F-009 W1/W2 and F-002 A6: removes a section from the model and the loaded document together, so the
+        /// positional section match stays aligned (the list is rebuilt by identity). Written at the next save.
+        /// </summary>
+        public bool RemoveSection(InspectionFile inspection, Section section)
+        {
+            if (_originalJson == null)
+                throw new InvalidOperationException("No file has been loaded. Call Load() first.");
+            int index = inspection.Sections.IndexOf(section);
+            if (index < 0 || _originalJson["Sections"] is not JArray sections || index >= sections.Count)
+                return false;
+            inspection.Sections.RemoveAt(index);
+            sections.RemoveAt(index);
+            return true;
+        }
+
+        /// <summary>F-009 W1: sets a section's ControlName in the model and the loaded document (written at the next save).</summary>
+        public bool SetSectionControlName(InspectionFile inspection, Section section, string? controlName)
+        {
+            if (_originalJson == null)
+                throw new InvalidOperationException("No file has been loaded. Call Load() first.");
+            int index = inspection.Sections.IndexOf(section);
+            if (index < 0 || _originalJson["Sections"] is not JArray sections || index >= sections.Count ||
+                sections[index] is not JObject sectionJson)
+                return false;
+            JToken value = controlName == null ? JValue.CreateNull() : new JValue(controlName);
+            if (sectionJson.TryGetValue("ControlName", out var existing) && JToken.DeepEquals(existing, value))
+                return false;
+            sectionJson["ControlName"] = value;
+            section.ControlName = controlName;
+            return true;
+        }
+
+        /// <summary>
+        /// Runs at the start of every save (Save, SaveCopy, OverwriteChangedFile), before the document is built. RED's
+        /// form rules use it to act on what changed since the last load or save (F-008 cylinder switch).
+        /// </summary>
+        public Action<InspectionFile>? BeforeSave { get; set; }
+
+        /// <summary>The item's Value as last loaded or saved (a copy); null when RED created the item.</summary>
+        public JToken? SavedValue(Item item) =>
+            _items.TryGetValue(item, out var origin) ? origin.Json["Value"]?.DeepClone() : null;
+
+        /// <summary>The loaded document's current value of a top-level key (a copy), or null when absent.</summary>
+        // The I12 completion rule reads the fee ciphertexts through here (in memory only; F-012).
+        public JToken? GetHeaderValue(string key) =>
+            key == "Sections" ? null : _originalJson?[key]?.DeepClone();
 
         /// <summary>
         /// Gets the current StatusId from the original JSON (0 or 1 = not yet set).

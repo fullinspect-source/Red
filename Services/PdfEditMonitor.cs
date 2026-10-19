@@ -148,6 +148,12 @@ namespace InspectionEditor.Services
             }
         }
 
+        private DateTime WorkingFileTime()
+        {
+            try { return File.GetLastWriteTime(WorkingPath); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return DateTime.Now; }
+        }
+
         public bool Poll(DateTimeOffset now, Func<bool> save) => Observe(now, save, false);
         public bool RetrySave(Func<bool> save) => Observe(DateTimeOffset.UtcNow, save, true);
 
@@ -190,13 +196,20 @@ namespace InspectionEditor.Services
                     attachment = (JObject)_expectedAttachment!.DeepClone();
                     attachment["FileData"] = Convert.ToBase64String(bytes);
                     if (attachment["ReducedFileData"] != null) attachment["ReducedFileData"] = null;
+                    // F-017 S1-S4 (F-016 R1): after a captured save the attachment carries the full bytes, its annotated
+                    // pages, the working copy's modified time, and is no longer reference-only. IncludedPages and
+                    // CanExcludePages are left as they are (S5, S6).
+                    attachment["AnnotatedPages"] = new JArray(PdfAttachmentService.AnnotatedPages(bytes).Cast<object>().ToArray());
+                    if (attachment["ReferenceOnly"]?.Type == JTokenType.Boolean && (bool)attachment["ReferenceOnly"]!)
+                        attachment["ReferenceOnly"] = false;
+                    attachment["LastWriteTime"] = PdfAttachmentService.FormatTime(WorkingFileTime());
                     replacement[target] = attachment;
                 }
                 else
                 {
                     if (expected.OfType<JObject>().Any(a => string.Equals(a.Value<string>("Filename"), _filename, StringComparison.OrdinalIgnoreCase)))
                         throw new IOException("The template attachment was added during editing; refresh before retrying.");
-                    target = replacement.Count; attachment = PdfAttachmentService.Create(_filename, bytes); replacement.Add(attachment);
+                    target = replacement.Count; attachment = PdfAttachmentService.Create(_filename, bytes, WorkingFileTime()); replacement.Add(attachment);
                 }
                 if (!new PdfAttachmentService(_owner).Transact(expected, replacement, save))
                     throw new IOException("INS save failed. The working PDF is retained. Use Retry Save after resolving the save failure.");

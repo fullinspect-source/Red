@@ -4,7 +4,66 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
-### 2026-10-18 — RED 2.2.3 — F-004: every item control, with INSPECT's values
+### 2026-10-19 — RED 2.3.0 — F-005 to F-026 in one combined release
+
+- **Base:** 2.2.3 (`d7d2af7`). F-005 to F-026 were built in the Dropbox copy (`Dropbox\P\PL`) by the Windows feature
+  runner, then driven by hand on synthetic reports (`ios-port\program\HANDS-ON-PASS-2026-10-19.md`; 5 defects and a
+  text slip fixed there). Released together by owner decision (ROADMAP "Release policy").
+  - `MainWindow.xaml.cs` was three-way merged: base = PL before the runner, ours = 2.2.3, theirs = PL now. No
+    conflicts. The result is 2.2.3 plus exactly the PL changes; this tree's 2.1.43 checklist snippets are kept.
+  - Files where PL before the runner equalled 2.2.3 took PL's version. Every deleted line was checked as runner work.
+  - Kept as released (PL differs for older reasons, not part of this release): `Services/GrokApiClient.cs` (Gemini 2.5
+    fallback), `Models/InspectionModels.cs` (snippet change notification), `tests/ai_release_packaging_static_test.py`,
+    `tests/gemini_37_routing_static_test.py`, the docs and the version pins.
+  - Not copied: `tests/GeminiRoutingHarness` (PL-only, September), gitignored secrets and harness work folders.
+- **Files changed:**
+  - New (101): the F-005..F-026 code, e.g. `MainWindow.{ItemGroups,InkItems,HeaderSections,Signature,CompletionCheck,
+    Submit,ReadOnly,Approve,JobFiles,Print,CommentLibraries,History}.cs`, `InspectionPickerWindow.{FolderViews,
+    Housekeeping,Signature,BuyerWalk,BuyerWalkFilter,BuyerWalkAddToMyList}.cs`, `App.Housekeeping.cs`,
+    `AddServiceWindow.cs`, `BuyerWalkScheduleWindow.cs`, `InkItemEditorWindow.cs`, `ReportPreviewWindow.cs`,
+    `SignaturePad.cs`, 32 services under `Services/` (incl. `Services/Reports/`), and 22 new harnesses under `tests/`.
+  - Modified (33): `MainWindow.xaml.cs`, `MainWindow.Attachments.cs`, `MainWindow.OrientationPdf.cs`,
+    `InspectionPickerWindow.xaml(.cs)`, `.InspectorProfile.cs`, `.Orders.cs`, `.OrdersFilter.cs`,
+    `.StrandAccount.cs`, `App.xaml.cs`, `DocsViewerWindow.xaml(.cs)`, `ImageEditorWindow.xaml(.cs)`,
+    `ResultPickerWindow.xaml.cs`, and the services CameraService, DiagnosticLogService, InspectionActivityService,
+    InspectLiveSettings, ItemAutoFailRules, OrientationPdfForm, OrientationPdfSession, PdfAttachmentService,
+    PdfEditMonitor, PhotoProcessingService, StrandMyListService and SurgicalSaveService; tests OrientationPdfHarness
+    (Program, CorruptAttachmentProbe), PhotoProcessingHarness and `generate_attachment_manager_probe.py`.
+  - `Services/InspectionActivityService.cs` also brings the owner-requested F-002 fix: dev builds, and copies whose
+    exe name contains "Dev", log activity locally; the real RED keeps the Dropbox log.
+  - Test fixes made during this release (also mirrored into PL):
+    - `generate_save_lifecycle_probe.py` stubs for `LogInspectClose`, `InspectFormatLog` and `_saveService`, so the
+      regenerated probe builds.
+    - `OrientationPdfHarness/AttachmentManagerProbe.cs` stubs (`MessageBoxImage.Information`, the owner overload, a
+      `JobFilesService` seam). PL's generated probe was stale; regenerated here.
+    - `run_official_autofill_reuse_probe.py`: the F-017 PDF-app seam and the PreInspector profile seam.
+    - `camera_crash_safety_static_test` (F-019 L8 daily log), `item_requirement_static_test` (F-012 W5 INC filter
+      rules) and `orientation_pdf_static_test` (F-017 A1 launcher).
+  - Also changed: the version (2.3.0, 2026-10-19) in the csproj and the four release-metadata tests, these release
+    notes and this handoff.
+- **Behavior:** specs `Dropbox/ios-port/program/features/F-005..F-026` with each card's Completion note. Live-risk
+  safeguards are kept as built:
+  - the Q-55 gate: Archive cleanup, job-folder purge and the Dropbox log prune wait for the owner's supervised check
+    (`housekeeping.json` LiveCleanupVerified);
+  - the first-live Submit and Approve questions (per PC, per kind);
+  - the Buyer Walk §18 live check stays an owner check.
+- **Verification:**
+  - Debug build `--no-incremental`: 0 errors, 29 warnings.
+  - The 32 harnesses, all exit 0: ItemGroupGrid 53, InkItem 21, HeaderSections 40, Cpr 12, BuyerWalkFamily 20,
+    SciForms 11, InspectorSignature 17, CompletionCheck 48, Submit 54, FolderViews 18, ArchiveRetention 27, JobFiles 26,
+    PdfAnnotation 11, Approve 28, Housekeeping 23, OfflineCache 18, AddService 35, InsRoundTrip 71, ItemControls 78,
+    SaveLoss 22 (with the 10 lifecycle checks), FailedSaveRecovery 17, LastEdit 74, ChecklistVisibility 7,
+    OrientationPdf 345, InspectUserType, FeeToken, Report 35, PhotoProcessing 16, PhotoMarkup 10, CommentLibrary 6,
+    BuyerWalk 40, History 4.
+  - Also: CommentSnippet 53, AppUpdate 34, UpdateUi 19, EnergySemantic, EquipmentAirflow, FramingDesignParser and
+    HetMeasured pass. DataUpdateHarness fails at a File.Move (UnauthorizedAccessException) identically on untouched
+    2.2.3, so it is environmental here. Not run: InspectConfigReadOnlyCheck, ItemRequirement, WalkTemplateEvidence
+    and PdfCleanup need the real INSPECT config or real files.
+  - Python: 35/45 (PYTHONUTF8=1); the other 10 are the known environment failures.
+  - The official autofill reuse probe: 66 checks.
+  - Hands-on pass in the Dropbox copy: every feature driven in an isolated dev build on synthetic reports, with all
+    HTTP(S) to a dead loopback proxy (Buyer Walk and ORDERS against a loopback mock).
+- **Deployment:** pending.
 
 - **Base:** 2.2.2 (`34162d2`). F-004 was built in the Dropbox copy (`Dropbox\P\PL`) and merged here file by file.
   - MainWindow.xaml.cs, Services/SurgicalSaveService.cs and tests/InsRoundTripHarness/Program.cs were three-way

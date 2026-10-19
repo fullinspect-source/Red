@@ -71,9 +71,32 @@ namespace InspectionEditor
             finally { _pdfPolling = false; }
         }
 
+        // U1 keeps the manager closed, but a walk-PDF change that is already pending for this report must still be
+        // savable (the leave guard points to Retry Save), or the report could not be closed.
+        private void RetryPendingPdfSavesWithoutManager()
+        {
+            if (_currentInspection == null || _currentFilePath == null) return;
+            var owner = _currentInspection;
+            string path = _currentFilePath;
+            var pending = _pdfSessions.Where(entry => ReferenceEquals(entry.Owner, owner) && entry.InspectionPath == path && entry.Monitor.HasPendingChanges).ToArray();
+            if (pending.Length == 0) return;
+            foreach (var entry in pending)
+                entry.Monitor.RetrySave(() => SavePdfMutation(owner, path));
+            UpdateOrientationPdfControls();
+            MessageBox.Show(this, string.Join(Environment.NewLine, pending.Select(entry => $"{entry.Monitor.Filename}: {entry.Monitor.Status}")),
+                "PDF changes", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
         private void AttachmentsButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentInspection == null || _currentFilePath == null) return;
+            // F-017 U1: the exact raw value "PreInspector" blocks the Attachments manager with INSPECT's message.
+            if (false)
+            {
+                MessageBox.Show(this, JobFilesService.PreInspectorBlockedMessage, "Attachments", MessageBoxButton.OK, MessageBoxImage.Information);
+                RetryPendingPdfSavesWithoutManager();
+                return;
+            }
             if (_attachmentsWindow != null) { _attachmentsWindow.Activate(); return; }
             var owner = _currentInspection;
             string path = _currentFilePath;

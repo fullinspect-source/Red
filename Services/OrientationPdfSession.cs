@@ -19,8 +19,10 @@ namespace InspectionEditor.Services
         public ProcessStartInfo StartInfo => Monitor.StartInfo;
         private OrientationPdfSession(PdfEditMonitor monitor) => Monitor = monitor;
 
+        // F-009 §1 (owner Q-17): code BWI is the BWT / New Home Orientation family, compared exactly like BWT.
         public static bool IsApplicable(InspectionFile? inspection) => inspection != null &&
             (string.Equals(inspection.InspectionCode?.Trim(), "BWT", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(inspection.InspectionCode?.Trim(), "BWI", StringComparison.OrdinalIgnoreCase) ||
              (inspection.InspectionName?.StartsWith("New Home Orientation", StringComparison.OrdinalIgnoreCase) ?? false) ||
              string.Equals(inspection.InspectionName?.Trim(), "Buyer Walk", StringComparison.OrdinalIgnoreCase));
 
@@ -62,11 +64,22 @@ namespace InspectionEditor.Services
             return File.Exists(path) ? path : null;
         }
 
+        // D3. INSPECT only removes '.' from the address; RED also drops characters a file name cannot hold (and the
+        // parentheses its matcher reserves), so the name is always safe. Falls back to the template name if unsafe.
+        public static string NewDocumentName(string template, string? address, DateTime today)
+        {
+            string stem = Path.GetFileNameWithoutExtension(template);
+            var invalid = new HashSet<char>(Path.GetInvalidFileNameChars()) { '(', ')' };
+            string place = new string((address ?? "").Replace(".", "").Where(c => !invalid.Contains(c) && c != '\r' && c != '\n').ToArray()).Trim();
+            string name = $"{stem} ({place} - {today.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}).pdf";
+            return place.Length > 0 && PdfAttachmentService.SafeFilename(name) && Official(name, template) ? name : template;
+        }
+
         private static bool Official(string name, string template)
         {
             if (!PdfAttachmentService.SafeFilename(name)) return false;
             string pattern = @"\A" + Regex.Escape(Path.GetFileNameWithoutExtension(template)) +
-                @"(?: \([^()\r\n]+ - (?<date>[0-9]{8})\))?\.pdf\z";
+                @"(?: \([^\r\n]+ - (?<date>[0-9]{8})\))?\.pdf\z"; // D2/D3: INSPECT keeps parentheses in the address
             var match = Regex.Match(name, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             return match.Success && (!match.Groups["date"].Success || DateTime.TryParseExact(match.Groups["date"].Value,
                 "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
@@ -122,7 +135,9 @@ namespace InspectionEditor.Services
             string source = FindTemplate(owner, inspectionPath) ?? throw Blocked(owner, "The exact file was not found.");
             try
             {
-                var monitor = new PdfEditMonitor(owner, null, name, PdfAttachmentService.ReadPdf(source), inspectionPath, workingRoot);
+                // F-009 D3: the new attachment is named "{stem} ({Address without '.'} - {yyyyMMdd}).pdf", as INSPECT.
+                var monitor = new PdfEditMonitor(owner, null, NewDocumentName(name, owner.Address, DateTime.Today),
+                    PdfAttachmentService.ReadPdf(source), inspectionPath, workingRoot);
                 try { monitor.PrepareOfficialForOpen(); }
                 catch { monitor.AbandonFailedPreparation(); throw; }
                 return new OrientationPdfSession(monitor);

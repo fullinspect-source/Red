@@ -57,6 +57,7 @@ namespace InspectionEditor
             MyListPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Collapsed;
             OrdersPanel.Visibility = Visibility.Visible;
+            BuyerWalkPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Collapsed;
             SetActiveTab(OrdersTabButton);
             UpdateOrdersSignInUi();
@@ -94,12 +95,14 @@ namespace InspectionEditor
             _strandSessionVersion++;
             _ordersLoadVersion++;
             StrandScheduleService.SignOut();
+            OfflineCacheService.DeleteJobsCache(); // F-020 C2: the jobs list holds personal data; it goes with the session
             _ordersSessionGeneration = StrandScheduleService.SessionGeneration;
             _ordersRefreshTimer?.Stop();
             OrdersListView.ItemsSource = null;
             OrdersStatusText.Text = status;
             UpdateOrdersSignInUi();
             UpdateOrdersSelectionUi();
+            ClearBuyerWalks(); // F-025 §4
         }
 
         // The Strand session is shared by every picker window. If another window signed in as
@@ -108,7 +111,7 @@ namespace InspectionEditor
 
         private void SyncOrdersWithStrandSession()
         {
-            if (_ordersBusy || _pickerClosed || _ordersSessionGeneration == StrandScheduleService.SessionGeneration)
+            if (_ordersBusy || _buyerWalksBusy || _pickerClosed || _ordersSessionGeneration == StrandScheduleService.SessionGeneration)
                 return;
 
             _ordersSessionGeneration = StrandScheduleService.SessionGeneration;
@@ -119,8 +122,11 @@ namespace InspectionEditor
             OrdersStatusText.Text = StrandScheduleService.IsSignedIn ? "" : OrdersSignInPrompt;
             UpdateOrdersSignInUi();
             UpdateOrdersSelectionUi();
+            ClearBuyerWalks(); // F-025 §4
             if (StrandScheduleService.IsSignedIn && OrdersPanel.Visibility == Visibility.Visible)
                 _ = LoadOrdersAsync();
+            if (StrandScheduleService.IsSignedIn && BuyerWalkPanel.Visibility == Visibility.Visible)
+                _ = LoadBuyerWalksAsync();
         }
 
         // Signs in with the saved/Inspect login when possible; only asks when that fails.

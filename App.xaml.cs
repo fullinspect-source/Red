@@ -130,7 +130,10 @@ namespace InspectionEditor
             // F-003 O10: the user kind (never the value) once per launch, so a support log shows which path RED takes.
             DiagnosticLogService.Info($"Started RED {AppIdentity.VersionDisplay}: user kind {InspectUserType.Classify(InspectorProfileService.Load()?.UserType)}, " +
                                       $"profile {(profileComplete ? "complete" : "incomplete")}");
+            InspectFormatLog.Launch(AppIdentity.DisplayName, AppIdentity.Version); // F-019 L7 launch banner (RED's own name and version)
             bool openEditor = profileComplete && InspectorProfileService.FirstRunMessage == null;
+            splash.SetStatus("Tidying the Archive...");
+            await RunLaunchHousekeepingAsync(); // F-013 step 14 retries, F-015 W1 (before any list is read)
             MainWindow? mainWindow = null;
             if (openEditor && e.Args.Length > 0 && !string.IsNullOrEmpty(e.Args[0]))
             {
@@ -144,6 +147,8 @@ namespace InspectionEditor
                 homeWindow.Show();
             }
             splash.Close();
+            _ = RunAfterListsLoadAsync(); // F-019 §2, L5, L6 in the background
+            StartOfflineCaches();          // F-020 R2
 
             if (staleWarning != null)
             {
@@ -153,6 +158,8 @@ namespace InspectionEditor
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
+            foreach (string message in LaunchMessages) // F-013 step 14: a changed My List copy was left in place
+                MessageBox.Show(message, "Submit", MessageBoxButton.OK, MessageBoxImage.Information);
 
             // If launched with a file argument (e.g. from "open in new window"), auto-load it
             if (mainWindow != null && e.Args.Length > 0 && !string.IsNullOrEmpty(e.Args[0]))
@@ -161,6 +168,13 @@ namespace InspectionEditor
                 if (System.IO.File.Exists(filePath))
                     mainWindow.LoadFileFromArgs(filePath);
             }
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try { InspectFormatLog.Exit(AppIdentity.DisplayName); } // F-019 L7
+            catch (Exception ex) { DiagnosticLogService.Log("Exit log line failed", ex); }
+            base.OnExit(e);
         }
 
         private static InspectionPickerWindow CreateHomeListWindow()

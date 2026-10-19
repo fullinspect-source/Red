@@ -66,9 +66,48 @@ namespace InspectionEditor.Services
         private string? _lastProcessedFile;
         private DateTime _lastProcessedTime = DateTime.MinValue;
         
-        private static readonly string CameraRollPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), 
+        // RED's own folder when nothing resolves (RED creates it, as before F-023).
+        private static readonly string DefaultCameraRollPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
             "Camera Roll");
+
+        private string? _watchedPath;
+
+        /// <summary>
+        /// F-023 T3: INSPECT 2026's PathManager::GetCameraRollPath (DOC §3): candidate roots Pictures known folder,
+        /// %OneDrive%\Pictures, %OneDriveConsumer%\Pictures, %OneDriveCommercial%\Pictures, %USERPROFILE%\Pictures
+        /// (case-insensitively deduplicated); the most recently created "Camera Roll*" subfolder of the existing roots
+        /// wins; else the first existing root; else null.
+        /// </summary>
+        public static string? ResolveCameraRoll(Func<string, string?>? environment = null, string? picturesFolder = null)
+        {
+            environment ??= Environment.GetEnvironmentVariable;
+            var roots = new List<string>();
+            void Add(string? root)
+            {
+                if (string.IsNullOrWhiteSpace(root)) return;
+                string full;
+                try { full = Path.GetFullPath(root); } catch (Exception) { return; }
+                if (!roots.Any(r => string.Equals(r.TrimEnd('\\'), full.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)))
+                    roots.Add(full);
+            }
+            Add(picturesFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
+            foreach (string variable in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial", "USERPROFILE" })
+                if (environment(variable) is { Length: > 0 } value) Add(Path.Combine(value, "Pictures"));
+
+            var existing = roots.Where(Directory.Exists).ToList();
+            DirectoryInfo? newest = null;
+            foreach (string root in existing)
+            {
+                try
+                {
+                    foreach (var folder in new DirectoryInfo(root).GetDirectories("Camera Roll*"))
+                        if (newest == null || folder.CreationTimeUtc > newest.CreationTimeUtc) newest = folder;
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+            return newest?.FullName ?? existing.FirstOrDefault();
+        }
 
         /// <summary>
         /// Fired each time a new photo is captured. Byte array is the photo data.
@@ -122,22 +161,63 @@ namespace InspectionEditor.Services
         {
             if (_isActive) return;
 
-            // Ensure Camera Roll folder exists
-            if (!Directory.Exists(CameraRollPath))
-            {
-                Directory.CreateDirectory(CameraRollPath);
-            }
+            // F-023 T3: the resolved camera roll; RED's own Camera Roll folder (created) when nothing resolves.
+            string path = ResolveCameraRoll() ?? DefaultCameraRollPath;
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            _watchedPath = path;
+            CreateWatcher(path);
+            _isActive = true;
+        }
 
-            _watcher = new FileSystemWatcher(CameraRollPath)
+        private void CreateWatcher(string path)
+        {
+            _watcher = new FileSystemWatcher(path)
             {
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime,
                 Filter = "*.*",
+                IncludeSubdirectories = true, // INSPECT 2026 watches subfolders
                 EnableRaisingEvents = true
             };
-
             _watcher.Created += OnFileCreated;
             _watcher.Renamed += OnFileRenamed;
-            _isActive = true;
+            _watcher.Error += OnWatcherError;
+        }
+
+        // INSPECT 2026: "Picture watcher error: {0}. Restarting." and the watcher is rebuilt.
+        private void OnWatcherError(object sender, ErrorEventArgs e)
+        {
+            DiagnosticLogService.Log("Picture watcher error. Restarting.", e.GetException());
+            Application.Current?.Dispatcher.BeginInvoke(() =>
+            {
+                if (!_isActive) return;
+                DisposeWatcher();
+                try
+                {
+                    string path = ResolveCameraRoll() ?? DefaultCameraRollPath; // the roll may have moved (OneDrive unlinked)
+                    if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+                    _watchedPath = path;
+                    CreateWatcher(path);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogService.Info($"Picture watcher could not restart: {ex.GetType().Name}");
+                    _isActive = false; // the next Camera press starts a new watcher
+                    MessageBox.Show("RED stopped watching the camera roll, so new photos will not be added. Press Camera again to restart it.",
+                        "Camera", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            });
+        }
+
+        private void DisposeWatcher()
+        {
+            if (_watcher == null) return;
+            _watcher.EnableRaisingEvents = false;
+            _watcher.Created -= OnFileCreated;
+            _watcher.Renamed -= OnFileRenamed;
+            _watcher.Error -= OnWatcherError;
+            _watcher.Dispose();
+            _watcher = null;
         }
 
         private async void OnFileCreated(object sender, FileSystemEventArgs e)
@@ -164,12 +244,16 @@ namespace InspectionEditor.Services
 
         private async Task ProcessNewPhoto(string filePath)
         {
+            bool png = filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase);
             if (!filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) &&
-                !filePath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) &&
-                !filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                !filePath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) && !png)
             {
                 return;
             }
+            // INSPECT takes .jpg/.jpeg only; RED's .png extra applies inside a Camera Roll* folder, so a screenshot saved
+            // under Pictures (watched when no Camera Roll folder exists) is never attached.
+            if (png && (_watchedPath == null || !Path.GetFileName(_watchedPath.TrimEnd('\\')).StartsWith("Camera Roll", StringComparison.OrdinalIgnoreCase)))
+                return;
 
             // Deduplicate: ignore if same file processed within last 2 seconds
             // (Windows Camera fires both Created and Renamed for the same photo)
@@ -273,15 +357,7 @@ namespace InspectionEditor.Services
         public void StopSession()
         {
             _isActive = false;
-
-            if (_watcher != null)
-            {
-                _watcher.EnableRaisingEvents = false;
-                _watcher.Created -= OnFileCreated;
-                _watcher.Renamed -= OnFileRenamed;
-                _watcher.Dispose();
-                _watcher = null;
-            }
+            DisposeWatcher();
 
             CloseCameraApp();
         }

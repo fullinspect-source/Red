@@ -1,5 +1,40 @@
 # RED 2.0 Release Notes
 
+## 2.3.0 — Submit, Approve, Buyer Walk and the rest of INSPECT's report workflow
+
+- **Submit and Approve work as they do in INSPECT:**
+  - Submit checks the report first and lists anything missing. "Go to" takes you to each problem.
+  - A finished report goes to the Outbox and the Archive.
+  - Review reports open with Approve instead of Submit.
+  - The first live Submit and the first live Approve on each PC ask you to confirm before anything is sent.
+- **Outbox, Archive and Review views.** My List has a view for each of these folders, showing each report's status and whether Strand has processed it.
+  - Reports in these views open read-only. You can open items to see their photos and comments, but nothing can be changed.
+  - "Move to My List" brings a report back.
+- **Housekeeping waits for a supervised first run.**
+  - Settings shows the Archive cleanup and job-folder purge switches, and a dry run that lists what would be removed.
+  - RED does not yet clean the Archive, purge job folders or prune the Dropbox log; until the supervised first run it only notes that it is waiting.
+  - "Remove from device" closes the report and deletes only its file.
+- **More of the checklist works like INSPECT:**
+  - Item-group grids (truck times, drainage, CPP slabs) are edited in place, with the number pad.
+  - Ink items (customer signature, sketches and placement diagrams) have stamps, colours, undo and redo.
+  - The Top and End sections show the status, next action, notes and markers.
+  - The inspector signature can be drawn, or taken from your saved signature.
+  - Concrete pour (CPR), BWT / New Home Orientation, Special Consult (SCI) and narrative forms follow INSPECT's rules.
+- **Job files and PDFs.**
+  - A Job Files browser shows the job's documents. You can add them as reference attachments.
+  - PDFs open in the PDF app chosen in INSPECT's settings.
+  - RED saves the pages you annotated, as INSPECT does.
+- **Adding work offline.** RED keeps forms, templates and jobs on this PC. The Add Service wizard, including reinspections, works from them.
+- **Report preview, print and PDF.** Preview a report, print it, save it as a PDF or start an e-mail.
+- **Photos.** Import several photos at once, sized as INSPECT sizes them. Mark them up with drawings and labels.
+- **Comment libraries.** The comment drawer shows the Company and My INSPECT comment libraries.
+- **Buyer Walk tab.** A BUYER WALK tab after ORDERS lists your buyer walks from Strand. Open one to schedule it, save it or add it to My List.
+- **History.** Each report's History lists its events in INSPECT's words.
+- **Also:**
+  - The ORDERS "Is like" filter now shows both wildcards, "%" and "_".
+  - RED's error log is now one file per day in RED's Logs folder, kept for 30 days.
+  - Test copies of RED keep their activity log on the PC, so they never add lines to the team's log.
+
 ## 2.2.3 — Every checklist item edits like INSPECT and saves INSPECT's values
 
 - **Answer choices match INSPECT:**

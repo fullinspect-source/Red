@@ -464,12 +464,15 @@ namespace InspectionEditor
         private bool ShouldSuppressColumnForCategory(string key)
         {
             return (_categoryMode == "Builder" && key == "Builder") ||
-                   (_categoryMode == "JobType" && key == "Type");
+                   (_categoryMode == "JobType" && key == "Type") ||
+                   SuppressFolderViewColumn(key); // F-014
         }
 
         private void MyListTabButton_Click(object sender, RoutedEventArgs e) => ShowMyListTab();
 
         private void OrdersTabButton_Click(object sender, RoutedEventArgs e) => ShowOrdersTab();
+
+        private void BuyerWalkTabButton_Click(object sender, RoutedEventArgs e) => ShowBuyerWalkTab(); // F-025
 
         private void SettingsTabButton_Click(object sender, RoutedEventArgs e) => ShowSettingsTab();
 
@@ -489,8 +492,11 @@ namespace InspectionEditor
             MyListPanel.Visibility = Visibility.Visible;
             SettingsPanel.Visibility = Visibility.Collapsed;
             OrdersPanel.Visibility = Visibility.Collapsed;
+            BuyerWalkPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Collapsed;
             SetActiveTab(MyListTabButton);
+            EnsureFolderViewBar();   // F-014 views: My List, Outbox, Archive
+            UpdateFolderViewBar();
             if (shouldRefresh)
                 RefreshCurrentMyListFolder();
         }
@@ -500,6 +506,7 @@ namespace InspectionEditor
             MyListPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Visible;
             OrdersPanel.Visibility = Visibility.Collapsed;
+            BuyerWalkPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Collapsed;
             SetActiveTab(SettingsTabButton);
             LoadStrandAccountUi();
@@ -511,6 +518,7 @@ namespace InspectionEditor
             MyListPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Collapsed;
             OrdersPanel.Visibility = Visibility.Collapsed;
+            BuyerWalkPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Visible;
             RefreshAboutDataStatus();
             SetActiveTab(AboutTabButton);
@@ -544,7 +552,7 @@ namespace InspectionEditor
             var inactiveForeground = new SolidColorBrush(Color.FromRgb(31, 41, 51));
             var inactiveBackground = new SolidColorBrush(Color.FromRgb(232, 236, 239));
             var inactiveBorder = new SolidColorBrush(Color.FromRgb(196, 205, 213));
-            foreach (var button in new[] { MyListTabButton, OrdersTabButton, SettingsTabButton, AboutTabButton })
+            foreach (var button in new[] { MyListTabButton, OrdersTabButton, BuyerWalkTabButton, SettingsTabButton, AboutTabButton })
             {
                 button.Background = inactiveBackground;
                 button.BorderBrush = inactiveBorder;
@@ -1035,7 +1043,7 @@ namespace InspectionEditor
                     {
                         try
                         {
-                            var info = ParseInspectionFile(filePath);
+                            var info = ParseListRow(filePath); // F-014 L3: header-only rows for Outbox and Archive
                             if (info != null)
                                 results.Add(info);
                         }
@@ -1231,11 +1239,12 @@ namespace InspectionEditor
                                         _openInspectionTypes.Contains(inspectionCodeFromName)
                 };
             }
-            catch
+            catch (Exception ex)
             {
                 // F-002 R4: a file that disappeared between listing and reading is dropped silently.
                 if (!File.Exists(filePath))
                     return null;
+                InspectFormatLog.ListReadFailed(filePath, ex); // F-019 L7
 
                 // Damaged but present (A-002-15): return basic info from file system
                 return new InspectionFileInfo
@@ -1474,6 +1483,7 @@ namespace InspectionEditor
 
             _columnOrder.Clear();
             _columnOrder.AddRange(new[] { "Address", "Type", "Date", "Builder", "Filename", "Open", "Signed", "Call", "LastEdit" });
+            RegisterFolderViewColumns(); // F-014: Status and Processed (Outbox and Archive views only)
 
             _columnCheckBoxesByKey.Clear();
             _columnCheckBoxesByKey["Address"] = AddressColumnCheckBox;
@@ -2253,6 +2263,9 @@ namespace InspectionEditor
         
         public string EditStatus { get; set; } = "N";
         public string CategoryName { get; set; } = "";
+        // F-014 L4: the StatusList name of StatusId, and LastDBDate as MM/dd/yyyy (Outbox and Archive views).
+        public string StatusName { get; set; } = "";
+        public string ProcessedDisplay { get; set; } = "";
 
         // Set by AssignRowColors() after load
         public Brush RowBackground    { get; set; } = Brushes.Transparent; // pastel bg per address

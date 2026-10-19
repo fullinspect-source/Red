@@ -144,7 +144,13 @@ try
     File.WriteAllBytes(b.WorkingPath, Pdf("second monitor")); b.Poll(now, Save); Check(b.Poll(now.AddSeconds(1), Save), "unrelated monitor replacement safely rebases");
     var metadata = (JObject)first.DeepClone(); var actual = (JObject)((JObject)model.Attachments![0]).DeepClone();
     metadata.Remove("FileData"); actual.Remove("FileData");
-    Check(JToken.DeepEquals(metadata, actual), "replace unknown metadata and page arrays exact");
+    // F-016 R1: a capture also moves LastWriteTime (the working file time), when the attachment has one.
+    bool timeMoved = !metadata.ContainsKey("LastWriteTime") || !JToken.DeepEquals(metadata["LastWriteTime"], actual["LastWriteTime"]);
+    metadata.Remove("LastWriteTime"); actual.Remove("LastWriteTime");
+    // F-017 S2: AnnotatedPages is recomputed from the saved bytes (the "first monitor" PDF has no annotations).
+    bool annotatedRecomputed = actual["AnnotatedPages"] is JArray { Count: 0 };
+    metadata.Remove("AnnotatedPages"); actual.Remove("AnnotatedPages");
+    Check(JToken.DeepEquals(metadata, actual) && timeMoved && annotatedRecomputed, "replace unknown metadata and page arrays exact");
     Check(JToken.DeepEquals(JToken.FromObject(model.Attachments[1]), unrelated) && JToken.DeepEquals(JToken.FromObject(model.Attachments[2]), new JValue("unknown-token")), "unknown unrelated tokens exact");
     a.Cleanup(); b.Cleanup();
     var deleteBefore = PdfAttachmentService.Snapshot(model);

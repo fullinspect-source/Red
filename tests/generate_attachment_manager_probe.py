@@ -4,8 +4,14 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 source = (root / 'MainWindow.Attachments.cs').read_text()
 # Only external launch and AppData location are seams; all callback/session logic is real.
-source = source.replace('using var process = Process.Start(monitor.StartInfo);', '_ = monitor.StartInfo;')
-source = source.replace('Path.Combine(AppIdentity.LocalAppDataPath, "PdfAttachments")', 'ProbeRoot')
+def must_replace(text, old, new):
+    # A seam that no longer matches would silently launch a real PDF app or read the real RED profile.
+    if old not in text:
+        raise SystemExit('probe seam not found: ' + old)
+    return text.replace(old, new)
+source = must_replace(source, 'using var process = Process.Start(PdfAppLauncher.StartInfoFor(monitor.WorkingPath)); // F-017 A1: the PDF app from Settings', '_ = monitor.StartInfo;')
+source = must_replace(source, 'if (JobFilesService.IsBlockedFor(InspectorProfileService.Load()?.UserType))', 'if (false)')
+source = must_replace(source, 'Path.Combine(AppIdentity.LocalAppDataPath, "PdfAttachments")', 'ProbeRoot')
 # Include the actual leave guard too, so pending-add navigation is executed, not inferred.
 orientation = (root / 'MainWindow.OrientationPdf.cs').read_text()
 start = orientation.index('        private bool FinishOrientationEditing(')

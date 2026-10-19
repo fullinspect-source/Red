@@ -99,7 +99,11 @@ namespace InspectionEditor
                 _ordersSessionGeneration = StrandScheduleService.SessionGeneration;
                 // A different account must not act on the previous account's rows if the reload fails.
                 if (!string.Equals(previousUser, StrandScheduleService.Username, StringComparison.OrdinalIgnoreCase))
+                {
                     OrdersListView.ItemsSource = null;
+                    OfflineCacheService.DeleteJobsCache(); // F-020 C2: the previous account's jobs list goes with it
+                    ClearBuyerWalks();                     // F-025 §4: an account change clears the rows
+                }
                 try
                 {
                     StrandCredentialService.Save(credentials);
@@ -131,7 +135,7 @@ namespace InspectionEditor
                         sessionEnded = true;
                     }
                     _ordersSignedOutManually = false;
-                    _ordersLoadedOnce = false;
+                    _ordersLoadedOnce = false; _buyerWalksLoadedOnce = false;
                     _lastStrandUsername = "";
                 }
                 catch (Exception saveEx)
@@ -163,7 +167,7 @@ namespace InspectionEditor
             StrandCredentialService.Clear();
             EndStrandSession(OrdersSignInPrompt);
             _ordersSignedOutManually = false;
-            _ordersLoadedOnce = false;
+            _ordersLoadedOnce = false; _buyerWalksLoadedOnce = false;
             _lastStrandUsername = "";
             ShowStrandCredentials(null);
             StrandAccountStatusText.Text = "Cleared. Enter your Strand login and press Test & Save, or press Import from INSPECT.";

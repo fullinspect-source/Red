@@ -29,12 +29,16 @@ static class MessageBox {
  public static MessageBoxResult Show(string text, string title, MessageBoxButton buttons, MessageBoxImage icon) => Result;
 }
 static class DiagnosticLogService { public static int Count; public static void Log(string context, Exception error) { Count++; } }
+static class InspectFormatLog { public static void SaveFailed(string path, Exception exception) { } }
+class SaveService { public string? FilePath => null; }
 class Activity { public int Closes; public void LogClose() => Closes++; public void LogSave() { } }
 class Camera { public event Action? PhotoCaptured; public void StopSession() { } }
 public class LifecycleProbe {
  bool _hasUnsavedChanges, _savingEditorChanges, _skipResultCheck, _pdfSaveInProgress, _isLoadingFile;
  InspectionFile? _currentInspection = new();
  Activity _activityService = new(); Camera _cameraService = new();
+ SaveService _saveService = new(); string? _currentFilePath;
+ void LogInspectClose() { }
  bool pending, fail, summary, unlocked, orientationActive, orientationReady = true; int writes;
  bool orientationDirty, cleanedAfterSave; int cleanups;
  // Model monitor polling/save separately from final session cleanup, as production does.

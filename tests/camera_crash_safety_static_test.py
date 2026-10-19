@@ -44,7 +44,9 @@ class CameraCrashSafetyTests(unittest.TestCase):
 
     def test_durable_diagnostic_log_is_best_effort_and_thread_safe(self):
         self.assertIn("AppIdentity.LocalAppDataPath", LOGGER)
-        self.assertIn('"red_errors.log"', LOGGER)
+        # F-019 L8: daily red-{yyyy-MM-dd}.log files in RED's own Logs folder.
+        self.assertIn('Path.Combine(AppIdentity.LocalAppDataPath, "Logs")', LOGGER)
+        self.assertIn('"red-" + date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ".log"', LOGGER)
         self.assertIn("lock (WriteLock)", LOGGER)
         self.assertRegex(LOGGER, r"catch\s*\{\s*// Diagnostics must never become another failure path\.")
 
@@ -55,8 +57,8 @@ class CameraCrashSafetyTests(unittest.TestCase):
         self.assertIn('DiagnosticLogService.Log("WPF dispatcher exception"', APP)
 
     def test_release_metadata(self):
-        self.assertIn("<Version>2.2.3</Version>", PROJECT)
-        self.assertIn("<ReleaseDate>2026-10-18</ReleaseDate>", PROJECT)
+        self.assertIn("<Version>2.3.0</Version>", PROJECT)
+        self.assertIn("<ReleaseDate>2026-10-19</ReleaseDate>", PROJECT)
 
 
 if __name__ == "__main__":

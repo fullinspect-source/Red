@@ -66,7 +66,7 @@ namespace InspectionEditor
                 UpdateOrientationPdfControls();
                 // The default editor can reuse a process. Only stable changed disk bytes count as a save.
                 _orientationPdf.MarkLaunched();
-                using var process = Process.Start(_orientationPdf.StartInfo);
+                using var process = Process.Start(PdfAppLauncher.StartInfoFor(_orientationPdf.WorkingPath)); // F-017 A1: the PDF app from Settings
             }
             catch (Exception ex)
             {

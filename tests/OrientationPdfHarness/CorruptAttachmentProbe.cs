@@ -75,8 +75,10 @@ static class CorruptAttachmentProbe
             File.WriteAllBytes(path, disk);
             check(service.Delete(new[] { 1, 1 }, () => { saver.Save(model); return true; }), label + ": damaged row transaction deletes exact selected index once");
             var after = JObject.Parse(File.ReadAllText(path));
+            // Attachments are compared as RED reads them (no date conversion): they now carry a LastWriteTime string (F-009 D3).
+            var afterRaw = JObject.Load(new Newtonsoft.Json.JsonTextReader(new StringReader(File.ReadAllText(path))) { DateParseHandling = Newtonsoft.Json.DateParseHandling.None });
             var expected = (JArray)attachments.DeepClone(); expected.RemoveAt(1);
-            check(JToken.DeepEquals(after["Attachments"], expected) && JToken.DeepEquals(after["UnknownRoot"], raw["UnknownRoot"]) &&
+            check(JToken.DeepEquals(afterRaw["Attachments"], expected) && JToken.DeepEquals(after["UnknownRoot"], raw["UnknownRoot"]) &&
                 ((JObject)raw["Sections"]![0]!["Items"]![0]!).Properties().All(p =>
                     JToken.DeepEquals(p.Value, after["Sections"]![0]!["Items"]![0]![p.Name])),
                 label + ": save/readback preserves unrelated attachments and root/item tokens");

@@ -89,7 +89,7 @@ class OrientationPdfWiringTests(unittest.TestCase):
         self.assertIn('if (!_pdfSaveInProgress) MessageBox.Show', MAIN)
         self.assertNotIn('_hasUnsavedChanges = false', UI + ATTACH)
     def test_only_disk_monitor_not_process_lifetime(self):
-        self.assertIn('Process.Start(_orientationPdf.StartInfo)', UI)
+        self.assertIn('Process.Start(PdfAppLauncher.StartInfoFor(_orientationPdf.WorkingPath))', UI)  # F-017 A1
         self.assertNotIn('WaitForExit', UI + ATTACH)
         self.assertIn('DispatcherTimer', ATTACH)
         self.assertIn('.Poll(DateTimeOffset.UtcNow', ATTACH)
@@ -135,8 +135,8 @@ class OrientationPdfWiringTests(unittest.TestCase):
         self.assertEqual(choices['RED PDF program (coming later)'].attrib['IsEnabled'], 'False')
     def test_version_and_markup(self):
         project = ET.parse(ROOT / 'InspectionEditor.csproj')
-        self.assertEqual(project.findtext('./PropertyGroup/Version'), '2.2.3')
-        self.assertEqual(project.findtext('./PropertyGroup/ReleaseDate'), '2026-10-18')
+        self.assertEqual(project.findtext('./PropertyGroup/Version'), '2.3.0')
+        self.assertEqual(project.findtext('./PropertyGroup/ReleaseDate'), '2026-10-19')
         for filename in ['AttachmentsWindow.xaml', 'MainWindow.xaml', 'InspectionPickerWindow.xaml']:
             ET.parse(ROOT / filename)
 

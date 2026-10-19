@@ -177,6 +177,40 @@ namespace InspectionEditor.Services
             return inspectionNumber;
         }
 
+        // F-025 A6 (§10.3): only these header fields, in this order: InspectionNumber (the server's; built only when
+        // blank), IsPreinspection, SuperintendentName (the first "Superintendent" item's Value, the item unchanged), the
+        // three zero-fee _Secure fields. Contact, Requests, IsReinspection, Attempt, WorkOrderId and the inspector fields
+        // keep the server's values; no event is added. zeroFee: tests pass a fake encoder.
+        public static string PrepareBuyerWalkForm(JObject form, string jobNumber, string inspectorInitialsName, InspectUserKind userKind, Func<string>? zeroFee = null)
+        {
+            string inspectionNumber = form.Value<string>("InspectionNumber") ?? "";
+            if (string.IsNullOrWhiteSpace(inspectionNumber))
+            {
+                bool wasPreinspection = form.Value<bool?>("IsPreinspection") == true;
+                string job = form.Value<string>("JobNumber") ?? jobNumber ?? ""; // OC §10.8: an empty string counts as not null
+                if (job.Length > 7)
+                    job = job.Substring(0, 7);
+                string code = form.Value<string>("InspectionCode") ?? "";
+                int attempt = form.Value<int?>("Attempt") ?? 0;
+                string initials = InspectorProfileService.Initials(inspectorInitialsName);
+                inspectionNumber = wasPreinspection ? $"{job}-{code}-P-{attempt}-{initials}" : $"{job}-{code}-{attempt}-{initials}";
+            }
+            SetHeader(form, "InspectionNumber", inspectionNumber);
+            SetHeader(form, "IsPreinspection", InspectUserType.IsPreinspection(userKind));
+            var superintendent = form["Sections"]?.Children()
+                .SelectMany(section => section["Items"]?.Children() ?? Enumerable.Empty<JToken>())
+                .OfType<JObject>()
+                .FirstOrDefault(item => string.Equals(item.Value<string>("Name"), "Superintendent", StringComparison.OrdinalIgnoreCase));
+            string superintendentValue = superintendent?["Value"]?.Type == JTokenType.String ? (string?)superintendent["Value"] ?? "" : "";
+            SetHeader(form, "SuperintendentName", string.IsNullOrWhiteSpace(superintendentValue) ? null : superintendentValue);
+            // One encoder call per field, as ORDERS (OC §10.8 rows 16-18).
+            string Fee() => zeroFee != null ? zeroFee() : InspectCipher.Encrypt((0m).ToString("F2", System.Globalization.CultureInfo.CurrentCulture));
+            SetHeader(form, "InspectionFee_Secure", Fee());
+            SetHeader(form, "InspectorOtherFee1_Secure", Fee());
+            SetHeader(form, "InspectorOtherFee2_Secure", Fee());
+            return inspectionNumber;
+        }
+
         // iPad fee token (ORDERS decision D-03 = B): one encrypted "0.00", made with the same cipher Add to My List uses
         // for zero fees. The owner pastes it into the iPad once, so Inspect's secret never ships there. Callers must
         // never save or log it.

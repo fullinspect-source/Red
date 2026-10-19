@@ -21,15 +21,26 @@ namespace InspectionEditor.Services
         
         public InspectionActivityService()
         {
-            // Log to Dropbox folder - syncs when online
-            var dropboxPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Dropbox", "Inspections", "ActivityLogs");
-            
+            string logFolder = LogFolderFor(AppIdentity.IsDevBuild, Environment.ProcessPath);
+
             // Ensure directory exists
-            Directory.CreateDirectory(dropboxPath);
-            
-            _logFilePath = Path.Combine(dropboxPath, "inspection_activity.jsonl");
+            Directory.CreateDirectory(logFolder);
+
+            _logFilePath = Path.Combine(logFolder, "inspection_activity.jsonl");
+        }
+
+        /// <summary>
+        /// The real RED logs to the Dropbox folder (syncs when online). Test runs log locally so they never add lines to
+        /// the team's log: dev builds, and copies whose exe name contains "Dev" (RC copies are Red.dll renamed).
+        /// </summary>
+        internal static string LogFolderFor(bool devBuild, string? processPath)
+        {
+            bool testRun = devBuild ||
+                Path.GetFileNameWithoutExtension(processPath ?? "").Contains("Dev", StringComparison.OrdinalIgnoreCase);
+            return testRun
+                ? Path.Combine(AppIdentity.LocalAppDataPath, "ActivityLogs")
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Dropbox", "Inspections", "ActivityLogs");
         }
         
         /// <summary>

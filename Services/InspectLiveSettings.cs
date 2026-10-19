@@ -17,6 +17,10 @@ namespace InspectionEditor.Services
         public static int ReadArchiveRetention(string? inspectionsFolder) =>
             ReadInt(inspectionsFolder, "ArchiveRetention", DefaultArchiveRetention);
 
+        // F-019 L5 step 3: DropboxLogRetention, read like ArchiveRetention (config.json, .bak, then INSPECT's default 10).
+        public const int DefaultDropboxLogRetention = 10;
+        public static int ReadDropboxLogRetention(string? inspectionsFolder) =>
+            ReadInt(inspectionsFolder, "DropboxLogRetention", DefaultDropboxLogRetention);
         // F-015 N4, shown in full before the cleanup exists (owner, 2026-10-18). The cutoff date is today - N. With 0 or
         // fewer days (N2: RED does not clean) or a cutoff before year 1, only the first sentence is shown.
         public static string ArchiveRetentionLine(int days, DateTime today)
@@ -32,6 +36,26 @@ namespace InspectionEditor.Services
         // F-015 N2: RED refuses 0 or negative days; there is no upper bound.
         public static string? ArchiveRetentionRefusal(int days) =>
             days <= 0 ? $"INSPECT's Archive retention is {days} days. RED does not clean the Archive until it is 1 or more." : null;
+
+        // F-013 B4: INSPECT's FormConfig.LastSyncDate, read live (config.json, then .bak); null when not set or unreadable.
+        public static DateTime? ReadLastSyncDate(string? inspectionsFolder)
+        {
+            if (string.IsNullOrWhiteSpace(inspectionsFolder))
+                return null;
+            string configPath = Path.Combine(inspectionsFolder, "config.json");
+            foreach (string path in new[] { configPath, configPath + ".bak" })
+            {
+                if (!StrandCredentialService.TryReadInspectConfig(path, out var config))
+                    continue;
+                var property = config!.Property("LastSyncDate", StringComparison.OrdinalIgnoreCase);
+                if (property == null || property.Value.Type == JTokenType.Null)
+                    return null;
+                if (property.Value.Type == JTokenType.Date)
+                    return property.Value.Value<DateTime>();
+                return DateTime.TryParse(property.Value.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? parsed : null;
+            }
+            return null;
+        }
 
         private static int ReadInt(string? inspectionsFolder, string key, int fallback)
         {

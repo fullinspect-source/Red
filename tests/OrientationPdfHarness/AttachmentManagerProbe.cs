@@ -6,10 +6,11 @@ namespace System.Windows
 {
     public class RoutedEventArgs : EventArgs { }
     public enum MessageBoxButton { OK }
-    public enum MessageBoxImage { Warning }
+    public enum MessageBoxImage { Warning, Information }
     public static class MessageBox
     {
         public static void Show(string text, string title, MessageBoxButton button, MessageBoxImage image) { }
+        public static void Show(object owner, string text, string title, MessageBoxButton button, MessageBoxImage image) { }
     }
 }
 namespace System.Windows.Threading
@@ -25,6 +26,8 @@ namespace System.Windows.Threading
 namespace InspectionEditor
 {
     static class DiagnosticLogService { public static void Log(string message, Exception ex) { } }
+    // F-017 U1 seam: the PreInspector block reads the RED profile, which the probe never does.
+    static class JobFilesService { public const string PreInspectorBlockedMessage = ""; public static bool IsBlockedFor(string? userType) => false; }
     public sealed class AttachmentsWindow
     {
         public sealed class PdfRow
