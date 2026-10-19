@@ -4,6 +4,57 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-18 — RED 2.2.3 — F-004: every item control, with INSPECT's values
+
+- **Base:** 2.2.2 (`34162d2`). F-004 was built in the Dropbox copy (`Dropbox\P\PL`) and merged here file by file.
+  - MainWindow.xaml.cs, Services/SurgicalSaveService.cs and tests/InsRoundTripHarness/Program.cs were three-way
+    merged: base = PL before F-004, theirs = PL after F-004. The 2.2.1 review-fix hunks were identical on both sides,
+    and this tree's 2.1.43 checklist snippets were kept.
+  - A second merge from the ORDERS session's pre-port copies gave the same files.
+  - The other files took only their F-004 hunks.
+- **Files changed:**
+  - New:
+    - `Services/ItemControls.cs`: the ControlName vocabulary and value sets, the NA→NI scope, number-pad rules N1-N7,
+      en-US time/date, the phone mask, upload values, SearchLookup Add New, copy rules and the bulk-writer value guard.
+    - `Services/ItemAutoFailRules.cs`: the four automatic Fail rules, moved out of MainWindow unchanged.
+    - `tests/ItemControlsHarness/`: 78 checks, plus `--corpus` and `--ui-fixture` modes.
+  - Modified:
+    - `MainWindow.xaml.cs`: the classic and inline editors per control; time/date pickers; upload, document and
+      button controls; Add New; the unsupported-control badge; the stored-value note; section "All" labels; the
+      keypad rules; the keyboard numeric editor; the phone mask; Item Fixed Confirmation; Copy/Remove; transcription
+      guard.
+    - `Services/SurgicalSaveService.cs`: NA→NI at load, held back on a save with no other change; `ProjectCurrent`;
+      Memo "ok" and PictureUpload "[Uploaded]" derived at save; SearchLookup ValueList and DocumentUpload Template
+      patched; copies reset Template and ButtonText.
+    - `Services/ChecklistItemVisibility.cs`: only `Hide` hides a row.
+    - `Services/TemplateService.cs` and `Services/EnergyComplianceService.cs`: values pass the control guard.
+  - Tests:
+    - `tests/ChecklistVisibilityHarness/Program.cs` and `tests/InsRoundTripHarness/Program.cs` (corpus mode, NA→NI
+      aware).
+    - Seven harness csproj files now also link `Services/ItemControls.cs`.
+    - Five Python source-shape tests were updated to the F-004 code:
+      - framing_design_extraction_static_test, item_requirement_static_test and red_21_layout_static_test (new
+        source strings);
+      - inline_text_ni_regression_test and ocr_unit_scope_test (stubs for the new helpers). NI toggled off is now
+        null, as INSPECT does it.
+  - Also changed: the version (2.2.3) in the csproj and the four release-metadata tests, these release notes and this
+    handoff.
+- **Behavior:** spec `Dropbox/ios-port/program/features/F-004-item-controls`. See SPEC, ACCEPTANCE and
+  NOTES-windows.md, plus owner Q-11, Q-12, Q-13 (default a), Q-15 and Q-16 (default). Released alone by owner
+  decision (ROADMAP "Release policy", 2026-10-19).
+- **Verification:**
+  - Debug build `--no-incremental`: 0 errors.
+  - Harnesses, all exit 0: InsRoundTrip 71, SaveLoss 152, FailedSaveRecovery 17, LastEdit 74, OrientationPdf 345,
+    ChecklistVisibility 7, InspectUserType 131, FeeToken and ItemControls 78.
+  - The regenerated lifecycle probe is unchanged.
+  - Python: 35/45 (PYTHONUTF8=1); the other 10 are the known environment failures.
+  - Corpus round trip on a sandbox copy (1703 files): A-002-02 and A-002-01 1703/1703, V3 18/18, V4 2/2 (was 0/2; the
+    difference was INSPECT's own NA→NI), fees 1703/1703.
+  - F-004 corpus run on a sandbox copy: no-edit open/close wrote nothing 1704/1704, and 0 values outside their set
+    across 76 FormIds.
+  - In the Dropbox copy: an isolated dev-build UI click-through with a synthetic report covering every control.
+- **Deployment:** pending.
+
 ### 2026-10-18 — RED 2.2.2 — F-003 rest: Archive retention row, one profile guard, O8 folder helper
 
 - **Base:** 2.2.1 (`95ccd6d`). F-003 was finished in the Dropbox copy (`Dropbox\P\PL`). Every file it touches was byte-identical here to its pre-F-003 state, so the files were copied whole from a frozen snapshot taken before the F-004 work started in PL. MainWindow.xaml.cs and InspectionPickerWindow.xaml.cs are not touched.

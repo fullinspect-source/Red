@@ -801,6 +801,7 @@ static class Corpus
 
         var report = new StringBuilder();
         int total = 0, identical = 0, unchangedNoWrite = 0, keyOrderOk = 0, droppedOk = 0, feesOk = 0, warnings = 0, loadErrors = 0;
+        int naRewriteFiles = 0;
         int localTemp = 0, localTempIdentical = 0;
         var modeADiffs = new Dictionary<string, int>();
         var modeAFailures = new List<string>();
@@ -820,15 +821,27 @@ static class Corpus
                 bool isLocal = original.Properties().Select(p => p.Name).SequenceEqual(InspectProjectionWriter.TopLevelKeys);
                 var saver = new SurgicalSaveService(new FailedSaveRecoveryService(Path.Combine(work, "Recovery")), null, Path.Combine(work, "VerifiedSaves"));
                 var model = saver.Load(entry.Path);
+                // F-004 V1: the open-time NA→NI rewrite is held back until another change, so a no-edit render is the
+                // deferred one; the render with NI is what an edited save and Submit carry.
+                byte[] unedited = Json.Utf8.GetBytes(saver.RenderPreservingSave(model, deferNaRewrites: true));
                 byte[] render = Json.Utf8.GetBytes(saver.RenderPreservingSave(model));
 
                 // A-002-02: forced Mode A save with no edits is byte-identical.
-                if (render.SequenceEqual(bytes)) identical++;
+                if (unedited.SequenceEqual(bytes)) identical++;
                 else
                 {
-                    var diff = Json.Diff(original, Json.Parse(render)).Select(Json.Normalize).Distinct().ToList();
+                    var diff = Json.Diff(original, Json.Parse(unedited)).Select(Json.Normalize).Distinct().ToList();
                     foreach (var path in diff) modeADiffs[path] = modeADiffs.GetValueOrDefault(path) + 1;
                     modeAFailures.Add($"{id}: {string.Join(", ", diff.Take(4))}{(diff.Count > 4 ? ", …" : "")}");
+                }
+                // F-004 V1: with NI, only the Value of items stored as exactly "NA" may differ.
+                if (!render.SequenceEqual(bytes))
+                {
+                    var rendered = Json.Parse(render);
+                    var naDiffs = Json.Diff(original, rendered);
+                    bool onlyNa = naDiffs.All(p => p.EndsWith(".Value") && (string?)original.SelectToken(p) == "NA" && (string?)rendered.SelectToken(p) == "NI");
+                    if (onlyNa) naRewriteFiles++;
+                    else modeAFailures.Add($"{id}: NI render differs outside NA values: {string.Join(", ", naDiffs.Select(Json.Normalize).Distinct().Take(4))}");
                 }
 
                 // Mode B over the Mode A document (what Submit does: save, then project).
@@ -857,8 +870,8 @@ static class Corpus
                     else serverTempFiles.Add(entry);
                 }
 
-                // A-002-01: a save request with no edits writes nothing (only meaningful when the render is identical).
-                if (render.SequenceEqual(bytes))
+                // A-002-01: a save request with no edits writes nothing, NA files included (F-004 V1 defers the NI).
+                if (unedited.SequenceEqual(bytes))
                 {
                     var stamp = File.GetLastWriteTimeUtc(entry.Path);
                     saver.Save(model);
@@ -912,6 +925,7 @@ static class Corpus
         report.AppendLine();
         report.AppendLine($"- A-002-02 forced Mode A save byte-identical: {identical}/{total - loadErrors}");
         report.AppendLine($"- A-002-01 no-edit save wrote nothing (identical files): {unchangedNoWrite}/{identical}");
+        report.AppendLine($"- F-004 V1: files whose edited-save render differs only by NA→NI Values: {naRewriteFiles}");
         report.AppendLine($"- A-002-10 / V3 INSPECT-local Temp snapshots reproduced byte for byte: {localTempIdentical}/{localTemp}");
         report.AppendLine($"- V4 server Temp snapshot -> next local snapshot equal (ignoring *_Secure, trailing 40): {v4Equal}/{v4Pairs}");
         report.AppendLine($"- V5 projected top-level keys equal SPEC B1: {keyOrderOk}/{total - loadErrors}; dropped keys absent: {droppedOk}/{total - loadErrors}");

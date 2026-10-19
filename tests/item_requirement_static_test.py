@@ -17,9 +17,10 @@ class ItemRequirementStaticTests(unittest.TestCase):
         self.assertGreaterEqual(MAIN.count("ItemRequirementService.IsPrimaryRequirementMissing(item)"), 5)
 
     def test_memo_value_editor_is_replaced_with_comment_guidance(self):
-        self.assertIn('StatusLabel.Text = "COMMENT REQUIRED"', MAIN)
-        self.assertIn("Inspect2022 does not use Value for Memo items.", MAIN)
-        self.assertIn('Text = missing ? "COMMENT REQUIRED" : "COMMENT ✓"', MAIN)
+        # F-004: every Memo (required or not) is edited in the Comment box; Value follows it at save.
+        self.assertIn('StatusLabel.Text = item.Required ? "COMMENT REQUIRED" : "COMMENT";', MAIN)
+        self.assertIn("INSPECT keeps Memo text in Comments.", MAIN)
+        self.assertIn('Text = missing ? "COMMENT REQUIRED" : hasText ? "COMMENT ✓" : "COMMENT"', MAIN)
 
     def test_comment_box_receives_required_highlight(self):
         self.assertIn('x:Name="CommentEditorBorder"', XAML)
@@ -33,7 +34,8 @@ class ItemRequirementStaticTests(unittest.TestCase):
         self.assertIn('UpdateInlinePrimaryRequirementVisuals(item);', capture)
         self.assertNotIn('RefreshInlineItemRow(item)', capture)
         helper = MAIN[MAIN.index('private void UpdateInlinePrimaryRequirementVisuals'):MAIN.index('private void InlineValueBox_TextChanged')]
-        self.assertIn('label.Text = missing ? "COMMENT REQUIRED" : "COMMENT ✓";', helper)
+        self.assertIn('label.Text = missing ? "COMMENT REQUIRED"', helper)
+        self.assertIn('string.IsNullOrWhiteSpace(item.Comments) ? "COMMENT" : "COMMENT ✓";', helper)
         self.assertIn('border.Name == "InlineNumberBadge"', helper)
 
     def test_value_entry_does_not_satisfy_memo_requirement(self):

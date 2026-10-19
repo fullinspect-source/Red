@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Compile Include="../../Models/InspectionModels.cs" Link="InspectionModels.cs" />
+    <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" />
+    <Compile Include="../../Services/ItemControls.cs" Link="ItemControls.cs" />
+    <Compile Include="../../Services/ItemAutoFailRules.cs" Link="ItemAutoFailRules.cs" />
+    <Compile Include="../../Services/ChecklistItemVisibility.cs" Link="ChecklistItemVisibility.cs" />
+    <Compile Include="../../Services/InspectionFileReader.cs" Link="InspectionFileReader.cs" />
+    <Compile Include="../../Services/InspectProjectionWriter.cs" Link="InspectProjectionWriter.cs" />
+    <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs" />
+    <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs" />
+    <Compile Include="../../Services/EditorEditService.cs" Link="EditorEditService.cs" />
+    <Compile Include="../../Services/LastEditTime.cs" Link="LastEditTime.cs" />
+  </ItemGroup>
+</Project>

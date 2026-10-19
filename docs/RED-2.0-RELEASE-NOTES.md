@@ -1,5 +1,38 @@
 # RED 2.0 Release Notes
 
+## 2.2.3 — Every checklist item edits like INSPECT and saves INSPECT's values
+
+- **Answer choices match INSPECT:**
+  - Pass/Fail items offer Pass, Fail and NI, with no N/A.
+  - Yes/No items offer Yes and No.
+  - Items INSPECT shows as Pass/Fail/NI do the same in RED, even when their type says "Yes/No".
+  - Walk checklists offer Discussed and NA.
+
+  Clicking the chosen answer again clears it. An older answer INSPECT doesn't offer (such as N/A) is shown as it was saved, and kept until you pick another.
+- **"NA" is shown as NI**, as INSPECT does, and saved as NI the next time you change something in that report. Opening and closing a report without edits still writes nothing. Walk checklists keep NA.
+- **New editors for items that used to be plain text boxes:**
+  - a time picker that saves "5:00 AM", and a date picker that saves "3/3/2026", in INSPECT's format on any Windows region setting;
+  - Home Readiness 1 to 10;
+  - Upload Picture, Upload File, and the form and info buttons.
+
+  Customer and sales-agent phone numbers are formatted like INSPECT's: (555) 010-0100.
+- **The superintendent can be picked from the list, or added with "Add New".**
+- **The number pad works like INSPECT's:**
+  - ¼, ½ and ¾ are added to the whole number;
+  - no digits can follow a fraction;
+  - values above 99999 are refused with INSPECT's "Value Too Large" message.
+
+  If INSPECT's number pad is turned off, RED shows a number box instead.
+- **Memo answers** (Special Consult narratives and similar) are typed in the Comment box, up to 1000 characters, and recorded the way INSPECT records them.
+- **No checklist item is hidden any more** because of its picture or comment button settings.
+- **On a reinspection,** choosing Pass or Discussed on an item with comments or pictures asks INSPECT's "Item Fixed Confirmation".
+- **Section "All" buttons** (YES/NO, DISCUSSED/NA) appear on checklist sections that have no Pass/NI buttons.
+- **Copies:**
+  - Remove is offered on any item that has a copy in its section.
+  - The concrete-pour truck log cannot be copied, and shows its times and numbers as text.
+- Templates, the energy-report fill and AI transcription now enter only values the item can hold.
+- Items of a kind INSPECT cannot show stay visible and editable, marked "Unsupported control".
+
 ## 2.2.2 — Inspector profile: INSPECT's Archive retention, and Add to My List asks only for the essentials
 
 - **Settings shows INSPECT's Archive retention.** Settings > Inspector Profile shows "Archive retention: N days (from INSPECT's settings)" and the date on or before which archived inspections are removed. The value is read from INSPECT's settings each time and never copied into RED. If INSPECT's value is 0 days or less, Settings says RED will not clean the Archive until it is 1 or more. RED does not delete anything from the Archive yet; INSPECT still does that cleanup.

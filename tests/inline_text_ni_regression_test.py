@@ -25,7 +25,8 @@ def method(name):
 class InlineTextNiTests(unittest.TestCase):
     def test_bounded_text_and_ni_share_old_footprint(self):
         body = method('CreateInlineStatusHeaderControl')
-        free = body.split('if (options == null)')[1].split('if (options != null)')[0]
+        # F-004: the free-text editor is built for text-like controls only (date, time and buttons have their own).
+        free = body.split('if (usesFreeEditor)')[1].split('if (options != null)')[0]
         self.assertIn('var valueEditor = new Grid', free)
         self.assertIn('MinWidth = 150', free)
         self.assertIn('MaxWidth = 220', free)
@@ -52,21 +53,28 @@ class InlineTextNiTests(unittest.TestCase):
         self.assertIn('Tag = new InlineValueAction(item, "NI")', helper)
         self.assertIn('niButton.Click += InlineStatusButton_Click', helper)
         self.assertEqual(SOURCE.count('AddInlineNiValueButtonIfNeeded(valueEditor, item, alwaysShow: true)'), 1)
-        body = method('CreateInlineStatusHeaderControl').split('if (options == null)')[0]
+        body = method('CreateInlineStatusHeaderControl').split('if (usesFreeEditor)')[0]
         self.assertEqual(body.count('AddInlineNiValueButtonIfNeeded(panel, item);'), 2)
 
     def test_extracted_click_lifecycle(self):
         code = '''using System;
 using System.Collections.Generic;
 using System.IO;
-class Item { public string Value = ""; public string Comments = "keep"; public List<string> Pictures = new(){"photo"}; public bool IsPictureRequired = false; }
+class Item { public string? Value = ""; public string Comments = "keep"; public List<string> Pictures = new(){"photo"}; public bool IsPictureRequired = false; }
 record InlineValueAction(Item Item, string Value);
+// F-004 collaborators: a text item (no checkbox set), and no reinspection prompt.
+class Ctrl { public bool IsCheckboxes => false; }
+static class ItemControls {
+ public static Ctrl For(Item item) => new();
+ public static bool AsksItemFixed(object? inspection, Item item, string value) => false;
+}
 class Button { public object Tag = null!; }
 class RoutedEventArgs { public bool Handled; }
 class SearchBox { public string Text = "filter"; }
 class Probe {
- Item? owner; string editor = ""; bool dirty; int refreshes; SearchBox SearchFilterBox = new();
+ Item? owner; string? editor = ""; bool dirty; int refreshes; SearchBox SearchFilterBox = new(); object? _currentInspection = null;
  void LoadItemEditor(Item item) { owner = item; editor = item.Value; }
+ void PromptItemFixed(Item item) { throw new Exception("NI must not ask Item Fixed"); }
  void SelectItemInTreeView(Item item) { if(owner != item) throw new Exception("ownership"); }
  void MarkUnsaved() { dirty = true; }
  void RecordInlineValueUsage(Item item, string value) { }
@@ -80,12 +88,13 @@ class Probe {
    var p = new Probe(); var other = new Item { Value = "other" }; p.LoadItemEditor(other);
    var item = new Item { Value = initial }; var args = new RoutedEventArgs();
    p.InlineStatusButton_Click(new Button { Tag = new InlineValueAction(item, "NI") }, args);
-   var expected = initial == "ni" ? "" : "NI";
+   // F-004 (RTC B32): NI toggles between "NI" and null, as INSPECT's NI checkbox does.
+   string? expected = initial == "ni" ? null : "NI";
    Check(item.Value == expected && p.editor == expected && p.owner == item, "value and editor mirror");
    Check(args.Handled && p.dirty && p.refreshes == 2, "dirty and refresh lifecycle");
    Check(other.Value == "other" && item.Comments == "keep" && item.Pictures.Count == 1, "ownership and evidence");
    // Disk roundtrip verifies the emitted value, not the application's INS serializer.
-   var file = Path.GetTempFileName(); try { File.WriteAllText(file, item.Value); Check(File.ReadAllText(file) == expected, "value disk roundtrip"); } finally { File.Delete(file); }
+   var file = Path.GetTempFileName(); try { File.WriteAllText(file, item.Value ?? ""); Check(File.ReadAllText(file) == (expected ?? ""), "value disk roundtrip"); } finally { File.Delete(file); }
   }
   Console.WriteLine("PASS: 4 extracted NI click/value lifecycle cases with disk roundtrip");
  }

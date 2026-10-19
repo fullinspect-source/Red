@@ -209,6 +209,11 @@ namespace InspectionEditor
             this.Closing += MainWindow_Closing;
             AddHandler(Keyboard.LostKeyboardFocusEvent,
                 new KeyboardFocusChangedEventHandler(Editor_LostKeyboardFocus), true);
+            // F-004 keyboard numeric editor (UseNumberPad false); the handlers act only in that mode.
+            StatusTextBox.PreviewTextInput += StatusTextBox_PreviewTextInput;
+            DataObject.AddPastingHandler(StatusTextBox, StatusTextBox_Pasting);
+            StatusTextBox.PreviewLostKeyboardFocus += StatusTextBox_PreviewLostKeyboardFocus;
+            StatusTextBox.PreviewKeyDown += StatusTextBox_PreviewKeyDown;
             this.Activated += MainWindow_Activated;
             this.Deactivated += MainWindow_Deactivated;
             
@@ -2228,27 +2233,13 @@ namespace InspectionEditor
             // Auto-set to Fail for passfail-type items when photo is added WITH a text notation.
             // Photo alone = just documentation (e.g. mandatory driveway/patio pics) — don't auto-fail.
             // Photo + text notation = deficiency documented — auto-fail is appropriate.
-            // BUT always respect explicit NI values - don't override inspector's choice.
-            string controlName = _editorLoadedItem.ControlName?.ToLower() ?? "";
-            bool isPassFailType = controlName.Contains("passfail");
-            bool hasTextNotation = !string.IsNullOrWhiteSpace(comment);
-            if (isPassFailType && hasTextNotation)
-            {
-                string oldValue = _editorLoadedItem.Value?.ToString()?.ToLower() ?? "";
-                bool isExplicitlyNI = oldValue == "ni" || oldValue == "na" || oldValue == "n/a";
-                
-                // Only auto-set to Fail if not explicitly NI
-                if (!isExplicitlyNI)
-                {
-                    _editorLoadedItem.Value = "Fail";
-                    if (_currentItem == _editorLoadedItem)
-                    {
-                        _currentItem.Value = "Fail";
-                    }
-                    LoadStatusControls(_editorLoadedItem);
-                }
-            }
-            
+            // BUT always respect explicit NI values - don't override inspector's choice. (F-004 V5b, owner Q-15)
+            if (ItemAutoFailRules.ApplyPhotoRule(_editorLoadedItem, comment))
+                LoadStatusControls(_editorLoadedItem);
+            // F-004: a PictureUpload item stores "[Uploaded]" once it has a picture (RTC B46).
+            if (ItemControls.SyncPictureUploadValue(_editorLoadedItem))
+                LoadStatusControls(_editorLoadedItem);
+
             // Refresh tree to show 📷 indicator and updated color
             PopulateTreeView(SearchFilterBox.Text);
         }
@@ -2585,6 +2576,8 @@ namespace InspectionEditor
             _transcriptionOptionsByItem.Clear();
             _currentFilePath = filePath;
             _currentInspectionCode = _currentInspection.InspectionCode;
+            // F-004 N2/B38: INSPECT's UseNumberPad as imported by F-003; RED's keypad when no profile was imported.
+            _useNumberPad = InspectorProfileService.Load()?.UseNumberPad ?? true;
             // A Reload skips the rules only when they were acknowledged for this same code and builder.
             bool skipRules = isReload && _reloadRulesKey != null && _reloadRulesKey == RulesKey(_currentInspection);
             _reloadRulesKey = null;
@@ -3730,7 +3723,10 @@ namespace InspectionEditor
         {
             if (_currentItem == null) { ClearValueButton.Visibility = Visibility.Collapsed; return; }
             bool hasValue = !string.IsNullOrWhiteSpace(_currentItem.Value?.ToString());
-            ClearValueButton.Visibility = hasValue ? Visibility.Visible : Visibility.Collapsed;
+            // F-004: Memo, PictureUpload, DocumentUpload and the button controls derive their Value; no clear.
+            bool derivedValue = ItemControls.For(_currentItem).Kind is ItemControlKind.Memo or ItemControlKind.PictureUpload
+                or ItemControlKind.DocumentUpload or ItemControlKind.DocumentButton or ItemControlKind.Button;
+            ClearValueButton.Visibility = hasValue && !derivedValue ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ClearValueButton_Click(object sender, RoutedEventArgs e)
@@ -4745,7 +4741,24 @@ namespace InspectionEditor
             bool sectionHasFail = SectionHasFailValue(section);
             var panel = new DockPanel { LastChildFill = true };
 
-            if (section.Items.Any(item => (item.ControlName ?? "").Contains("passfail", StringComparison.OrdinalIgnoreCase)))
+            if (GetSectionAllLabels(section) is { } allLabels)
+            {
+                var labelActions = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(12, 0, 0, 0)
+                };
+                DockPanel.SetDock(labelActions, Dock.Right);
+                foreach (string label in allLabels)
+                    labelActions.Children.Add(CreateSectionAllLabelButton(section, label, minHeight: 40));
+                panel.Children.Add(labelActions);
+            }
+
+            // F-004 F6: grid cells (F-005) are not Pass/Fail rows, so a grid-only section gets no Pass/NI bulk buttons.
+            if (section.Items.Any(item => (item.ControlName ?? "").Contains("passfail", StringComparison.OrdinalIgnoreCase) &&
+                                          !ItemControls.IsGroupMember(item)))
             {
                 var sectionActions = new StackPanel
                 {
@@ -4802,6 +4815,59 @@ namespace InspectionEditor
             border.MouseLeftButtonUp += InlineSectionHeader_MouseLeftButtonUp;
             StretchInlineWidth(border);
             return border;
+        }
+
+        private sealed record SectionAllLabelAction(Section Section, string Label);
+
+        // F-004 SC3/V4: INSPECT's section "All" labels. Sections with Pass/Fail rows keep RED's own Pass/NI bulk
+        // buttons instead (V4: RED's equivalent), so the labels show on the other checkbox sections.
+        private IReadOnlyList<string>? GetSectionAllLabels(Section section)
+        {
+            if (section?.Items == null ||
+                section.Items.Any(item => item != null && ItemAutoFailRules.IsPassFailControl(item) && !ItemControls.IsGroupMember(item)))
+                return null;
+            int rows = section.Items.Count(item => item != null && ChecklistItemVisibility.ShouldShow(item));
+            return ItemControls.SectionAllLabels(section, rows);
+        }
+
+        private Button CreateSectionAllLabelButton(Section section, string label, double minHeight)
+        {
+            var button = new Button
+            {
+                Content = label,
+                Tag = new SectionAllLabelAction(section, label),
+                MinWidth = 44,
+                MinHeight = minHeight,
+                Padding = new Thickness(8, 4, 8, 4),
+                Margin = new Thickness(4, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+                BorderThickness = new Thickness(2),
+                FontSize = Math.Max(11, _checklistFontSize - 1),
+                FontWeight = FontWeights.Bold,
+                FocusVisualStyle = null,
+                IsEnabled = !_readOnlyMode,
+                ToolTip = $"All: set every item in this section to {label} (again clears it)"
+            };
+            button.Click += SectionAllLabelButton_Click;
+            return button;
+        }
+
+        // INSPECT's ClickLabel_SelectAllCheckboxes sets Value directly, with no comment popup or Item Fixed question.
+        // Item 1615 (CPR "Test cylinders included") is left alone until F-008 applies its ServiceId rule on every path
+        // (owner Q-14 default); hidden items and grid cells are not INSPECT checkbox rows.
+        private void SectionAllLabelButton_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is not Button { Tag: SectionAllLabelAction action } || _readOnlyMode || _currentInspection == null) return;
+            var changed = ItemControls.ApplySectionAllLabel(action.Section, action.Label,
+                item => item.ItemId == 1615 || ItemControls.IsHidden(item) || ItemControls.IsGroupMember(item));
+            if (changed.Count == 0) return;
+            MarkUnsaved();
+            if (_editorLoadedItem != null && changed.Contains(_editorLoadedItem))
+                LoadStatusControls(_editorLoadedItem);
+            PopulateTreeView(SearchFilterBox.Text);
         }
 
         private Button CreateInlineSectionFillButton(string text, Section section, Brush background)
@@ -5096,7 +5162,9 @@ namespace InspectionEditor
                 Background = new SolidColorBrush(Color.FromRgb(219, 234, 254)),
                 Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(96, 165, 250)),
-                ToolTip = "Duplicate this checklist item"
+                ToolTip = "Duplicate this checklist item",
+                // F-004 K4: no copies inside item-group grids (F-005), so grid counts stay fixed.
+                Visibility = ItemControls.CanCopy(item) ? Visibility.Visible : Visibility.Hidden
             };
             duplicateButton.Click += InlineDuplicateButton_Click;
             Grid.SetColumn(duplicateButton, 0);
@@ -5183,6 +5251,19 @@ namespace InspectionEditor
 
             var chips = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 10, 6) };
             string value = item.Value?.ToString() ?? "";
+            // F-004: names INSPECT cannot render stay visible and editable, flagged (SPEC §3 last row).
+            if (ItemControls.For(item).Kind == ItemControlKind.Unsupported)
+                chips.Children.Add(CreateUnsupportedControlBadge(item));
+            // A stored value outside the control's set is kept and shown as stored (SPEC C1).
+            if (CreateStoredValueNote(item) is UIElement storedNote)
+                chips.Children.Add(storedNote);
+            // A list value typed outside a short ValueList (RTC B34: 834 such values) stays visible beside the choices.
+            string[]? headerOptions = GetInlineStatusOptions(item, item.ControlName?.ToLower() ?? "");
+            if (ItemControls.For(item).Kind is ItemControlKind.Lookup or ItemControlKind.Text && headerOptions != null &&
+                !HasInlineValueChoiceList(item, headerOptions) && !ShowsBlankForNi(item) && !string.IsNullOrWhiteSpace(value) &&
+                !headerOptions.Any(option => option.Equals(value, StringComparison.OrdinalIgnoreCase)))
+                chips.Children.Add(CreateInlineBadge($"Value: {value}", new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                    new SolidColorBrush(Color.FromRgb(15, 23, 42)), FontWeights.SemiBold));
             if (item.Pictures.Count > 0)
                 chips.Children.Add(CreateInlineBadge($"Photo {item.Pictures.Count}", new SolidColorBrush(Color.FromRgb(37, 99, 235)), Brushes.White, FontWeights.SemiBold));
             if (!string.IsNullOrWhiteSpace(item.Comments))
@@ -5405,9 +5486,12 @@ namespace InspectionEditor
 
         private UIElement CreateInlineStatusHeaderControl(Item item)
         {
-            if (ItemRequirementService.RequiresComment(item))
+            var control = ItemControls.For(item);
+            if (control.Kind == ItemControlKind.Memo)
             {
+                // RTC B33: Memo text is the item's Comments; Value follows it ("ok" or null).
                 bool missing = ItemRequirementService.IsPrimaryRequirementMissing(item);
+                bool hasText = !string.IsNullOrWhiteSpace(item.Comments);
                 return new Border
                 {
                     Name = "InlineCommentRequirement",
@@ -5417,10 +5501,10 @@ namespace InspectionEditor
                     BorderBrush = new SolidColorBrush(missing ? Color.FromRgb(220, 38, 38) : Color.FromRgb(34, 197, 94)),
                     BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(4),
-                    ToolTip = "Inspect2022 stores this answer in Comments, not Value.",
+                    ToolTip = "INSPECT stores this answer in Comments (up to 1000 characters).",
                     Child = new TextBlock
                     {
-                        Text = missing ? "COMMENT REQUIRED" : "COMMENT ✓",
+                        Text = missing ? "COMMENT REQUIRED" : hasText ? "COMMENT ✓" : "COMMENT",
                         Foreground = new SolidColorBrush(missing ? Color.FromRgb(153, 27, 27) : Color.FromRgb(22, 101, 52)),
                         FontSize = Math.Max(11, _checklistFontSize - 1),
                         FontWeight = FontWeights.Bold
@@ -5438,12 +5522,13 @@ namespace InspectionEditor
                 Tag = "InlinePrefixSuffixSwipeZone"
             };
 
+            bool usesFreeEditor = false;
             if (HasInlineValueChoiceList(item, options))
             {
                 var valueCombo = new ComboBox
                 {
                     ItemsSource = GetSortedInlineValueChoices(item).ToList(),
-                    Text = item.Value?.ToString() ?? "",
+                    Text = ShowsBlankForNi(item) ? "" : item.Value?.ToString() ?? "",
                     Tag = item,
                     IsEditable = true,
                     IsTextSearchEnabled = false,
@@ -5457,7 +5542,9 @@ namespace InspectionEditor
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                     FontSize = Math.Max(11, _checklistFontSize - 1),
                     FontWeight = FontWeights.SemiBold,
-                    ToolTip = "Pick, type, or paste a value"
+                    ToolTip = control.Kind == ItemControlKind.SearchLookup
+                        ? "Search the list, or type a new name and press Add New"
+                        : "Pick, type, or paste a value"
                 };
                 valueCombo.SetValue(InlineValueDisplayProperty, true);
                 valueCombo.GotKeyboardFocus += InlineValueCombo_GotKeyboardFocus;
@@ -5467,6 +5554,8 @@ namespace InspectionEditor
                 valueCombo.LostFocus += InlineValueCombo_LostFocus;
                 valueCombo.PreviewKeyDown += InlineValueCombo_PreviewKeyDown;
                 panel.Children.Add(valueCombo);
+                if (control.Kind == ItemControlKind.SearchLookup)
+                    panel.Children.Add(CreateInlineAddNewButton(item, valueCombo));
                 AddInlineNiValueButtonIfNeeded(panel, item);
                 AddInlineClearValueButton(panel, item);
             }
@@ -5495,8 +5584,29 @@ namespace InspectionEditor
                 if (!options.Any(option => option.Equals("NI", StringComparison.OrdinalIgnoreCase)))
                     AddInlineNiValueButtonIfNeeded(panel, item);
             }
+            else
+            {
+                switch (control.Kind)
+                {
+                    case ItemControlKind.Time:
+                        panel.Children.Add(CreateTimePicker(item));
+                        break;
+                    case ItemControlKind.Date:
+                        panel.Children.Add(CreateDatePicker(item));
+                        break;
+                    case ItemControlKind.PictureUpload:
+                    case ItemControlKind.DocumentUpload:
+                    case ItemControlKind.DocumentButton:
+                    case ItemControlKind.Button:
+                        panel.Children.Add(CreateItemActionButton(item));
+                        break;
+                    default:
+                        usesFreeEditor = true;
+                        break;
+                }
+            }
 
-            if (options == null)
+            if (usesFreeEditor)
             {
                 AddInlineClearValueButton(panel, item, alwaysShow: true);
                 // Share the previous text-box footprint instead of widening the row for NI.
@@ -5511,9 +5621,10 @@ namespace InspectionEditor
                 valueEditor.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 var valueBox = new TextBox
                 {
-                    Text = item.Value?.ToString() ?? "",
+                    Text = ShowsBlankForNi(item) ? "" : item.Value?.ToString() ?? "",
                     Tag = item,
                     MinHeight = 34,
+                    MaxLength = control.MaxLength,
                     Padding = new Thickness(9, 5, 9, 5),
                     Margin = new Thickness(0, 0, 5, 0),
                     Background = Brushes.White,
@@ -5523,19 +5634,32 @@ namespace InspectionEditor
                     FontWeight = string.IsNullOrWhiteSpace(item.Value?.ToString()) ? FontWeights.Normal : FontWeights.SemiBold,
                     HorizontalContentAlignment = HorizontalAlignment.Right,
                     VerticalContentAlignment = VerticalAlignment.Center,
-                    ToolTip = "Type a value for this item"
+                    ToolTip = control.Kind == ItemControlKind.NumberPad ? "Type a number (up to 99999)" : "Type a value for this item"
                 };
                 valueBox.SetValue(InlineValueDisplayProperty, true);
                 valueBox.GotKeyboardFocus += InlineValueBox_GotKeyboardFocus;
                 valueBox.TextChanged += InlineValueBox_TextChanged;
                 valueBox.LostFocus += InlineValueBox_LostFocus;
                 valueBox.MouseLeftButtonUp += (_, e) => e.Handled = true;
+                if (control.Kind == ItemControlKind.NumberPad)
+                {
+                    // F-004 §4 / RTC B38: digits and one decimal point, at most 99999, stored in N7 form.
+                    valueBox.PreviewTextInput += NumberTextBox_PreviewTextInput;
+                    DataObject.AddPastingHandler(valueBox, NumberTextBox_Pasting);
+                    valueBox.PreviewLostKeyboardFocus += NumberTextBox_PreviewLostKeyboardFocus;
+                    valueBox.PreviewKeyDown += NumberTextBox_PreviewKeyDown;
+                }
                 valueEditor.Children.Add(valueBox);
-                AddInlineNiValueButtonIfNeeded(valueEditor, item, alwaysShow: true);
-                var niButton = (Button)valueEditor.Children[1];
-                niButton.Margin = new Thickness(0);
-                Grid.SetColumn(niButton, 1);
+                if (OffersNiButton(item))
+                {
+                    AddInlineNiValueButtonIfNeeded(valueEditor, item, alwaysShow: true);
+                    var niButton = (Button)valueEditor.Children[1];
+                    niButton.Margin = new Thickness(0);
+                    Grid.SetColumn(niButton, 1);
+                }
                 panel.Children.Add(valueEditor);
+                if (control.Kind == ItemControlKind.SearchLookup)
+                    panel.Children.Add(CreateInlineAddNewButton(item, valueBox));
             }
 
             if (options != null)
@@ -5566,6 +5690,30 @@ namespace InspectionEditor
             return scroller;
         }
 
+        // SearchLookup "Add New" beside the inline editor (owner Q-16 default, RTC B36).
+        private Button CreateInlineAddNewButton(Item item, Control editor)
+        {
+            var button = new Button
+            {
+                Content = "Add New",
+                Tag = item,
+                MinHeight = 34,
+                Padding = new Thickness(9, 5, 9, 5),
+                Margin = new Thickness(0, 0, 5, 0),
+                FontSize = Math.Max(11, _checklistFontSize - 1),
+                IsEnabled = !_readOnlyMode,
+                ToolTip = "Add the typed name to this item's list and select it"
+            };
+            button.Click += (_, e) =>
+            {
+                e.Handled = true;
+                if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
+                string text = editor switch { ComboBox combo => combo.Text, TextBox box => box.Text, _ => "" };
+                AddSearchLookupValue(item, text);
+            };
+            return button;
+        }
+
         private void AddInlineNiValueButtonIfNeeded(Panel panel, Item item, bool alwaysShow = false)
         {
             if (!alwaysShow && !ShouldOfferInlineNiValueButton(item))
@@ -5594,20 +5742,9 @@ namespace InspectionEditor
             panel.Children.Add(niButton);
         }
 
-        private bool ShouldOfferInlineNiValueButton(Item item)
-        {
-            string controlName = item.ControlName?.Trim().ToLowerInvariant() ?? "";
-            if (controlName.Contains("nani") && !IsInlineStatusOnlyDesignTarget(item))
-                return true;
-
-            if (!item.Required)
-                return false;
-
-            string text = $"{item.Name} {item.DisplayLabel} {item.ControlName}".ToLowerInvariant();
-            return text.Contains("other comments") ||
-                   text.Contains("comment") ||
-                   text.Contains("memo");
-        }
+        // F-004: never on checkbox, number pad (without NI), memo, date, time, upload, button or ink controls, and never
+        // on BWCheck (SPEC C2).
+        private bool ShouldOfferInlineNiValueButton(Item item) => OffersNiButton(item);
 
         private void AddInlineClearValueButton(Panel panel, Item item, bool alwaysShow = false)
         {
@@ -5916,10 +6053,11 @@ namespace InspectionEditor
 
         private bool HasInlineValueChoiceList(Item item, string[]? options)
         {
+            var kind = ItemControls.For(item).Kind;
+            if (kind == ItemControlKind.Checkboxes) return false;
             return options != null &&
-                   options.Length > 4 &&
-                   item.ValueList != null &&
-                   item.ValueList.Count > 0;
+                   (kind is ItemControlKind.HomeReadiness or ItemControlKind.SearchLookup ||
+                    options.Length > 4 && item.ValueList != null && item.ValueList.Count > 0);
         }
 
         private IEnumerable<string> OrderInlineQuickStatusOptions(string[] options)
@@ -6210,25 +6348,27 @@ namespace InspectionEditor
             return CreateInlineHorizontalScroller(panel, 220);
         }
 
+        // F-004 SPEC §3 (owner Q-11, Q-12): checkbox controls offer exactly INSPECT's choices; list controls their list.
         private string[]? GetInlineStatusOptions(Item item, string controlName)
         {
-            string[]? options = controlName switch
+            var control = ItemControls.For(item);
+            string[]? options = control.Kind switch
             {
-                "yesno" => new[] { "Yes", "No", "N/A" },
-                "yesnonani" => new[] { "Yes", "No", "NI" },
-                "passfail" => new[] { "Pass", "Fail", "N/A" },
-                "passfailnani" => new[] { "Pass", "Fail", "NI" },
-                _ => item.ValueList?
+                ItemControlKind.Checkboxes => control.Choices!.ToArray(),
+                ItemControlKind.HomeReadiness => ItemControls.HomeReadinessChoices.ToArray(),
+                ItemControlKind.SearchLookup => ItemControls.SearchLookupChoices(item).ToArray(),
+                ItemControlKind.Lookup or ItemControlKind.Text => item.ValueList?
                     .Where(value => !string.IsNullOrWhiteSpace(value))
                     .Take(12)
-                    .ToArray()
+                    .ToArray(),
+                _ => null
             };
 
             // Inspect stores LookupNaNi choices without including NI in ValueList.
             // Keep NI in the actual choice collection so it remains selectable in
             // both the collapsed row and the expanded value drawer.
-            if (options is { Length: > 0 } &&
-                controlName.Contains("nani") &&
+            if (options is { Length: > 0 } && control.Kind != ItemControlKind.Checkboxes &&
+                control.HasNiToggle &&
                 !options.Any(value => value.Equals("NI", StringComparison.OrdinalIgnoreCase)))
             {
                 options = options.Concat(new[] { "NI" }).ToArray();
@@ -6275,15 +6415,21 @@ namespace InspectionEditor
 
         private IEnumerable<string> GetSortedInlineValueChoices(Item item)
         {
-            var options = (item.ValueList ?? new List<string>())
+            var control = ItemControls.For(item);
+            var source = control.Kind switch
+            {
+                ItemControlKind.HomeReadiness => ItemControls.HomeReadinessChoices.ToList(),
+                ItemControlKind.SearchLookup => ItemControls.SearchLookupChoices(item),
+                _ => item.ValueList ?? new List<string>()
+            };
+            var options = source
                 .Where(v => !string.IsNullOrWhiteSpace(v))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             // Long LookupNaNi lists render as a ComboBox instead of individual
             // buttons, so NI must also be part of the ComboBox data source.
-            string controlName = item.ControlName?.Trim().ToLowerInvariant() ?? "";
-            if (controlName.Contains("nani") &&
+            if (control.HasNiToggle &&
                 !options.Any(value => value.Equals("NI", StringComparison.OrdinalIgnoreCase)))
             {
                 options.Add("NI");
@@ -6358,6 +6504,8 @@ namespace InspectionEditor
             {
                 Text = existingComment,
                 Tag = item,
+                // F-004: a Memo's text is its answer, at most 1000 characters (RTC B33).
+                MaxLength = ItemControls.For(item).Kind == ItemControlKind.Memo ? ItemControls.MemoMaxLength : 0,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
                 MinHeight = quickComments.Count > 0 ? quickCommentAreaHeight : commentAreaHeight,
@@ -6751,6 +6899,11 @@ namespace InspectionEditor
             string controlName = item.ControlName?.ToLowerInvariant() ?? "";
             string[]? options = GetInlineStatusOptions(item, controlName);
 
+            // F-004: only controls that store typed text (not Date, Time, uploads, buttons, Memo, ink or checkboxes).
+            if (ItemControls.For(item).Kind is not (ItemControlKind.Text or ItemControlKind.Lookup or ItemControlKind.SearchLookup
+                or ItemControlKind.NumberPad or ItemControlKind.Unsupported))
+                return false;
+
             if (IsInlinePhotoTextValueItem(item))
                 return true;
 
@@ -6921,7 +7074,8 @@ namespace InspectionEditor
                 panel.Children.Add(otherToolsButton);
             }
 
-            if (item.IsCopied)
+            // F-004 K3: Remove only while another item in the section shares this ItemId (original or copy).
+            if (ItemControls.CanRemove(_currentInspection?.Sections.FirstOrDefault(s => s.Items.Contains(item)), item))
             {
                 var removeButton = new Button
                 {
@@ -6968,7 +7122,8 @@ namespace InspectionEditor
             };
 
             double increment = GetNumberpadIncrement(item);
-            bool showFractions = increment < 1;
+            // INSPECT's keypad always has ¼, ½ and ¾ on NumberPad items (RTC B37).
+            bool showFractions = increment < 1 || ItemControls.For(item).Kind == ItemControlKind.NumberPad;
             int rowCount = showFractions ? 5 : 4;
 
             for (int row = 0; row < rowCount; row++)
@@ -8588,7 +8743,25 @@ namespace InspectionEditor
 
             string key = action.Key;
             string currentValue = action.Item.Value?.ToString() ?? "";
-            if (key == "CLEAR")
+            if (ItemControls.For(action.Item).Kind == ItemControlKind.NumberPad)
+            {
+                // F-004 §4: on NumberPad items the keypad follows INSPECT's rules N1-N5 (RED's tool elsewhere).
+                var outcome = ItemControls.PressNumberPadKey(action.Item.Value?.ToString(), key, out string? value);
+                if (outcome == NumberPadOutcome.TooLarge)
+                {
+                    MessageBox.Show(this, ItemControls.NumberTooLargeMessage, ItemControls.NumberTooLargeCaption,
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    e.Handled = true;
+                    return;
+                }
+                if (outcome == NumberPadOutcome.Unchanged)
+                {
+                    e.Handled = true;
+                    return;
+                }
+                action.Item.Value = value;
+            }
+            else if (key == "CLEAR")
             {
                 action.Item.Value = "";
             }
@@ -9571,9 +9744,11 @@ namespace InspectionEditor
             LoadItemEditor(item);
             SelectItemInTreeView(item);
             string currentValue = item.Value?.ToString() ?? "";
+            var control = ItemControls.For(item);
             if (value.Equals(currentValue, StringComparison.OrdinalIgnoreCase))
             {
-                item.Value = "";
+                // F-004: a selected checkbox or NI toggle clears to null (RTC B26, B32); list choices keep RED's "".
+                item.Value = control.IsCheckboxes || value.Equals("NI", StringComparison.OrdinalIgnoreCase) ? null : "";
             }
             else
             {
@@ -9581,8 +9756,12 @@ namespace InspectionEditor
                 bool wasFail = currentValue.Equals("Fail", StringComparison.OrdinalIgnoreCase);
                 bool hasComment = !string.IsNullOrWhiteSpace(item.Comments);
                 bool hasClearablePics = item.Pictures != null && item.Pictures.Count > 0 && !item.IsPictureRequired;
+                bool asksItemFixed = ItemControls.AsksItemFixed(_currentInspection, item, value);
                 item.Value = value;
-                if (changingToPass && wasFail && (hasComment || hasClearablePics))
+                // F-004 V3: Pass or Discussed on a reinspection asks INSPECT's Item Fixed Confirmation.
+                if (asksItemFixed)
+                    PromptItemFixed(item);
+                else if (changingToPass && wasFail && (hasComment || hasClearablePics))
                     PromptClearOnPass(hasComment, hasClearablePics);
             }
 
@@ -9749,7 +9928,9 @@ namespace InspectionEditor
                 opened.Contains(drawerName))
                 return true;
 
-            return drawerName == InlineNumberpadDrawer && GetNumberpadDefault(item) != null;
+            // F-004 N2/B37: with INSPECT's UseNumberPad on, NumberPad items open with the keypad unless closed.
+            return drawerName == InlineNumberpadDrawer &&
+                (GetNumberpadDefault(item) != null || _useNumberPad && ItemControls.For(item).Kind == ItemControlKind.NumberPad);
         }
 
         private bool HasStandardToolsOverride(Item item)
@@ -9893,9 +10074,14 @@ namespace InspectionEditor
                     sectionControlsPanel.Children.Add(countText);
                 }
                 
-                bool hasPassFailItems = section.Items.Any(i => 
-                    (i.ControlName?.ToLower() ?? "").Contains("passfail"));
-                
+                // F-004 SC3: INSPECT's "All" labels on checkbox sections without RED's Pass/NI buttons
+                if (GetSectionAllLabels(section) is { } allLabels)
+                    foreach (string label in allLabels)
+                        sectionControlsPanel.Children.Add(CreateSectionAllLabelButton(section, label, minHeight: 32));
+
+                bool hasPassFailItems = section.Items.Any(i =>
+                    (i.ControlName?.ToLower() ?? "").Contains("passfail") && !ItemControls.IsGroupMember(i));
+
                 if (hasPassFailItems)
                 {
                     bool sectionHasFail = SectionHasFailValue(section);
@@ -10704,8 +10890,10 @@ namespace InspectionEditor
                 string controlName = item.ControlName?.ToLower() ?? "";
                 // Only set value for passfail-type items (not yesno, text, lookup, etc.)
                 bool isPassFailType = controlName.Contains("passfail");
-                
-                if (isPassFailType)
+                // F-004 C1/C2: only a value in the item's own set (plain PassFail has no NI, owner Q-11).
+                bool inSet = ItemControls.For(item).Choices?.Contains(value, StringComparer.OrdinalIgnoreCase) == true;
+
+                if (isPassFailType && inSet)
                 {
                     item.Value = value;
                     count++;
@@ -10730,6 +10918,7 @@ namespace InspectionEditor
             // Use _editorLoadedItem - this is set ONLY when LoadItemEditor is called
             // and won't change due to accidental touch/scroll events
             if (_currentInspection?.Sections == null || _editorLoadedItem == null) return;
+            if (!ItemControls.CanCopy(_editorLoadedItem)) return; // F-004 K4: grid counts stay fixed
 
             // Persist whatever is currently in the UI (comment text, value) to the original item
             // before switching the editor to the new blank duplicate.
@@ -10788,9 +10977,10 @@ namespace InspectionEditor
 
         private void RemoveDuplicateButton_Click(object sender, RoutedEventArgs e)
         {
-            // Only allow removing duplicated items (IsCopied = true)
-            if (_editorLoadedItem == null || !_editorLoadedItem.IsCopied) return;
-            if (_currentInspection?.Sections == null) return;
+            // F-004 K3: only when another item in the same section shares this ItemId (as INSPECT)
+            if (_editorLoadedItem == null || _currentInspection?.Sections == null) return;
+            if (!ItemControls.CanRemove(_currentInspection.Sections.FirstOrDefault(s => s.Items.Contains(_editorLoadedItem)), _editorLoadedItem))
+                return;
 
             Item itemToRemove = _editorLoadedItem;
             
@@ -10948,8 +11138,9 @@ namespace InspectionEditor
             // Update prev/next navigation buttons
             UpdateNavButtons(item);
             
-            // Show Remove button only for duplicated items (IsCopied = true)
-            RemoveDuplicateButton.Visibility = item.IsCopied ? Visibility.Visible : Visibility.Collapsed;
+            // F-004 K3/K4: Remove only with a same-ItemId sibling in the section; no Copy or Remove inside grids
+            RemoveDuplicateButton.Visibility = ItemControls.CanRemove(_currentSection, item) ? Visibility.Visible : Visibility.Collapsed;
+            DuplicateItemButton.Visibility = ItemControls.CanCopy(item) ? Visibility.Visible : Visibility.Collapsed;
 
             // Load status/value controls based on ControlName
             LoadStatusControls(item);
@@ -10958,6 +11149,8 @@ namespace InspectionEditor
             LoadCurrentPhoto();
 
             string existingComment = item.Comments ?? "";
+            // F-004: a Memo's text is its answer, at most 1000 characters (RTC B33).
+            CommentsTextBox.MaxLength = ItemControls.For(item).Kind == ItemControlKind.Memo ? ItemControls.MemoMaxLength : 0;
             CommentsTextBox.Text = existingComment;
             UpdateClassicSpecialistFlagButtonState();
 
@@ -11002,12 +11195,13 @@ namespace InspectionEditor
         {
             string controlName = (item.ControlName ?? "").ToLower();
 
-            // SearchLookup is always a proper-name picker (e.g. Superintendent)
-            if (controlName == "searchlookup") return true;
+            // F-004 V6 (owner Q-16 default): SearchLookup items (e.g. Superintendent) are editable: pick or "Add New".
+            if (ItemControls.For(item).Kind == ItemControlKind.SearchLookup) return false;
 
             // YesNo/PassFail controls are never proper names — they're checkboxes
             // (e.g. "Superintendent on site" YesNo in IEF/IER should NOT be locked)
             if (controlName is "yesno" or "yesnonani" or "passfail" or "passfailnani") return false;
+            if (ItemControls.For(item).IsCheckboxes) return false;
 
             string name = (item.Name ?? "").ToLower();
             return name.Contains("superintendent") ||
@@ -11148,17 +11342,14 @@ namespace InspectionEditor
             _statusButtons.Clear();
             StatusTextBox.Visibility = Visibility.Collapsed;
             NiValueButton.Visibility = Visibility.Collapsed;
+            StatusTextBox.MaxLength = 0;
             _isLookupMode = false;
+            _statusNumberKeyboardMode = false;
             int statusTabIndex = 20; // Status buttons get TabIndex 20-24
 
-            string controlName = item.ControlName?.ToLower() ?? "";
+            var control = ItemControls.For(item);
+            // F-004 V1: a stored "NA" is already "NI" in the model (SurgicalSaveService.Load); other values show as stored.
             string currentValue = item.Value?.ToString() ?? "";
-
-            // Normalize legacy "NA" values to "NI" for display/comparison
-            if (currentValue.Equals("NA", StringComparison.OrdinalIgnoreCase))
-            {
-                currentValue = "NI";
-            }
 
             // Read-only display for proper name / contact fields
             bool isSciCheck = (_currentInspectionCode ?? "").Equals("SCI", StringComparison.OrdinalIgnoreCase);
@@ -11183,135 +11374,155 @@ namespace InspectionEditor
                 return;
             }
 
-            // Determine what type of control to show
-            if (ItemRequirementService.RequiresComment(item))
+            // F-004 SPEC §3: one editor per ControlName; each stores only its control's values.
+            StatusTextBox.IsReadOnly = false;
+            StatusTextBox.Background = Brushes.White;
+            switch (control.Kind)
             {
-                StatusLabel.Text = "COMMENT REQUIRED";
-                StatusPanel.Children.Add(new TextBlock
-                {
-                    Text = "Enter this answer in the green Comment box. Inspect2022 does not use Value for Memo items.",
-                    Foreground = new SolidColorBrush(Color.FromRgb(22, 101, 52)),
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 6, 0, 0),
-                    TextWrapping = TextWrapping.Wrap
-                });
-                ClearValueButton.Visibility = Visibility.Collapsed;
-            }
-            else if (controlName == "yesno")
-            {
-                StatusLabel.Text = "STATUS";
-                var options = new[] { "Yes", "No", "N/A" };
-                foreach (var option in options)
-                {
-                    var btn = CreateStatusButton(option, currentValue);
-                    btn.TabIndex = statusTabIndex++;
-                    StatusQuickPanel.Children.Add(btn);
-                    _statusButtons.Add(btn);
-                }
-            }
-            else if (controlName == "yesnonani")
-            {
-                StatusLabel.Text = "STATUS";
-                var options = new[] { "Yes", "No", "NI" };
-                foreach (var option in options)
-                {
-                    var btn = CreateStatusButton(option, currentValue);
-                    btn.TabIndex = statusTabIndex++;
-                    StatusQuickPanel.Children.Add(btn);
-                    _statusButtons.Add(btn);
-                }
-            }
-            else if (controlName == "passfailnani" || controlName == "passfail")
-            {
-                StatusLabel.Text = "STATUS";
-                var options = new[] { "Pass", "Fail", "NI" };
-                foreach (var option in options)
-                {
-                    var btn = CreateStatusButton(option, currentValue);
-                    btn.TabIndex = statusTabIndex++;
-                    StatusQuickPanel.Children.Add(btn);
-                    _statusButtons.Add(btn);
-                }
-            }
-            else if ((controlName == "lookup" || controlName == "lookupnani" || controlName == "searchlookup") && item.ValueList != null && item.ValueList.Count > 0)
-            {
-                StatusLabel.Text = "VALUE (type or select)";
-                _isLookupMode = true;
-                
-                // Show editable text box with current value
-                StatusTextBox.Text = currentValue;
-                StatusTextBox.Visibility = Visibility.Visible;
-                NiValueButton.Visibility = Visibility.Visible;
-                StatusTextBox.IsReadOnly = false;
-                StatusTextBox.Background = Brushes.White;
-                
-                // Add lookup options as suggestion buttons
-                foreach (var option in item.ValueList)
-                {
-                    var btn = CreateStatusButton(option, currentValue);
-                    btn.TabIndex = statusTabIndex++;
-                    StatusPanel.Children.Add(btn);
-                    _statusButtons.Add(btn);
-                }
-                // LookupNaNi uses the compact NI button beside the value textbox.
-            }
-            else if (controlName == "numberpad")
-            {
-                StatusLabel.Text = "VALUE";
-                // Show current value in text box (read-only display)
-                StatusTextBox.Text = currentValue;
-                StatusTextBox.Visibility = Visibility.Visible;
-                NiValueButton.Visibility = Visibility.Visible;
-                StatusTextBox.IsReadOnly = true;
-                StatusTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
-                
-                // Add number pad buttons [0]-[9] plus [.] [½] [¼] [¾] [⌫] and [C]
-                var digits = new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ".", "½", "¼", "¾", "⌫", "C" };
-                foreach (var digit in digits)
-                {
-                    bool isFraction = digit == "½" || digit == "¼" || digit == "¾";
-                    bool isAction = digit == "⌫" || digit == "C";
-                    var btn = new Button
+                case ItemControlKind.Memo:
+                    // RTC B33: the text lives in Comments; Value is "ok" or null (set at save).
+                    StatusLabel.Text = item.Required ? "COMMENT REQUIRED" : "COMMENT";
+                    StatusPanel.Children.Add(new TextBlock
                     {
-                        Content = digit,
-                        Width = 44,
-                        Height = 44,
-                        Margin = new Thickness(2),
-                        FontSize = isFraction ? 15 : 18,
-                        FontWeight = FontWeights.Bold,
-                        Background = isAction
-                            ? new SolidColorBrush(Color.FromRgb(255, 200, 200))
-                            : isFraction
-                                ? new SolidColorBrush(Color.FromRgb(200, 220, 245)) // Light blue for fractions
-                                : new SolidColorBrush(Color.FromRgb(230, 230, 230)),
-                        BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
-                        BorderThickness = new Thickness(1),
-                        TabIndex = statusTabIndex++
+                        Text = "Enter this answer in the green Comment box (up to 1000 characters). INSPECT keeps Memo text in Comments.",
+                        Foreground = new SolidColorBrush(Color.FromRgb(22, 101, 52)),
+                        FontWeight = FontWeights.SemiBold,
+                        FontSize = 12,
+                        Margin = new Thickness(0, 6, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                    AddStoredValueNote(StatusPanel, item, control);
+                    break;
+
+                case ItemControlKind.Checkboxes:
+                    StatusLabel.Text = "STATUS";
+                    foreach (var option in control.Choices!)
+                    {
+                        var btn = CreateStatusButton(option, currentValue);
+                        btn.TabIndex = statusTabIndex++;
+                        StatusQuickPanel.Children.Add(btn);
+                        _statusButtons.Add(btn);
+                    }
+                    AddStoredValueNote(StatusPanel, item, control);
+                    break;
+
+                case ItemControlKind.Lookup when item.ValueList is { Count: > 0 }:
+                case ItemControlKind.HomeReadiness:
+                case ItemControlKind.SearchLookup:
+                {
+                    StatusLabel.Text = control.Kind == ItemControlKind.SearchLookup ? "VALUE (search or add new)" : "VALUE (type or select)";
+                    _isLookupMode = true;
+                    SetStatusTextSilently(ShowsBlankForNi(item) ? "" : currentValue);
+                    StatusTextBox.Visibility = Visibility.Visible;
+                    NiValueButton.Visibility = OffersNiButton(item) ? Visibility.Visible : Visibility.Collapsed;
+                    var options = control.Kind switch
+                    {
+                        ItemControlKind.HomeReadiness => ItemControls.HomeReadinessChoices.ToList(),
+                        ItemControlKind.SearchLookup => ItemControls.SearchLookupChoices(item),
+                        _ => item.ValueList!.ToList()
                     };
-                    btn.Click += NumberPadButton_Click;
-                    StatusKeyPanel.Children.Add(btn);
+                    if (control.Kind == ItemControlKind.SearchLookup)
+                    {
+                        // Owner Q-16 default: pick from the list or "Add New" (RTC B36).
+                        var addNew = new Button
+                        {
+                            Content = "Add New",
+                            Padding = new Thickness(8, 3, 8, 3),
+                            Margin = new Thickness(1, 1, 1, 4),
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            ToolTip = "Add the typed text to this item's list and select it",
+                            TabIndex = statusTabIndex++
+                        };
+                        addNew.Click += SearchLookupAddNewButton_Click;
+                        StatusPanel.Children.Add(addNew);
+                    }
+                    foreach (var option in options)
+                    {
+                        var btn = CreateStatusButton(option, currentValue);
+                        btn.TabIndex = statusTabIndex++;
+                        StatusPanel.Children.Add(btn);
+                        _statusButtons.Add(btn);
+                    }
+                    break;
                 }
+
+                case ItemControlKind.NumberPad when _useNumberPad:
+                {
+                    StatusLabel.Text = "VALUE";
+                    // N6: display mask N2; the keypad applies N1-N5 (RTC B37).
+                    SetStatusTextSilently(ShowsBlankForNi(item) ? "" : ItemControls.FormatNumberDisplay(currentValue));
+                    StatusTextBox.Visibility = Visibility.Visible;
+                    NiValueButton.Visibility = OffersNiButton(item) ? Visibility.Visible : Visibility.Collapsed;
+                    StatusTextBox.IsReadOnly = true;
+                    StatusTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                    foreach (var key in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "¼", "½", "¾", "CLEAR" })
+                    {
+                        bool isFraction = ItemControls.TryNumberPadFraction(key, out _);
+                        bool isClear = key == "CLEAR";
+                        var btn = new Button
+                        {
+                            Content = key,
+                            Width = isClear ? 92 : 44,
+                            Height = 44,
+                            Margin = new Thickness(2),
+                            FontSize = isClear ? 13 : isFraction ? 15 : 18,
+                            FontWeight = FontWeights.Bold,
+                            Background = isClear
+                                ? new SolidColorBrush(Color.FromRgb(255, 200, 200))
+                                : isFraction
+                                    ? new SolidColorBrush(Color.FromRgb(200, 220, 245)) // Light blue for fractions
+                                    : new SolidColorBrush(Color.FromRgb(230, 230, 230)),
+                            BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                            BorderThickness = new Thickness(1),
+                            TabIndex = statusTabIndex++
+                        };
+                        btn.Click += NumberPadButton_Click;
+                        StatusKeyPanel.Children.Add(btn);
+                    }
+                    break;
+                }
+
+                case ItemControlKind.NumberPad:
+                    // UseNumberPad false: INSPECT's keyboard numeric editor (RTC B38).
+                    StatusLabel.Text = "VALUE (number)";
+                    _statusNumberKeyboardMode = true;
+                    SetStatusTextSilently(ShowsBlankForNi(item) ? "" : currentValue);
+                    StatusTextBox.Visibility = Visibility.Visible;
+                    NiValueButton.Visibility = OffersNiButton(item) ? Visibility.Visible : Visibility.Collapsed;
+                    break;
+
+                case ItemControlKind.Time:
+                    StatusLabel.Text = "TIME";
+                    StatusQuickPanel.Children.Add(CreateTimePicker(item));
+                    break;
+
+                case ItemControlKind.Date:
+                    StatusLabel.Text = "DATE";
+                    StatusQuickPanel.Children.Add(CreateDatePicker(item));
+                    break;
+
+                case ItemControlKind.PictureUpload:
+                case ItemControlKind.DocumentUpload:
+                case ItemControlKind.DocumentButton:
+                case ItemControlKind.Button:
+                    StatusLabel.Text = control.Kind == ItemControlKind.PictureUpload ? "PICTURE"
+                        : control.Kind == ItemControlKind.DocumentUpload ? "FILE" : "DOCUMENT";
+                    StatusQuickPanel.Children.Add(CreateItemActionButton(item));
+                    AddStoredValueNote(StatusPanel, item, control);
+                    break;
+
+                default:
+                    // Text, Lookup without a list, ink (F-006) and names INSPECT cannot render.
+                    StatusLabel.Text = control.Kind == ItemControlKind.Text ? "VALUE (text)" : "VALUE";
+                    SetStatusTextSilently(ShowsBlankForNi(item) ? "" : currentValue);
+                    StatusTextBox.Visibility = Visibility.Visible;
+                    StatusTextBox.MaxLength = control.MaxLength;
+                    NiValueButton.Visibility = OffersNiButton(item) ? Visibility.Visible : Visibility.Collapsed;
+                    if (control.Kind == ItemControlKind.Unsupported)
+                        StatusPanel.Children.Add(CreateUnsupportedControlBadge(item));
+                    break;
             }
-            else if (controlName == "text" || controlName == "textbox" || controlName == "number")
-            {
-                StatusLabel.Text = controlName == "number" ? "VALUE (number)" : "VALUE (text)";
-                StatusTextBox.Text = currentValue;
-                StatusTextBox.Visibility = Visibility.Visible;
-                NiValueButton.Visibility = Visibility.Visible;
-                StatusTextBox.IsReadOnly = false;
-                StatusTextBox.Background = Brushes.White;
-            }
-            else
-            {
-                // Generic fallback - show text box
-                StatusLabel.Text = "VALUE";
-                StatusTextBox.Text = currentValue;
-                StatusTextBox.Visibility = Visibility.Visible;
-                NiValueButton.Visibility = Visibility.Visible;
-                StatusTextBox.IsReadOnly = false;
-                StatusTextBox.Background = Brushes.White;
-            }
+            UpdateNiValueButtonState(item);
             
             // Visual cue: red background if required field is empty
             UpdateRequiredFieldHighlighting(item);
@@ -11321,6 +11532,334 @@ namespace InspectionEditor
 
             // Inject RESNET multipoint button for blower door section items
             TryAddMultipointButton(item);
+        }
+
+        // ── F-004 item controls ─────────────────────────────────────────────────────────────────────────────
+
+        // INSPECT's UseNumberPad (imported by F-003): keypad when true, keyboard numeric editor when false (RTC B37-B38).
+        private bool _useNumberPad = true;
+        // The classic value box is the keyboard numeric editor of a NumberPad item.
+        private bool _statusNumberKeyboardMode;
+
+        // Shows text in the classic value box without capturing it as an edit (N2 display, blank NI).
+        private void SetStatusTextSilently(string text)
+        {
+            bool loading = _isLoadingEditor;
+            _isLoadingEditor = true;
+            try { StatusTextBox.Text = text; }
+            finally { _isLoadingEditor = loading; }
+        }
+
+        // RTC B32: while a *Ni control holds NI its editor shows blank, and typing replaces NI.
+        private static bool ShowsBlankForNi(Item item) =>
+            ItemControls.For(item).HasNiToggle &&
+            string.Equals(item.Value?.ToString(), "NI", StringComparison.OrdinalIgnoreCase);
+
+        // INSPECT's NI toggle on *Ni controls, plus RED's NI shortcut on plain Text and Lookup, where "NI" is ordinary text.
+        private static bool OffersNiButton(Item item)
+        {
+            var control = ItemControls.For(item);
+            return control.HasNiToggle ||
+                   control.Kind is ItemControlKind.Text or ItemControlKind.Lookup && !ItemControls.IsGroupMember(item);
+        }
+
+        private void UpdateNiValueButtonState(Item item)
+        {
+            bool selected = string.Equals(item.Value?.ToString(), "NI", StringComparison.OrdinalIgnoreCase);
+            NiValueButton.Background = new SolidColorBrush(selected ? Color.FromRgb(120, 120, 120) : Color.FromRgb(224, 224, 224));
+            NiValueButton.Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(85, 85, 85));
+        }
+
+        // SPEC §3/C1: a value outside the control's set (YesNo "N/A", YesNoNaNi "Yes") is kept and shown as stored.
+        private UIElement? CreateStoredValueNote(Item item)
+        {
+            var control = ItemControls.For(item);
+            string value = item.Value?.ToString() ?? "";
+            string? text = null;
+            if (control.Kind == ItemControlKind.Checkboxes && value.Length > 0 &&
+                !control.Choices!.Any(choice => choice.Equals(value, StringComparison.OrdinalIgnoreCase)))
+                text = $"Stored value: {value} (kept until you choose another)";
+            // Older RED wrote non-required Memo answers into Value; INSPECT replaces Value with "ok" when the text changes.
+            else if (control.Kind == ItemControlKind.Memo && !string.IsNullOrWhiteSpace(value) &&
+                     !value.Equals("ok", StringComparison.OrdinalIgnoreCase))
+                text = $"Stored value: {value} (replaced by \"ok\" once the comment changes)";
+            else if (control.Kind == ItemControlKind.DocumentUpload && value.Length > 0)
+                text = $"File: {ItemControls.GetString(item, "Template") ?? "(no name)"}";
+            if (text == null) return null;
+            return new TextBlock
+            {
+                Text = text,
+                Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
+                FontStyle = FontStyles.Italic,
+                FontSize = 11,
+                Margin = new Thickness(0, 4, 0, 0),
+                TextWrapping = TextWrapping.Wrap
+            };
+        }
+
+        private void AddStoredValueNote(Panel panel, Item item, ItemControl control)
+        {
+            if (CreateStoredValueNote(item) is UIElement note) panel.Children.Add(note);
+        }
+
+        // SPEC §3 last row: INSPECT cannot render this ControlName; RED keeps the item visible and editable as text.
+        private Border CreateUnsupportedControlBadge(Item item) => new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(254, 243, 199)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(217, 119, 6)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            Padding = new Thickness(6, 2, 6, 2),
+            Margin = new Thickness(0, 4, 4, 0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            ToolTip = "INSPECT has no editor for this control. RED keeps the item visible and stores what you type.",
+            Child = new TextBlock
+            {
+                Text = ItemControls.UnsupportedBadge(item),
+                Foreground = new SolidColorBrush(Color.FromRgb(146, 64, 14)),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold
+            }
+        };
+
+        // Stores a value chosen through an F-004 editor (pickers, buttons), then refreshes both panes after the
+        // control's own event has finished.
+        private void SetItemControlValue(Item item, string? value)
+        {
+            if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
+            if (item.Value == null ? value == null : value != null && string.Equals(item.Value.ToString(), value, StringComparison.Ordinal))
+                return;
+            item.Value = value;
+            MarkUnsaved();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (ReferenceEquals(item, _editorLoadedItem)) LoadStatusControls(item);
+                PopulateTreeView(SearchFilterBox.Text);
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // RTC B39 TimeEdit: hour, minute and AM/PM; stored "h:mm AM/PM" in en-US whatever the Windows region (SPEC C3).
+        private FrameworkElement CreateTimePicker(Item item)
+        {
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 5, 0) };
+            bool hasTime = ItemControls.TryParseTime(item.Value?.ToString(), out DateTime current);
+            ComboBox Combo(IEnumerable<string> values, string? selected, double width, string tip) => new ComboBox
+            {
+                ItemsSource = values.ToList(),
+                SelectedItem = selected,
+                Width = width,
+                MinHeight = 32,
+                Margin = new Thickness(0, 0, 3, 0),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                ToolTip = tip,
+                IsEnabled = !_readOnlyMode
+            };
+            var hour = Combo(Enumerable.Range(1, 12).Select(h => h.ToString(CultureInfo.InvariantCulture)),
+                hasTime ? ((current.Hour + 11) % 12 + 1).ToString(CultureInfo.InvariantCulture) : null, 52, "Hour");
+            var minute = Combo(Enumerable.Range(0, 60).Select(m => m.ToString("00", CultureInfo.InvariantCulture)),
+                hasTime ? current.Minute.ToString("00", CultureInfo.InvariantCulture) : null, 56, "Minute");
+            var half = Combo(new[] { "AM", "PM" }, hasTime ? (current.Hour < 12 ? "AM" : "PM") : null, 58, "AM or PM");
+            void Apply(object? sender, SelectionChangedEventArgs e)
+            {
+                if (hour.SelectedItem is not string h) return;
+                int hour12 = int.Parse(h, CultureInfo.InvariantCulture);
+                int minutes = minute.SelectedItem is string m ? int.Parse(m, CultureInfo.InvariantCulture) : 0;
+                bool pm = half.SelectedItem as string == "PM";
+                var time = DateTime.Today.AddHours(hour12 % 12 + (pm ? 12 : 0)).AddMinutes(minutes);
+                SetItemControlValue(item, ItemControls.FormatTime(time));
+            }
+            hour.SelectionChanged += Apply;
+            minute.SelectionChanged += Apply;
+            half.SelectionChanged += Apply;
+            panel.Children.Add(hour);
+            panel.Children.Add(new TextBlock { Text = ":", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0) });
+            panel.Children.Add(minute);
+            panel.Children.Add(half);
+            var now = new Button
+            {
+                Content = "Now",
+                Padding = new Thickness(8, 3, 8, 3),
+                IsEnabled = !_readOnlyMode,
+                ToolTip = "Use the current time"
+            };
+            now.Click += (_, e) => { e.Handled = true; SetItemControlValue(item, ItemControls.FormatTime(DateTime.Now)); };
+            panel.Children.Add(now);
+            return panel;
+        }
+
+        // RTC B39 DateEdit: opens on today; stored "M/d/yyyy" in en-US whatever the Windows region (SPEC C3).
+        private FrameworkElement CreateDatePicker(Item item)
+        {
+            var picker = new DatePicker
+            {
+                Width = 150,
+                Margin = new Thickness(0, 0, 5, 0),
+                Language = System.Windows.Markup.XmlLanguage.GetLanguage("en-US"),
+                SelectedDateFormat = DatePickerFormat.Short,
+                DisplayDate = DateTime.Today,
+                IsEnabled = !_readOnlyMode
+            };
+            if (ItemControls.TryParseDate(item.Value?.ToString(), out DateTime stored))
+                picker.SelectedDate = stored.Date;
+            picker.SelectedDateChanged += (_, _) =>
+                SetItemControlValue(item, picker.SelectedDate is DateTime date ? ItemControls.FormatDate(date) : null);
+            return picker;
+        }
+
+        // PictureUpload, DocumentUpload, DocumentButton and Button (RTC B46-B50).
+        private Button CreateItemActionButton(Item item)
+        {
+            var control = ItemControls.For(item);
+            string? buttonText = ItemControls.GetString(item, "ButtonText");
+            string caption = control.Kind switch
+            {
+                ItemControlKind.PictureUpload => ItemControls.PictureUploadCaption(item),
+                ItemControlKind.DocumentUpload => ItemControls.DocumentUploadCaption(item),
+                _ => string.IsNullOrEmpty(buttonText) ? item.Name ?? "Button" : buttonText
+            };
+            var button = new Button
+            {
+                Content = caption,
+                Tag = item,
+                MinHeight = 32,
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 0, 5, 0),
+                IsEnabled = !_readOnlyMode
+            };
+            switch (control.Kind)
+            {
+                case ItemControlKind.PictureUpload:
+                    button.ToolTip = "Add a picture from a file (stored as [Uploaded])";
+                    button.Click += (_, e) => { e.Handled = true; UploadPictureForItem(item); };
+                    break;
+                case ItemControlKind.DocumentUpload:
+                    button.ToolTip = "Choose a file. INSPECT stores its contents as text, so binary files do not survive (owner Q-13).";
+                    button.Click += (_, e) => { e.Handled = true; UploadDocumentForItem(item); };
+                    break;
+                case ItemControlKind.DocumentButton:
+                    bool walkDocument = OrientationPdfSession.IsApplicable(_currentInspection);
+                    button.IsEnabled = walkDocument && !_readOnlyMode;
+                    button.ToolTip = walkDocument
+                        ? "Open the walk document"
+                        : "Document forms for this report type arrive with F-009.";
+                    button.Click += (_, e) => { e.Handled = true; OpenOrientationPdfButton_Click(this, new RoutedEventArgs()); };
+                    break;
+                default:
+                    button.ToolTip = "INSPECT's button has no action.";
+                    break;
+            }
+            return button;
+        }
+
+        private void UploadPictureForItem(Item item)
+        {
+            if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
+            LoadItemEditor(item);
+            SelectPhotoButton_Click(this, new RoutedEventArgs());
+            LoadItemEditor(item);
+            PopulateTreeView(SearchFilterBox.Text);
+        }
+
+        // RTC B47, owner Q-13 default (a): the file's bytes decoded as UTF-8 in Value, its name in Template, then save.
+        private void UploadDocumentForItem(Item item)
+        {
+            if (_readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
+            var dialog = new OpenFileDialog { Filter = "All Files|*.*", Title = item.Name ?? "Upload File" };
+            if (dialog.ShowDialog(this) != true) return;
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(dialog.FileName); }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"The file could not be read.\n\n{ex.Message}", "Upload File", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            ItemControls.StoreDocumentUpload(item, Path.GetFileName(dialog.FileName), bytes);
+            MarkUnsaved();
+            PersistEditorChanges();
+            LoadItemEditor(item);
+            PopulateTreeView(SearchFilterBox.Text);
+        }
+
+        // SearchLookup "Add New" (owner Q-16 default, RTC B36): the typed text joins the item's ValueList.
+        private void SearchLookupAddNewButton_Click(object sender, RoutedEventArgs e)
+        {
+            var item = _editorLoadedItem;
+            if (item == null || _readOnlyMode || !EditorEditService.Owns(_currentInspection, item)) return;
+            AddSearchLookupValue(item, StatusTextBox.Text);
+        }
+
+        private void AddSearchLookupValue(Item item, string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                MessageBox.Show("Type the new name first, then press Add New.", "Add New", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            ItemControls.AddSearchLookupValue(item, text);
+            MarkUnsaved();
+            LoadItemEditor(item);
+            PopulateTreeView(SearchFilterBox.Text);
+        }
+
+        // Keyboard numeric editor (UseNumberPad false, RTC B38): digits and one decimal point, at most 99999.
+        private static bool AcceptNumberInput(TextBox box, string input)
+        {
+            string current = box.Text;
+            int start = Math.Min(box.SelectionStart, current.Length);
+            string prospective = current.Remove(start, Math.Min(box.SelectionLength, current.Length - start)).Insert(start, input);
+            if (ItemControls.IsAcceptableNumberText(prospective, out bool tooLarge)) return true;
+            if (tooLarge)
+                MessageBox.Show(ItemControls.NumberTooLargeMessage, ItemControls.NumberTooLargeCaption, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        private void NumberTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (sender is TextBox box && !AcceptNumberInput(box, e.Text)) e.Handled = true;
+        }
+
+        private void NumberTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (sender is not TextBox box) return;
+            string text = e.DataObject.GetDataPresent(DataFormats.UnicodeText) ? e.DataObject.GetData(DataFormats.UnicodeText) as string ?? "" : "";
+            if (!AcceptNumberInput(box, text.Trim())) e.CancelCommand();
+        }
+
+        // N7 on the way out: "4." → "4", "4.50" → "4.5"; the normalised text is then captured as the value.
+        private void NumberTextBox_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is not TextBox box) return;
+            // Only text the user typed: a stored "05" or "4.50" the user never touched is not an edit (F-002 A-002-01).
+            var item = box.Tag as Item ?? (ReferenceEquals(box, StatusTextBox) ? _editorLoadedItem : null);
+            if (item == null || box.Text == (ShowsBlankForNi(item) ? "" : item.Value?.ToString() ?? "")) return;
+            string normalized = ItemControls.NormalizeTypedNumber(box.Text);
+            if (normalized != box.Text) box.Text = normalized;
+        }
+
+        // WPF raises no PreviewTextInput for Space, so the numeric editor refuses it here.
+        private void NumberTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Space) e.Handled = true;
+        }
+
+        private void StatusTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (_statusNumberKeyboardMode) NumberTextBox_PreviewTextInput(sender, e);
+        }
+
+        private void StatusTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (_statusNumberKeyboardMode) NumberTextBox_Pasting(sender, e);
+        }
+
+        private void StatusTextBox_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (_statusNumberKeyboardMode) NumberTextBox_PreviewLostKeyboardFocus(sender, e);
+        }
+
+        private void StatusTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (_statusNumberKeyboardMode) NumberTextBox_PreviewKeyDown(sender, e);
         }
 
         private void UpdateRequiredFieldHighlighting(Item item)
@@ -11881,10 +12420,11 @@ namespace InspectionEditor
                     return;
                 }
                 
-                // If clicking the already-selected button, clear the value (toggle off)
-                if (clickedValue.Equals(currentValue, StringComparison.OrdinalIgnoreCase))
+                // If clicking the already-selected button, clear the value (toggle off): null, as INSPECT (F-004 RTC B26)
+                string? nextValue = ItemControls.NextChoiceValue(_currentItem, clickedValue);
+                if (nextValue == null)
                 {
-                    _currentItem.Value = "";
+                    _currentItem.Value = null;
                 }
                 else
                 {
@@ -11893,18 +12433,27 @@ namespace InspectionEditor
                     bool wasFail = currentValue.Equals("Fail", StringComparison.OrdinalIgnoreCase);
                     bool hasComment = !string.IsNullOrWhiteSpace(_currentItem.Comments);
                     bool hasPictures = _currentItem.Pictures != null && _currentItem.Pictures.Count > 0;
-                    
-                    _currentItem.Value = clickedValue;
+                    bool asksItemFixed = ItemControls.AsksItemFixed(_currentInspection, _currentItem, nextValue);
 
-                    // Prompt to clear comment/pictures when changing from Fail to Pass.
-                    // Required pictures are never clearable — exclude them from the offer entirely.
-                    bool hasClearablePics = hasPictures && !(_currentItem.IsPictureRequired);
-                    if (changingToPass && wasFail && (hasComment || hasClearablePics))
+                    _currentItem.Value = nextValue;
+
+                    // F-004 V3: Pass or Discussed on a reinspection asks INSPECT's Item Fixed Confirmation.
+                    if (asksItemFixed)
                     {
-                        PromptClearOnPass(hasComment, hasClearablePics);
+                        PromptItemFixed(_currentItem);
+                    }
+                    else
+                    {
+                        // Prompt to clear comment/pictures when changing from Fail to Pass.
+                        // Required pictures are never clearable — exclude them from the offer entirely.
+                        bool hasClearablePics = hasPictures && !(_currentItem.IsPictureRequired);
+                        if (changingToPass && wasFail && (hasComment || hasClearablePics))
+                        {
+                            PromptClearOnPass(hasComment, hasClearablePics);
+                        }
                     }
                 }
-                
+
                 MarkUnsaved();
 
                 // Refresh the status controls to show new selection styling
@@ -11992,6 +12541,25 @@ namespace InspectionEditor
             }
         }
         
+        // F-004 V3 (RTC B27c): Yes sets Comments to String.Empty and Pictures to [] (required pictures included, as INSPECT).
+        private void PromptItemFixed(Item item)
+        {
+            if (MessageBox.Show(this, ItemControls.ItemFixedMessage, ItemControls.ItemFixedCaption,
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+            ItemControls.ClearFixedItem(item);
+            if (ReferenceEquals(item, _editorLoadedItem))
+            {
+                bool loading = _isLoadingEditor;
+                _isLoadingEditor = true;
+                try { CommentsTextBox.Text = ""; }
+                finally { _isLoadingEditor = loading; }
+                _currentPhotoIndex = 0;
+                LoadCurrentPhoto();
+            }
+            MarkUnsaved();
+        }
+
         private void PromptClearOnPass(bool hasComment, bool hasPictures)
         {
             // Use _editorLoadedItem (not _currentItem) to avoid touch-drift issues
@@ -12138,45 +12706,24 @@ namespace InspectionEditor
         {
             if (sender is Button btn && _currentItem != null)
             {
-                string digit = btn.Content?.ToString() ?? "";
-                string currentValue = _currentItem.Value?.ToString() ?? "";
-                
-                if (digit == "C")
+                if (_readOnlyMode) return;
+                string key = btn.Content?.ToString() ?? "";
+                // F-004 §4: INSPECT's keypad rules N1-N5, stored as the plain decimal string (N7).
+                var outcome = ItemControls.PressNumberPadKey(_currentItem.Value?.ToString(), key, out string? value);
+                if (outcome == NumberPadOutcome.TooLarge)
                 {
-                    // Clear - reset to empty
-                    _currentItem.Value = "";
+                    MessageBox.Show(this, ItemControls.NumberTooLargeMessage, ItemControls.NumberTooLargeCaption,
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
-                else if (digit == "⌫")
-                {
-                    // Backspace - remove last character
-                    if (currentValue.Length > 0)
-                    {
-                        _currentItem.Value = currentValue.Substring(0, currentValue.Length - 1);
-                    }
-                }
-                else if (digit == "½")
-                {
-                    // Append .5
-                    _currentItem.Value = currentValue + ".5";
-                }
-                else if (digit == "¼")
-                {
-                    // Append .25
-                    _currentItem.Value = currentValue + ".25";
-                }
-                else if (digit == "¾")
-                {
-                    // Append .75
-                    _currentItem.Value = currentValue + ".75";
-                }
-                else
-                {
-                    // Append digit
-                    _currentItem.Value = currentValue + digit;
-                }
-                
-                // Update the display
-                StatusTextBox.Text = _currentItem.Value?.ToString() ?? "";
+                if (outcome == NumberPadOutcome.Unchanged) return;
+                _currentItem.Value = value;
+
+                // Update the display (N6: mask N2)
+                SetStatusTextSilently(ItemControls.FormatNumberDisplay(value));
+                UpdateNiValueButtonState(_currentItem);
+                UpdateRequiredFieldHighlighting(_currentItem);
+                UpdateClearButton();
                 MarkUnsaved();
                 RefreshEngDataPanel();
                 RefreshEcDataPanel();
@@ -12275,9 +12822,16 @@ namespace InspectionEditor
         {
             if (_currentItem != null)
             {
-                _currentItem.Value = "NI";
-                StatusTextBox.Text = "NI";
+                if (_readOnlyMode) return;
+                // F-004: NI toggles between "NI" and null (RTC B32); a *Ni editor shows blank while NI.
+                _currentItem.Value = ItemControls.NextNiToggleValue(_currentItem);
+                SetStatusTextSilently(ShowsBlankForNi(_currentItem) ? "" : _currentItem.Value?.ToString() ?? "");
+                UpdateNiValueButtonState(_currentItem);
                 MarkUnsaved();
+                MirrorInlineEdit(_currentItem, ShowsBlankForNi(_currentItem) ? "" : _currentItem.Value?.ToString() ?? "", isComment: false);
+                UpdateClearButton();
+                UpdateRequiredFieldHighlighting(_currentItem);
+                UpdateCurrentItemBadgeColor();
                 RefreshEngDataPanel();
                 RefreshEcDataPanel();
             }
@@ -12288,7 +12842,17 @@ namespace InspectionEditor
             if (_isLoadingEditor || _readOnlyMode) return;
             if (_editorLoadedItem != null && StatusTextBox.Visibility == Visibility.Visible)
             {
-                CaptureValueEdit(_editorLoadedItem, StatusTextBox.Text);
+                // F-004 keyboard number editor: the model takes the N7 form of what is typed ("4." is stored as "4").
+                string typed = StatusTextBox.Text;
+                if (ItemControls.UsesPhoneMask(_editorLoadedItem) && ItemControls.ApplyPhoneMask(typed) is var masked && masked != typed)
+                {
+                    // RTC B32 phone mask: re-enters this handler with the masked text, which is then captured.
+                    StatusTextBox.Text = masked;
+                    StatusTextBox.CaretIndex = masked.Length;
+                    return;
+                }
+                CaptureValueEdit(_editorLoadedItem, _statusNumberKeyboardMode ? ItemControls.NormalizeTypedNumber(typed) : typed, StatusTextBox);
+                UpdateNiValueButtonState(_editorLoadedItem);
 
                 // Update required field highlighting (right-side editor)
                 UpdateRequiredFieldHighlighting(_editorLoadedItem);
@@ -12750,7 +13314,10 @@ namespace InspectionEditor
             
             // Remove the current photo
             _editorLoadedItem.Pictures.RemoveAt(_currentPhotoIndex);
-            
+            // F-004: a PictureUpload item with no picture left stores "" (RTC B46).
+            if (ItemControls.SyncPictureUploadValue(_editorLoadedItem))
+                LoadStatusControls(_editorLoadedItem);
+
             // Adjust index if needed
             if (_currentPhotoIndex >= _editorLoadedItem.Pictures.Count)
                 _currentPhotoIndex = _editorLoadedItem.Pictures.Count - 1;
@@ -13046,6 +13613,10 @@ namespace InspectionEditor
             if (!string.IsNullOrWhiteSpace(matchingAnchorPair.val))
                 anchorValue = matchingAnchorPair.val;
 
+            // F-004 C1: only a value the control can store (no OCR text in a Date, upload or Memo Value).
+            if (!ItemControls.TryValueForControl(anchor, anchorValue, out string anchorStored))
+                return anchor.Value?.ToString() ?? "";
+            anchorValue = anchorStored;
             anchor.Value = anchorValue;
             MarkUnsaved();
 
@@ -13072,9 +13643,10 @@ namespace InspectionEditor
                 {
                     // A model/serial pair may fill its companion, never another model/serial row.
                     if (consumedKeys.Contains(key) || TranscriptionKeyMatchesItem(key, anchor)) continue;
-                    if (!string.IsNullOrWhiteSpace(val) && TranscriptionKeyMatchesItem(key, candidate))
+                    if (!string.IsNullOrWhiteSpace(val) && TranscriptionKeyMatchesItem(key, candidate) &&
+                        ItemControls.TryValueForControl(candidate, val, out string candidateStored))
                     {
-                        candidate.Value = val;
+                        candidate.Value = candidateStored;
                         consumedKeys.Add(key);
                         autoFilled.Add(candidate.DisplayLabel ?? candidate.Name ?? "next item");
                         break;
@@ -13440,23 +14012,9 @@ namespace InspectionEditor
 
         private void AutoSetFailForItemWithComment(Item item, string? commentText, bool refreshClassicStatus)
         {
-            string controlName = item.ControlName?.ToLower() ?? "";
-            bool isPassFailType = controlName.Contains("passfail"); // passfail, passfailni, passfailna (not yesno)
-
-            if (isPassFailType && !string.IsNullOrWhiteSpace(commentText))
+            // F-004 V5a (owner Q-15): passfail controls only, only ever "Fail".
+            if (ItemAutoFailRules.ApplyCommentRule(item, commentText))
             {
-                string oldValue = item.Value?.ToString()?.ToLower() ?? "";
-                if (oldValue == "fail")
-                    return;
-
-                item.Value = "Fail";
-
-                // Also update _currentItem if it's the same item (consistency)
-                if (_currentItem != null && _currentItem == item)
-                {
-                    _currentItem.Value = "Fail";
-                }
-
                 if (refreshClassicStatus)
                     LoadStatusControls(item); // Refresh the status buttons UI
                 
@@ -13745,30 +14303,8 @@ namespace InspectionEditor
         private void AutoFixPassFailItems()
         {
             if (_currentInspection?.Sections == null) return;
-            
-            foreach (var section in _currentInspection.Sections)
-            {
-                foreach (var item in section.Items)
-                {
-                    string controlName = item.ControlName?.ToLower() ?? "";
-                    bool isPassFailType = controlName.Contains("passfail");
-                    
-                    if (!isPassFailType) continue;
-                    
-                    bool hasComment = !string.IsNullOrWhiteSpace(item.Comments);
-                    bool hasPhotos = item.Pictures != null && item.Pictures.Count > 0;
-                    string currentValue = item.Value?.ToString()?.Trim() ?? "";
-                    
-                    // Only auto-set to Fail if value is EMPTY (not set yet)
-                    // Respect explicit NI/Pass values - don't override inspector's choice
-                    bool hasNoValue = string.IsNullOrEmpty(currentValue);
-                    
-                    if ((hasComment || hasPhotos) && hasNoValue)
-                    {
-                        item.Value = "Fail";
-                    }
-                }
-            }
+            // F-004 V5c (owner Q-15): only EMPTY values; explicit NI/Pass are the inspector's choice.
+            ItemAutoFailRules.ApplySaveCommandSweep(_currentInspection);
         }
 
         private void SaveFileButton_Click(object sender, RoutedEventArgs e)
@@ -14079,24 +14615,8 @@ namespace InspectionEditor
             // PDF bytes are staged by stable-disk monitors, never by ordinary focus-loss saves.
 
             // Sweep items with PassFail controls: any with [trade] prefix comment should be Fail
-            // BUT respect explicit NI values - don't override inspector's choice
-            foreach (var section in _currentInspection.Sections)
-            {
-                foreach (var item in section.Items)
-                {
-                    if (!string.IsNullOrEmpty(item.Comments) && item.Comments.TrimStart().StartsWith("["))
-                    {
-                        string controlName = item.ControlName?.ToLower() ?? "";
-                        string currentValue = item.Value?.ToString()?.Trim() ?? "";
-                        bool hasNoValue = string.IsNullOrEmpty(currentValue);
-
-                        if (controlName.Contains("passfail") && hasNoValue)
-                        {
-                            item.Value = "Fail";
-                        }
-                    }
-                }
-            }
+            // BUT respect explicit NI values - don't override inspector's choice (F-004 V5d, owner Q-15)
+            ItemAutoFailRules.ApplyAutoSaveSweep(_currentInspection);
 
             _saveService.Save(_currentInspection);
             _activityService.LogSave();
@@ -14128,11 +14648,12 @@ namespace InspectionEditor
             UpdateInlinePrimaryRequirementVisuals(item);
         }
 
-        private void CaptureValueEdit(Item item, string text)
+        // source: the editor the text came from; it keeps what the user typed when the stored form differs (F-004 N7).
+        private void CaptureValueEdit(Item item, string text, object? source = null)
         {
             if (!EditorEditService.SetValue(_currentInspection, item, text)) return;
             MarkUnsaved();
-            MirrorInlineEdit(item, text, isComment: false);
+            MirrorInlineEdit(item, text, isComment: false, source);
             RefreshEcMismatchVisuals(item);
             if (ReferenceEquals(item, _currentItem)) RefreshEcDataPanel(refreshSources: false);
             if (_currentInspection?.InspectionCode == "AFI" && item.Number is "1.5" or "1.6" or "1.7")
@@ -14165,7 +14686,8 @@ namespace InspectionEditor
                 }
                 finally { _isLoadingEditor = wasLoading; }
             }
-            if (ReferenceEquals(item, _editorLoadedItem) && StatusTextBox.Text != text)
+            if (ReferenceEquals(item, _editorLoadedItem) && !ReferenceEquals(source, StatusTextBox) &&
+                StatusTextBox.Visibility == Visibility.Visible && StatusTextBox.Text != text)
             {
                 bool loading = _isLoadingEditor;
                 _isLoadingEditor = true;
@@ -14174,7 +14696,7 @@ namespace InspectionEditor
             }
         }
 
-        private void MirrorInlineEdit(Item item, string text, bool isComment)
+        private void MirrorInlineEdit(Item item, string text, bool isComment, object? source = null)
         {
             if (!_inlineItemRows.TryGetValue(item, out var entry)) return;
             bool loading = _isLoadingEditor;
@@ -14182,11 +14704,11 @@ namespace InspectionEditor
             try
             {
                 foreach (var box in FindVisualChildren<TextBox>(entry.Row))
-                    if (ReferenceEquals(box.Tag, item) && box.AcceptsReturn == isComment && box.Text != text)
+                    if (ReferenceEquals(box.Tag, item) && !ReferenceEquals(box, source) && box.AcceptsReturn == isComment && box.Text != text)
                         box.Text = text;
                 if (!isComment)
                     foreach (var combo in FindVisualChildren<ComboBox>(entry.Row))
-                        if (ReferenceEquals(combo.Tag, item) && combo.Text != text)
+                        if (ReferenceEquals(combo.Tag, item) && !ReferenceEquals(combo, source) && combo.Text != text)
                             combo.Text = text;
             }
             finally { _isLoadingEditor = loading; }
@@ -14218,7 +14740,8 @@ namespace InspectionEditor
                         : Color.FromRgb(34, 197, 94));
                     if (border.Child is TextBlock label)
                     {
-                        label.Text = missing ? "COMMENT REQUIRED" : "COMMENT ✓";
+                        label.Text = missing ? "COMMENT REQUIRED"
+                            : string.IsNullOrWhiteSpace(item.Comments) ? "COMMENT" : "COMMENT ✓";
                         label.Foreground = new SolidColorBrush(missing
                             ? Color.FromRgb(153, 27, 27)
                             : Color.FromRgb(22, 101, 52));
@@ -14242,14 +14765,24 @@ namespace InspectionEditor
         private void InlineValueBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (!_isLoadingEditor && !_readOnlyMode && sender is TextBox { Tag: Item item } box)
-                CaptureValueEdit(item, box.Text);
+            {
+                if (ItemControls.UsesPhoneMask(item) && ItemControls.ApplyPhoneMask(box.Text) is var masked && masked != box.Text)
+                {
+                    // RTC B32 phone mask: re-enters this handler with the masked text, which is then captured.
+                    box.Text = masked;
+                    box.CaretIndex = masked.Length;
+                    return;
+                }
+                CaptureValueEdit(item, ItemControls.For(item).Kind == ItemControlKind.NumberPad
+                    ? ItemControls.NormalizeTypedNumber(box.Text) : box.Text, box);
+            }
         }
 
         private void InlineValueCombo_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (!_isLoadingEditor && !_readOnlyMode && sender is ComboBox { Tag: Item item } &&
+            if (!_isLoadingEditor && !_readOnlyMode && sender is ComboBox { Tag: Item item } combo &&
                 e.OriginalSource is TextBox box)
-                CaptureValueEdit(item, box.Text);
+                CaptureValueEdit(item, box.Text, combo);
         }
 
         private void Editor_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)

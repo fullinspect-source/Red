@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Compile Include="../../Models/InspectionModels.cs" Link="InspectionModels.cs" />
-    <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" />
+    <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" /><Compile Include="../../Services/ItemControls.cs" Link="ItemControls.cs" />
     <Compile Include="../../Services/InspectionFileReader.cs" Link="InspectionFileReader.cs" />
     <Compile Include="../../Services/InspectProjectionWriter.cs" Link="InspectProjectionWriter.cs" />
     <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs" />

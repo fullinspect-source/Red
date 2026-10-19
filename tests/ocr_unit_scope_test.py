@@ -17,6 +17,7 @@ class Item {public string Name="", DisplayLabel=""; public object? Value;}
 class Section {public List<Item> Items=new();}
 class Inspection {public List<Section> Sections=new();}
 static class EditorEditService {public static bool Owns(Inspection? i,Item x)=>i?.Sections.Any(s=>s.Items.Contains(x))==true;}
+static class ItemControls {public static bool TryValueForControl(Item i,string v,out string s){s=v;return true;}} // F-004 C1 guard: text items accept any text
 namespace System.Windows { public struct Thickness {public Thickness(int a,int b,int c,int d){}} namespace Media {public static class Brushes {public static object Green=new();}} namespace Controls {public class TextBlock {public string Text="";public object? Foreground,FontStyle,Margin,TextWrapping;public int FontSize;}}}
 static class FontStyles {public static object Italic=new();} static class TextWrapping {public static object Wrap=new();}
 class Stack {public List<object> Children=new();}

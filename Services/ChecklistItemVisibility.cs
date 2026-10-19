@@ -1,19 +1,11 @@
 using InspectionEditor.Models;
-using System.Linq;
 
 namespace InspectionEditor.Services
 {
     internal static class ChecklistItemVisibility
     {
-        public static bool ShouldShow(Item item)
-        {
-            if (!item.HidePicturesButton || !item.HideCommentsButton)
-                return true;
-
-            // Some STRAND forms, including Buyer Walk serial-number rows, hide both
-            // normal edit buttons while still storing a real photo for that row.
-            // Surface those rows so the existing photo viewer and AI OCR remain usable.
-            return item.Pictures?.Any(p => !string.IsNullOrWhiteSpace(p.Data)) == true;
-        }
+        // F-004 F1/F2: only Hide (never true in observed data) keeps a row out, as in INSPECT's section builder.
+        // HidePicturesButton, HideCommentsButton and HideAddButton never hide a row.
+        public static bool ShouldShow(Item item) => !ItemControls.IsHidden(item);
     }
 }

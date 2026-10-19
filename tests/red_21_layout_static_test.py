@@ -224,7 +224,9 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertIn("ApplyTranscriptionSuggestion(action.Item, action.Suggestion);", inline)
         self.assertIn("TranscriptionKeyMatchesItem(pair.key, anchor)", distribution)
         self.assertIn("ownerSection?.Items?.ToList()", distribution)
-        self.assertIn("candidate.Value = val;", distribution)
+        # F-004 C1: OCR text reaches an item only in a form its control can store.
+        self.assertIn("ItemControls.TryValueForControl(candidate, val, out string candidateStored)", distribution)
+        self.assertIn("candidate.Value = candidateStored;", distribution)
         self.assertNotIn("GetVisibleItems()", distribution)
         self.assertNotIn("_transcriptionOptionsByItem.TryGetValue(anchor", distribution)
         self.assertIn("TranscriptionUnit(anchor) != TranscriptionUnit(candidate)", distribution)

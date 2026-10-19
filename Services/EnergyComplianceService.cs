@@ -1766,7 +1766,9 @@ namespace InspectionEditor.Services
 
             if (ctrl is "text" or "textnani" or "memo" or "numberpad" or "numberpadnani")
             {
-                item.Value = value;
+                // F-004 C1: only values the control stores (Memo text belongs in Comments; numbers in N7 form).
+                if (!ItemControls.TryValueForControl(item, value, out string stored)) return false;
+                item.Value = stored;
                 return true;
             }
 

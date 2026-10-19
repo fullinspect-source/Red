@@ -72,9 +72,10 @@ class FramingDesignExtractionRegressionTests(unittest.TestCase):
         self.assertNotIn("current.Contains(suggested", PARSER)
 
     def test_inline_ni_is_available_for_value_nani_controls(self):
-        self.assertIn('controlName.Contains("nani")', MAIN)
+        # F-004: INSPECT's NI toggle on the *Ni/*NaNi controls (ItemControls.HasNiToggle), never on checkbox rows.
+        self.assertIn("control.HasNiToggle", MAIN)
+        self.assertIn("private static bool OffersNiButton(Item item)", MAIN)
         self.assertIn("AddInlineNiValueButtonIfNeeded(panel, item);", MAIN)
-        self.assertIn("!IsInlineStatusOnlyDesignTarget(item)", MAIN)
         self.assertIn('options = options.Concat(new[] { "NI" }).ToArray();', MAIN)
         self.assertIn('options.Add("NI");', MAIN)
 
@@ -87,7 +88,7 @@ class FramingDesignExtractionRegressionTests(unittest.TestCase):
         options_start = MAIN.index("private string[]? GetInlineStatusOptions")
         options_end = MAIN.index("private UIElement CreateInlineValueChoicesDrawer", options_start)
         options_method = MAIN[options_start:options_end]
-        self.assertIn('controlName.Contains("nani")', options_method)
+        self.assertIn("control.HasNiToggle", options_method)
         self.assertIn('options = options.Concat(new[] { "NI" }).ToArray();', options_method)
 
     def test_status_only_items_never_receive_framing_design_values(self):

@@ -27,6 +27,8 @@ namespace InspectionEditor.Services
         // Last loaded/saved JSON of each model item and picture. Weak keys: removed copies simply disappear.
         private ConditionalWeakTable<Item, ItemOrigin> _items = new();
         private ConditionalWeakTable<Picture, PictureOrigin> _pictures = new();
+        // F-004 V1: items whose stored "NA" became "NI" on open. The NI goes to disk only with another change.
+        private HashSet<Item> _naRewrites = new(ReferenceEqualityComparer.Instance);
 
         private sealed class ItemOrigin
         {
@@ -81,12 +83,14 @@ namespace InspectionEditor.Services
             var pictures = new ConditionalWeakTable<Picture, PictureOrigin>();
             RegisterOrigins(inspection, originalJson, items, pictures);
             RemoveEmptyPictureShells(inspection);
+            var naRewrites = ItemControls.RewriteNaOnOpen(inspection);
 
             _originalJson = originalJson;
             _filePath = filePath;
             _lastSavedBytes = loadedBytes;
             _items = items;
             _pictures = pictures;
+            _naRewrites = new HashSet<Item>(naRewrites, ReferenceEqualityComparer.Instance);
             inspection.SavedAttachments = originalJson["Attachments"] is JArray loadedAttachments
                 ? (JArray)loadedAttachments.DeepClone() : new JArray();
 
@@ -244,20 +248,9 @@ namespace InspectionEditor.Services
             var commits = new List<Action>();
             try
             {
-                _originalJson = BuildDocument(inspection, commits);
-                if (inspection.AttachmentEdit != null) PatchAttachmentCollection(inspection);
-                else
-                {
-                    PatchAddedAttachments(inspection);
-                    PatchOrientationAttachment(inspection);
-                }
-                PatchPlanCheckMetadata(inspection);
-                if (feesFrom != null)
-                {
-                    foreach (string key in FeeKeys)
-                        if (feesFrom.TryGetValue(key, out JToken? fee)) _originalJson[key] = fee.DeepClone();
-                }
-                string json = _originalJson.ToString(Formatting.None);
+                // F-004 V1: the open-time NA→NI rewrite alone is not an edit (F-002 A-002-01), so it is held back first.
+                bool deferNaRewrites = sameTarget && _naRewrites.Count > 0;
+                string json = BuildCandidate(inspection, previousJson, commits, deferNaRewrites, feesFrom);
 
                 if (sameTarget && baseline != null &&
                     new UTF8Encoding(false).GetBytes(json).AsSpan().SequenceEqual(baseline))
@@ -266,6 +259,12 @@ namespace InspectionEditor.Services
                     _lastSavedBytes = baseline;
                     CompleteSave(inspection, commits);
                     return;
+                }
+                if (deferNaRewrites)
+                {
+                    // Something else changed, so this save also carries the NI (INSPECT marked those items dirty).
+                    commits.Clear();
+                    json = BuildCandidate(inspection, previousJson, commits, deferNaRewrites: false, feesFrom);
                 }
 
                 byte[] savedBytes;
@@ -308,6 +307,7 @@ namespace InspectionEditor.Services
                 _lastSavedBytes = savedBytes;
                 _filePath = targetPath;
                 CompleteSave(inspection, commits);
+                _naRewrites.Clear();
             }
             catch
             {
@@ -316,26 +316,45 @@ namespace InspectionEditor.Services
             }
         }
 
+        // Builds the Mode A candidate from previousJson into _originalJson and returns its compact JSON.
+        private string BuildCandidate(InspectionFile inspection, JObject previousJson, List<Action> commits,
+            bool deferNaRewrites, JObject? feesFrom = null)
+        {
+            _originalJson = previousJson;
+            _originalJson = BuildDocument(inspection, commits, deferNaRewrites);
+            if (inspection.AttachmentEdit != null) PatchAttachmentCollection(inspection);
+            else
+            {
+                PatchAddedAttachments(inspection);
+                PatchOrientationAttachment(inspection);
+            }
+            PatchPlanCheckMetadata(inspection);
+            if (feesFrom != null)
+            {
+                foreach (string key in FeeKeys)
+                    if (feesFrom.TryGetValue(key, out JToken? fee)) _originalJson[key] = fee.DeepClone();
+            }
+            return _originalJson.ToString(Formatting.None);
+        }
+
         /// <summary>The exact JSON a save would write now (a forced Mode A save), without writing or committing.</summary>
-        internal string RenderPreservingSave(InspectionFile inspection)
+        internal string RenderPreservingSave(InspectionFile inspection) => RenderPreservingSave(inspection, deferNaRewrites: false);
+
+        /// <summary>
+        /// As above; with <paramref name="deferNaRewrites"/> the open-time NA→NI rewrite (F-004 V1) is held back, which is
+        /// what a save writes when nothing else changed.
+        /// </summary>
+        internal string RenderPreservingSave(InspectionFile inspection, bool deferNaRewrites)
         {
             if (_originalJson == null)
                 throw new InvalidOperationException("No file has been loaded. Call Load() first.");
             JObject previousJson = _originalJson;
-            try
-            {
-                _originalJson = BuildDocument(inspection, new List<Action>());
-                if (inspection.AttachmentEdit != null) PatchAttachmentCollection(inspection);
-                else
-                {
-                    PatchAddedAttachments(inspection);
-                    PatchOrientationAttachment(inspection);
-                }
-                PatchPlanCheckMetadata(inspection);
-                return _originalJson.ToString(Formatting.None);
-            }
+            try { return BuildCandidate(inspection, previousJson, new List<Action>(), deferNaRewrites); }
             finally { _originalJson = previousJson; }
         }
+
+        /// <summary>F-004 V1: true while an open-time NA→NI rewrite is still waiting for a save with another change.</summary>
+        public bool HasPendingNaRewrites => _naRewrites.Count > 0;
 
         private void CompleteSave(InspectionFile inspection, List<Action> commits)
         {
@@ -393,13 +412,32 @@ namespace InspectionEditor.Services
 
         /// <summary>
         /// SPEC Mode B: INSPECT's own bytes for the report as last loaded or saved. Callers save first (Mode A), then
-        /// project, so the projection reflects every edit and the recomputed ResultSortOrder.
+        /// project, so the projection reflects every edit and the recomputed ResultSortOrder. A save that only had the
+        /// F-004 V1 NA→NI rewrite pending writes nothing, so this projection still says "NA": Submit (F-013) uses
+        /// <see cref="ProjectCurrent"/>.
         /// </summary>
         public InspectProjection ProjectSavedDocument()
         {
             if (_originalJson == null)
                 throw new InvalidOperationException("No file has been loaded. Call Load() first.");
             return InspectProjectionWriter.Project(_originalJson);
+        }
+
+        /// <summary>
+        /// The Mode B projection of the report as it stands in memory, including an open-time NA→NI rewrite that no
+        /// save has written yet (F-004 V1: Submit carries the NI). For F-013, after its save.
+        /// </summary>
+        public InspectProjection ProjectCurrent(InspectionFile inspection)
+        {
+            if (_originalJson == null)
+                throw new InvalidOperationException("No file has been loaded. Call Load() first.");
+            JObject previousJson = _originalJson;
+            try
+            {
+                BuildCandidate(inspection, previousJson, new List<Action>(), deferNaRewrites: false);
+                return InspectProjectionWriter.Project(_originalJson);
+            }
+            finally { _originalJson = previousJson; }
         }
 
         /// <summary>
@@ -482,14 +520,14 @@ namespace InspectionEditor.Services
         /// Items arrays are rebuilt from the model. Origin updates are queued in <paramref name="commits"/> and run
         /// only after the candidate is safely on disk.
         /// </summary>
-        private JObject BuildDocument(InspectionFile inspection, List<Action> commits)
+        private JObject BuildDocument(InspectionFile inspection, List<Action> commits, bool deferNaRewrites = false)
         {
             if (inspection.Sections != null) RecomputeResultSortOrder(inspection);
             var document = new JObject();
             foreach (var property in _originalJson!.Properties())
             {
                 if (property.Name == "Sections" && property.Value is JArray sections && inspection.Sections != null)
-                    document.Add("Sections", BuildSections(sections, inspection, commits));
+                    document.Add("Sections", BuildSections(sections, inspection, commits, deferNaRewrites));
                 else
                     document.Add(property.Name, property.Value.DeepClone());
             }
@@ -497,7 +535,7 @@ namespace InspectionEditor.Services
         }
 
         // SPEC A6: sections are matched by position.
-        private JArray BuildSections(JArray sections, InspectionFile inspection, List<Action> commits)
+        private JArray BuildSections(JArray sections, InspectionFile inspection, List<Action> commits, bool deferNaRewrites)
         {
             var result = new JArray();
             for (int s = 0; s < sections.Count; s++)
@@ -512,18 +550,18 @@ namespace InspectionEditor.Services
                 foreach (var property in sectionJson.Properties())
                 {
                     if (property.Name == "Items" && (property.Value is JArray || section.Items.Count > 0))
-                        newSection.Add("Items", BuildItems(section, inspection, commits));
+                        newSection.Add("Items", BuildItems(section, inspection, commits, deferNaRewrites));
                     else
                         newSection.Add(property.Name, property.Value.DeepClone());
                 }
                 if (newSection["Items"] == null && section.Items.Count > 0)
-                    newSection.Add("Items", BuildItems(section, inspection, commits));
+                    newSection.Add("Items", BuildItems(section, inspection, commits, deferNaRewrites));
                 result.Add(newSection);
             }
             return result;
         }
 
-        private JArray BuildItems(Section section, InspectionFile inspection, List<Action> commits)
+        private JArray BuildItems(Section section, InspectionFile inspection, List<Action> commits, bool deferNaRewrites)
         {
             var items = new JArray();
             foreach (var item in section.Items)
@@ -533,18 +571,23 @@ namespace InspectionEditor.Services
                 if (_items.TryGetValue(item, out var origin))
                 {
                     itemJson = (JObject)origin.Json.DeepClone();
-                    PatchValue(item, itemJson);
+                    DeriveControlValue(item, origin.Json, origin.Pictures);
+                    if (!(deferNaRewrites && IsPendingNaRewrite(item, origin.Json)))
+                        PatchValue(item, itemJson);
                     PatchComments(item, itemJson);
                     PatchCopyFields(item, itemJson);
                     PatchPictures(item, itemJson, origin, commits);
+                    PatchControlData(item, itemJson);
                 }
                 else
                 {
                     // NEW ITEM (a copy made in RED)
                     itemJson = CreateCopyJson(item, section, inspection);
+                    DeriveControlValue(item, null, null);
                     PatchValue(item, itemJson);
                     PatchComments(item, itemJson);
                     PatchPictures(item, itemJson, null, commits);
+                    PatchControlData(item, itemJson);
                 }
                 items.Add(itemJson);
                 var committed = itemJson;
@@ -607,6 +650,9 @@ namespace InspectionEditor.Services
                     ? new Dictionary<string, object>(source.ExtensionData)
                     : new Dictionary<string, object>()
             };
+            // Item.Clone does not copy Template or ButtonText either (the save resets them in the copy's JSON).
+            foreach (string key in new[] { "Template", "ButtonText" })
+                if (copy.ExtensionData.ContainsKey(key)) copy.ExtensionData[key] = JValue.CreateNull();
             section.Items.Insert(index + 1, copy);
             RecomputeResultSortOrder(inspection);
             return copy;
@@ -701,6 +747,73 @@ namespace InspectionEditor.Services
             JToken? saved = itemJson["Value"];
             if (saved == null ? value.Type != JTokenType.Null : !JToken.DeepEquals(saved, value))
                 itemJson["Value"] = value;
+        }
+
+        // F-004 V1: the item still holds only the open-time "NI" for a stored "NA".
+        private bool IsPendingNaRewrite(Item item, JObject originJson) =>
+            _naRewrites.Contains(item) &&
+            string.Equals(ItemControls.ValueText(item), "NI", StringComparison.Ordinal) &&
+            originJson["Value"] is JValue { Type: JTokenType.String } saved && (string?)saved == "NA";
+
+        /// <summary>
+        /// F-004 values INSPECT derives from other storage, set when that storage changed since the last load or save:
+        /// Memo "ok"/null from its Comments text (RTC B33), PictureUpload "[Uploaded]"/"" from its pictures (B46).
+        /// </summary>
+        private static void DeriveControlValue(Item item, JObject? originJson, List<Picture>? originPictures)
+        {
+            switch (ItemControls.For(item).Kind)
+            {
+                case ItemControlKind.Memo:
+                {
+                    JToken? saved = originJson?["Comments"];
+                    string savedText = saved == null || saved.Type == JTokenType.Null ? "" : saved.ToString();
+                    if (!string.Equals(savedText, item.Comments ?? "", StringComparison.Ordinal))
+                        item.Value = ItemControls.MemoValueFor(item.Comments);
+                    break;
+                }
+                case ItemControlKind.PictureUpload:
+                {
+                    var current = item.Pictures.Where(p => p != null && !string.IsNullOrEmpty(p.Data)).ToList();
+                    bool changed = originPictures == null
+                        ? current.Count > 0
+                        : originPictures.Count != current.Count || current.Where((p, i) => !ReferenceEquals(p, originPictures[i])).Any();
+                    if (changed) ItemControls.SyncPictureUploadValue(item);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// F-004 storage beyond Value (F-002 A3): a SearchLookup "Add New" grows ValueList (RTC B36); a DocumentUpload
+        /// stores the file name in Template (B47). Written only when different from the item's JSON.
+        /// </summary>
+        private static void PatchControlData(Item item, JObject itemJson)
+        {
+            switch (ItemControls.For(item).Kind)
+            {
+                case ItemControlKind.SearchLookup:
+                {
+                    JToken list = item.ValueList == null ? JValue.CreateNull() : JArray.FromObject(item.ValueList);
+                    JToken? saved = itemJson["ValueList"];
+                    if (saved == null ? item.ValueList is { Count: > 0 } : !JToken.DeepEquals(saved, list))
+                        itemJson["ValueList"] = list;
+                    break;
+                }
+                case ItemControlKind.DocumentUpload:
+                {
+                    if (item.ExtensionData == null || !item.ExtensionData.TryGetValue("Template", out object? template)) break;
+                    JToken value = template switch
+                    {
+                        null => JValue.CreateNull(),
+                        JToken token => token.DeepClone(),
+                        _ => JToken.FromObject(template)
+                    };
+                    JToken? saved = itemJson["Template"];
+                    if (saved == null ? value.Type != JTokenType.Null : !JToken.DeepEquals(saved, value))
+                        itemJson["Template"] = value;
+                    break;
+                }
+            }
         }
 
         /// <summary>

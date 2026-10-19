@@ -124,7 +124,11 @@ namespace InspectionEditor.Services
                 !IsYesNoTemplateValue(item, normalized))
                 return false;
 
-            item.Value = normalized;
+            // F-004 C1/C2 (owner Q-12): only a value in the item's own set (no N/A or NA on YesNo, no NI on plain PassFail).
+            if (!ItemControls.TryValueForControl(item, normalized, out string stored))
+                return false;
+
+            item.Value = stored;
             return true;
         }
 
