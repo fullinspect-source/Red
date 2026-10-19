@@ -48,8 +48,8 @@ namespace InspectionEditor.Services
         public override string ToString() => $"{Label}: {Old} -> {New}";
     }
 
-    // What Add to My List needs from a complete profile (F-003 O9).
-    public sealed record AddToMyListProfile(string Folder, InspectUserKind Kind, string InitialsName);
+    // A profile that passed the F-003 O9 guard: what Submit, Approve and Add need to file and stamp an inspection (O6).
+    public sealed record CompleteProfile(string Folder, InspectUserKind Kind, string InspectorName, string Username, string Phone, string DefaultState);
 
     public static class InspectorProfileService
     {
@@ -321,14 +321,36 @@ namespace InspectionEditor.Services
 
         public static bool IsCompleteNow() => IsComplete(Load(), StrandCredentialService.LoadSaved());
 
-        // Null when the profile is incomplete: Add to My List then refuses with ProfileIncompleteMessage (O9).
-        public static AddToMyListProfile? ForAddToMyList()
+        // The O9 profile guard. Submit (F-013), Approve (F-018) and every Add (F-001, F-021, F-025) call it, through
+        // ProfileGuard.Require, before they act. Null means: refuse with InspectUserType.ProfileIncompleteMessage and open
+        // Settings. It checks O9's three items only (owner, 2026-10-18): a Strand username with @, a two-word
+        // InspectorName and a non-blank UserType. The start-up lock keeps its six (MissingItems); callers check the
+        // folder they write to themselves.
+        public static CompleteProfile? RequireComplete() => RequireComplete(Load(), StrandCredentialService.LoadSaved());
+
+        internal static CompleteProfile? RequireComplete(InspectorProfile? profile, StrandCredentials? login)
         {
-            var profile = Load();
-            if (profile == null || !IsComplete(profile, StrandCredentialService.LoadSaved()))
+            if (profile == null || login == null || ValidateUsername(login.Username) != null || ValidateName(profile.InspectorName) != null ||
+                InspectUserType.Classify(profile.UserType) == InspectUserKind.Missing)
                 return null;
-            return new AddToMyListProfile(profile.InspectionsFolder, InspectUserType.Classify(profile.UserType), profile.InspectorName.Trim());
+            return new CompleteProfile(profile.InspectionsFolder, InspectUserType.Classify(profile.UserType), profile.InspectorName.Trim(),
+                                       login.Username.Trim(), profile.Phone, profile.DefaultState.Trim().ToUpperInvariant());
         }
+
+        // O6, as INSPECT's InspectionFactory: the profile values a new inspection carries.
+        public static void StampNewInspection(JObject form, CompleteProfile profile)
+        {
+            form["InspectorUsername"] = profile.Username;
+            form["InspectorName"] = profile.InspectorName;
+            form["InspectorPhone"] = profile.Phone;
+            form["State"] = profile.DefaultState;
+            form["IsPreinspection"] = InspectUserType.IsPreinspection(profile.Kind);
+        }
+
+        // Inspection::GetInitials (O6): the first letter of each whitespace-separated word, upper-cased.
+        public static string Initials(string? inspectorName) =>
+            string.Concat((inspectorName ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(word => word[0]))
+                  .ToUpperInvariant();
 
         // Field messages, as INSPECT's Settings (O5).
         public static string? ValidateName(string? name) =>

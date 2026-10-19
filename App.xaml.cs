@@ -179,6 +179,21 @@ namespace InspectionEditor
             return homeWindow;
         }
 
+        // Settings in the home window (F-003 O9 refusals). Without one, e.g. when RED was started with a file, a new home
+        // window opens; it starts on Settings by itself while the profile is incomplete.
+        internal static void ShowHomeSettings()
+        {
+            foreach (Window window in Current.Windows)
+            {
+                if (window is InspectionPickerWindow { IsHomeWindow: true } home)
+                {
+                    home.OpenSettingsTab();
+                    return;
+                }
+            }
+            CreateHomeListWindow().Show();
+        }
+
         private static void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             DiagnosticLogService.Log("WPF dispatcher exception", e.Exception);

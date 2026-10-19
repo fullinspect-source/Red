@@ -19,7 +19,7 @@ namespace InspectionEditor
         // dialogProfile: the profile the order dialog already checked before its assign PATCH, so nothing read
         // again after that server write can refuse or disagree with it.
         private async Task AddOrdersToMyListAsync(List<StrandScheduleRequest> selected, bool skipRowChecks = false,
-                                                  AddToMyListProfile? dialogProfile = null)
+                                                  CompleteProfile? dialogProfile = null)
         {
             if (selected.Count == 0 || _ordersBusy || _pickerClosed)
                 return;
@@ -48,12 +48,14 @@ namespace InspectionEditor
 
             // RED's own inspector profile (F-003 O2): an incomplete one refuses before any server call (O9, owner
             // Q-22) and opens Settings, which shows what is missing.
-            var profile = dialogProfile ?? InspectorProfileService.ForAddToMyList();
+            var profile = dialogProfile;
             if (profile == null)
             {
-                ShowOrdersMessage(InspectUserType.ProfileIncompleteMessage, "Add to My List", MessageBoxImage.Warning);
-                ShowSettingsTab();
-                return;
+                _ordersDialogOpen = true; // the guard's message pauses the ORDERS refresh, as ShowOrdersMessage does
+                try { profile = ProfileGuard.Require(this, "Add to My List"); }
+                finally { _ordersDialogOpen = false; }
+                if (profile == null)
+                    return;
             }
             string inspectorFolder = profile.Folder;
             if (!Directory.Exists(inspectorFolder))
@@ -62,7 +64,7 @@ namespace InspectionEditor
                 return;
             }
             InspectUserKind userKind = profile.Kind;
-            string initialsName = profile.InitialsName;
+            string initialsName = profile.InspectorName;
 
             int toCopy = rows.Count;
             int copied = 0;

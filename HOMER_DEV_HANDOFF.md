@@ -4,6 +4,37 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-18 — RED 2.2.2 — F-003 rest: Archive retention row, one profile guard, O8 folder helper
+
+- **Base:** 2.2.1 (`95ccd6d`). F-003 was finished in the Dropbox copy (`Dropbox\P\PL`). Every file it touches was byte-identical here to its pre-F-003 state, so the files were copied whole from a frozen snapshot taken before the F-004 work started in PL. MainWindow.xaml.cs and InspectionPickerWindow.xaml.cs are not touched.
+- **Files changed:**
+  - New:
+    - `Services/InspectFolders.cs` (O8 folder rule) and `Services/InspectLiveSettings.cs` (ArchiveRetention read live, F-015 N1/N2/N4);
+    - `ProfileGuard.cs` (the one O9 guard call for Submit, Approve and Add);
+    - `tests/InspectConfigReadOnlyCheck/` (F-003 V2 read-only check on INSPECT's real config files).
+  - Modified:
+    - `Services/InspectorProfileService.cs`: `CompleteProfile`/`RequireComplete` replace `AddToMyListProfile`/`ForAddToMyList`; `StampNewInspection`, `Initials`.
+    - `Services/StrandMyListService.cs`: MyList is created through `InspectFolders`; initials come from the helper.
+    - `App.xaml.cs`: `ShowHomeSettings`.
+    - The profile card and Add: `InspectionPickerWindow.InspectorProfile.cs` (retention row, `OpenSettingsTab`), `InspectionPickerWindow.xaml` (two TextBlocks), `InspectionPickerWindow.AddToMyList.cs` and `OrderRequestWindow.xaml.cs` (both now call `ProfileGuard.Require`).
+    - Tests: `tests/InspectUserTypeHarness` (Program.cs and csproj) and `tests/FeeTokenHarness/FeeTokenHarness.csproj` (links the two files `StrandMyListService` now needs).
+  - Also changed: the version (2.2.2) in the csproj and the four release-metadata tests, these release notes and this handoff.
+- **Behavior:** spec `Dropbox/ios-port/program/features/F-003-settings-import` (SPEC, ACCEPTANCE, NOTES-windows.md; owner answers 2026-10-18):
+  - Settings shows the full F-015 N4 retention text, read from `{IF}\config.json`, then `.bak`, then 40. With 0 or fewer days it shows the first sentence plus the N2 refusal line. RED still deletes nothing from the Archive (F-015 is not built).
+  - The Add to My List guard checks O9's three items only: Strand username with @, a two-word name, and a non-blank user type. The start-up lock still checks six.
+  - RED creates MyList, Outbox or Archive only right before writing; never Temp, Documents, Data or Jobs; Review and Logs only through their own named calls.
+- **Verification:**
+  - Debug build `--no-incremental`: 0 errors.
+  - Harnesses, all exit 0: InsRoundTrip 71, SaveLoss 152, FailedSaveRecovery 17, LastEdit 74, OrientationPdf 345,
+    ChecklistVisibility 6, InspectUserType 131 (58 new F-003 checks) and FeeToken.
+  - Python: 35/45 (PYTHONUTF8=1); the other 10 are the known environment failures.
+  - `tests/InspectConfigReadOnlyCheck` against the real INSPECT config files on the build PC: all unchanged (SHA-256,
+    size, LastWriteTime), and no entry was added next to them.
+  - The corpus round trip was not re-run, because no save code changed.
+  - Before the port, in the Dropbox copy, an isolated dev-build UI run showed the retention row and the 0-day line,
+    and starting RED created no folders.
+- **Deployment:** pending.
+
 ### 2026-10-18 — RED 2.2.1 — F-002: INSPECT-faithful .ins saving, changed-on-disk stop with Overwrite
 
 - **Base:** 2.2.0 (`924c549`). F-002 was developed in the Dropbox copy and merged here file by file. MainWindow.xaml.cs, Models/InspectionModels.cs and InspectionPickerWindow.xaml.cs were three-way merged against 2.1.42 (`4653e33`); F-002's pre-change backups equal 2.1.42, so only F-002 hunks came over. The other files were unchanged here since 2.1.42 and were taken whole.

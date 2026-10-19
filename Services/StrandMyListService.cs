@@ -35,7 +35,7 @@ namespace InspectionEditor.Services
         private static string _webSessionUser = "";
         private static Uri? _webSessionBase;
 
-        public static string MyListFolder(string inspectorFolder) => Path.Combine(inspectorFolder, "MyList");
+        public static string MyListFolder(string inspectorFolder) => InspectFolders.PathOf(inspectorFolder, InspectFolder.MyList);
 
         // Inspect's FormConfig.URL; only Strand-owned HTTPS hosts receive the login.
         private static Uri WebsiteBase()
@@ -159,7 +159,7 @@ namespace InspectionEditor.Services
                     job = job.Substring(0, 7);
                 string code = form.Value<string>("InspectionCode") ?? "";
                 int attempt = form.Value<int?>("Attempt") ?? request.Attempt;
-                string initials = Regex.Replace(inspectorInitialsName ?? "", @"\s*([^\s])[^\s]*\s*", "$1").ToUpperInvariant();
+                string initials = InspectorProfileService.Initials(inspectorInitialsName);
                 inspectionNumber = wasPreinspection
                     ? $"{job}-{code}-P-{attempt}-{initials}"
                     : $"{job}-{code}-{attempt}-{initials}";
@@ -264,7 +264,7 @@ namespace InspectionEditor.Services
         public static string SaveNewForm(string inspectorFolder, string inspectionNumber, JObject form)
         {
             string target = TargetPath(inspectorFolder, inspectionNumber);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            InspectFolders.EnsureForWrite(inspectorFolder, InspectFolder.MyList); // F-003 O8
             byte[] bytes = new UTF8Encoding(false).GetBytes(form.ToString(Formatting.None));
 
             // CreateNew throws if the file exists. FileShare.Read (as Inspect's File.CreateText) lets Inspect's
@@ -292,7 +292,7 @@ namespace InspectionEditor.Services
         public static string MoveToMyList(string inspectorFolder, string inspectionNumber, string sourcePath)
         {
             string target = TargetPath(inspectorFolder, inspectionNumber);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            InspectFolders.EnsureForWrite(inspectorFolder, InspectFolder.MyList); // F-003 O8
             if (!string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
                 File.Move(sourcePath, target); // throws instead of overwriting MyList\{N}.ins
             return target;

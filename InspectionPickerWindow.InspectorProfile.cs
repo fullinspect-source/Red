@@ -107,6 +107,7 @@ namespace InspectionEditor
             }
 
             ShowProfileDetails(profile);
+            ShowArchiveRetention(profile?.InspectionsFolder);
             if (InspectorProfileService.FirstRunMessage is { } message)
             {
                 ProfileStatusText.Text = message;
@@ -140,6 +141,33 @@ namespace InspectionEditor
                 $"signature {(profile.Signature.Length > 0 ? "saved" : "none")}.";
 
             static string YesNo(bool value) => value ? "yes" : "no";
+        }
+
+        // F-015 N1/N4: INSPECT's Archive retention, read live from the folder's config.json (never imported or stored),
+        // with the N2 message when it is 0 or negative.
+        private void ShowArchiveRetention(string? inspectionsFolder)
+        {
+            int days = InspectLiveSettings.ReadArchiveRetention(inspectionsFolder);
+            ArchiveRetentionText.Text = InspectLiveSettings.ArchiveRetentionLine(days, DateTime.Today);
+            string? refusal = InspectLiveSettings.ArchiveRetentionRefusal(days);
+            ArchiveRetentionRefusalText.Text = refusal ?? "";
+            ArchiveRetentionRefusalText.Visibility = refusal == null ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        internal bool IsHomeWindow => _stayOpenHome;
+
+        // Brings this window forward on Settings (ProfileGuard, F-003 O9).
+        internal void OpenSettingsTab()
+        {
+            if (_pickerClosed)
+            {
+                App.ShowHomeSettings();
+                return;
+            }
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+            Activate();
+            ShowSettingsTab();
         }
 
         private void ProfileText_Changed(object sender, TextChangedEventArgs e) => SaveProfileFromUi(sender);
@@ -179,7 +207,10 @@ namespace InspectionEditor
             ShowProfileDetails(profile);
             UpdateProfileLock();
             if (!string.Equals(oldFolder, profile.InspectionsFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowArchiveRetention(profile.InspectionsFolder);
                 RepointMyListToProfile();
+            }
         }
 
         // My List follows the profile's Inspections folder (F-003 O7): when the folder shown is not inside it,

@@ -28,7 +28,7 @@ namespace InspectionEditor
         public bool OpenSettingsRequested { get; private set; }
 
         // The inspector profile checked before the assign PATCH, handed on with AddToMyListRequested.
-        public AddToMyListProfile? CheckedProfile { get; private set; }
+        public CompleteProfile? CheckedProfile { get; private set; }
 
         public OrderRequestWindow(Guid requestId)
         {
@@ -173,11 +173,10 @@ namespace InspectionEditor
             // Check RED can save a form before assigning anything on the server. An incomplete inspector profile
             // refuses before the assign PATCH; Settings opens when this dialog closes (Save or Cancel), so edits
             // made here are not lost.
-            var profile = InspectorProfileService.ForAddToMyList();
+            var profile = ProfileGuard.Require(this, Title);
             if (profile == null)
             {
-                MessageBox.Show(this, InspectUserType.ProfileIncompleteMessage, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
-                OpenSettingsRequested = true;
+                OpenSettingsRequested = true; // the picker opens no further order dialogs
                 return;
             }
             if (!System.IO.Directory.Exists(profile.Folder))

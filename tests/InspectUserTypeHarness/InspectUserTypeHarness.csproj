@@ -7,6 +7,8 @@
 <Compile Include="../../Services/DiagnosticLogService.cs" Link="DiagnosticLogService.cs" />
 <Compile Include="../../Services/InspectUserType.cs" Link="InspectUserType.cs" />
 <Compile Include="../../Services/InspectorProfileService.cs" Link="InspectorProfileService.cs" />
+<Compile Include="../../Services/InspectFolders.cs" Link="InspectFolders.cs" />
+<Compile Include="../../Services/InspectLiveSettings.cs" Link="InspectLiveSettings.cs" />
 <Compile Include="../../Services/StrandCredentialService.cs" Link="StrandCredentialService.cs" />
 <!-- Private, gitignored; PrepareForm encrypts the zero fees. -->
 <Compile Include="../../Services/InspectCipherSecrets.Generated.cs" Link="InspectCipherSecrets.Generated.cs" />

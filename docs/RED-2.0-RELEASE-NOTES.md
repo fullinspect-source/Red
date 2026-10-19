@@ -1,5 +1,12 @@
 # RED 2.0 Release Notes
 
+## 2.2.2 — Inspector profile: INSPECT's Archive retention, and Add to My List asks only for the essentials
+
+- **Settings shows INSPECT's Archive retention.** Settings > Inspector Profile shows "Archive retention: N days (from INSPECT's settings)" and the date on or before which archived inspections are removed. The value is read from INSPECT's settings each time and never copied into RED. If INSPECT's value is 0 days or less, Settings says RED will not clean the Archive until it is 1 or more. RED does not delete anything from the Archive yet; INSPECT still does that cleanup.
+- **Add to My List checks only the essentials.** It now needs only your Strand username, your full name (first and last) and your INSPECT user type. If one is missing, it says "Complete your inspector profile in RED Settings first." and opens Settings. A missing saved password or default state no longer blocks it. RED's start-up check is unchanged.
+- **RED creates folders only when it saves into them.** My List is created when the first inspection is saved there. RED never creates INSPECT's Temp, Documents, Data or Jobs folders.
+- INSPECT's own settings files are only read, never written. This was checked again against the real files.
+
 ## 2.2.1 — Saving that keeps INSPECT's files as INSPECT wrote them
 
 - **Saving changes only what you edited.** Everything else in the .ins file stays byte for byte as INSPECT wrote it. RED no longer adds its own item or header keys (the one RED-only addition left is the Plan Check result on CPP reports), keeps empty comments as they were, and leaves unchanged pictures untouched. Opening and closing a report without edits writes nothing.

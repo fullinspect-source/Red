@@ -11,4 +11,7 @@
 <Compile Include="../../Services/InspectCipherSecrets.Generated.cs" Link="InspectCipherSecrets.Generated.cs" />
 <Compile Include="../../Services/StrandScheduleService.cs" Link="StrandScheduleService.cs" />
 <Compile Include="../../Services/StrandMyListService.cs" Link="StrandMyListService.cs" />
+<!-- StrandMyListService creates MyList through InspectFolders and takes initials from InspectorProfileService (F-003). -->
+<Compile Include="../../Services/InspectFolders.cs" Link="InspectFolders.cs" />
+<Compile Include="../../Services/InspectorProfileService.cs" Link="InspectorProfileService.cs" />
 </ItemGroup></Project>

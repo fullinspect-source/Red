@@ -319,12 +319,228 @@ finally
     Directory.Delete(profileBox, recursive: true);
 }
 
+// The rest of F-003 on sandbox copies: Archive retention read live (F-015 N1/N2/N4), the O8 folder rule, the O9 guard
+// and the O6 stamping helper (A-003-01, -02, -05, -07, -08, -10, -11, -12).
+string rest = Path.Combine(Path.GetTempPath(), "red-f003-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(rest);
+try
+{
+    string sbxIf = Path.Combine(rest, "Inspections");
+    Directory.CreateDirectory(sbxIf);
+    string sbxUc = Path.Combine(rest, "UserConfig.json");
+    string form = Path.Combine(sbxIf, "config.json"), bak = form + ".bak";
+    File.WriteAllText(sbxUc, new JObject { ["InspectorFolder"] = sbxIf }.ToString());
+    File.WriteAllText(form, new JObject
+    {
+        ["Username"] = "inspector@example.com", ["InspectorName"] = "Pat Example", ["Phone"] = "(555) 010-0100", ["UserType"] = "Inspector",
+        ["DefaultState"] = "TX", ["ArchiveRetention"] = 8, ["UseNumberPad"] = true, ["PdfAppProgID"] = "AcrobatDC"
+    }.ToString());
+    File.WriteAllText(bak, new JObject { ["InspectorName"] = "Pat Example", ["ArchiveRetention"] = 15 }.ToString());
+    File.SetLastWriteTime(bak, new DateTime(2025, 7, 24, 9, 0, 0));
+    var fingerprints = new[] { sbxUc, form, bak }.ToDictionary(path => path, path => (Sha256Of(path), File.GetLastWriteTimeUtc(path)));
+
+    // A-003-01: the six values are imported; Archive retention is shown from INSPECT's file, never imported.
+    var first = InspectorProfileService.ReadFromInspect(sbxUc, Array.Empty<string>(), "Inspect 2026").Profile!;
+    Check(first.InspectorName == "Pat Example" && first.Phone == "(555) 010-0100" && first.UserType == "Inspector" &&
+          first.DefaultState == "TX" && first.UseNumberPad && first.PdfAppProgId == "AcrobatDC",
+        "A-003-01: the six values other than ArchiveRetention are imported");
+    Check(!typeof(InspectorProfile).GetProperties().Any(p => p.Name.Contains("Retention", StringComparison.OrdinalIgnoreCase) || p.Name == "LastSyncDate"),
+        "A-003-01 (O2): RED's store has no ArchiveRetention, DropboxLogRetention or LastSyncDate");
+    int days = InspectLiveSettings.ReadArchiveRetention(sbxIf);
+    Check(days == 8 && InspectLiveSettings.ArchiveRetentionLine(days, DateTime.Today).StartsWith("Archive retention: 8 days (from INSPECT's settings).") &&
+          InspectLiveSettings.ArchiveRetentionRefusal(days) == null,
+        "A-003-01: Settings line \"Archive retention: 8 days (from INSPECT's settings).\", read live");
+    // F-015 N4 in full (owner, 2026-10-18), with A-015's today 2026-10-17 and cutoff date 10/9/2026.
+    var a015Today = new DateTime(2026, 10, 17, 21, 25, 56);
+    Check(InspectLiveSettings.ArchiveRetentionLine(8, a015Today) ==
+          "Archive retention: 8 days (from INSPECT's settings). At each start RED deletes archived inspections last changed on or before " +
+          "10/9/2026, as INSPECT does. They are removed from every device that shares this Dropbox folder.",
+        "N4: the full Settings text with the cutoff date today - N");
+    Check(InspectLiveSettings.ArchiveRetentionLine(0, a015Today) == "Archive retention: 0 days (from INSPECT's settings)." &&
+          InspectLiveSettings.ArchiveRetentionLine(-5, a015Today) == "Archive retention: -5 days (from INSPECT's settings).",
+        "N2/N4: with 0 or fewer days RED does not clean, so no deletion sentence");
+    Check(InspectLiveSettings.ArchiveRetentionLine(int.MaxValue, a015Today) == $"Archive retention: {int.MaxValue} days (from INSPECT's settings).",
+        "N4: a retention longer than the calendar shows no cutoff date (no crash)");
+    Check(new[] { InspectFolder.MyList, InspectFolder.Outbox, InspectFolder.Archive, InspectFolder.Jobs }
+              .All(folder => Path.GetDirectoryName(InspectFolders.PathOf(first.InspectionsFolder, folder)) == sbxIf) &&
+          StrandMyListService.MyListFolder(first.InspectionsFolder) == Path.Combine(sbxIf, "MyList"),
+        "A-003-01: My List, Outbox, Archive and Jobs paths are under the sandbox Inspections folder");
+
+    // A-003-02: import, every editable RED setting changed in RED's own store, re-import: INSPECT's files untouched.
+    string store = Path.Combine(rest, "RED", "inspector_profile.json");
+    InspectorProfileService.Save(first, store);
+    InspectorProfileService.Save(CloneWith(first, x => { x.InspectorName = "Pat Q Example"; x.Phone = "(555) 010-0199"; x.DefaultState = "OK"; }), store);
+    InspectorProfileService.Diff(InspectorProfileService.Load(store)!, null,
+        InspectorProfileService.ReadFromInspect(sbxUc, Array.Empty<string>(), "Inspect 2026", sbxIf));
+    InspectLiveSettings.ReadArchiveRetention(sbxIf);
+    Check(fingerprints.All(kv => Sha256Of(kv.Key) == kv.Value.Item1 && File.GetLastWriteTimeUtc(kv.Key) == kv.Value.Item2),
+        "A-003-02: UserConfig, config.json and config.json.bak keep their SHA-256 and LastWriteTime");
+    Check(Directory.GetFileSystemEntries(sbxIf).Length == 2, "A-003-02: nothing was created in the Inspections folder");
+
+    // A-003-05: Phone and Archive retention change at the source; only Phone is offered.
+    var source = JObject.Parse(File.ReadAllText(form));
+    source["Phone"] = "(555) 010-0101";
+    source["ArchiveRetention"] = 40;
+    File.WriteAllText(form, source.ToString());
+    var offered = InspectorProfileService.Diff(first, null, InspectorProfileService.ReadFromInspect(sbxUc, Array.Empty<string>(), "Inspect 2026"))
+        .Select(c => c.ToString()).ToList();
+    Check(offered.SequenceEqual(new[] { "Phone: (555) 010-0100 -> (555) 010-0101" }),
+        "A-003-05: Re-import lists only \"Phone: (555) 010-0100 -> (555) 010-0101\"; Archive retention is not listed");
+    Check(InspectLiveSettings.ReadArchiveRetention(sbxIf) == 40, "A-003-05: the new Archive retention is simply read live");
+
+    // A-003-07 and F-015 N1: config.json, then .bak, then 40; 0 or less gets the N2 message; no upper bound.
+    void Retention(string? formJson, string? bakJson, int expected, string what)
+    {
+        foreach (var (path, json) in new[] { (form, formJson), (bak, bakJson) })
+        {
+            if (json == null) File.Delete(path);
+            else File.WriteAllText(path, json);
+        }
+        Check(InspectLiveSettings.ReadArchiveRetention(sbxIf) == expected, $"N1: {what} -> {expected}");
+    }
+    Retention("{\"ArchiveRetention\":0}", null, 0, "0 days");
+    Check(InspectLiveSettings.ArchiveRetentionRefusal(0) == "INSPECT's Archive retention is 0 days. RED does not clean the Archive until it is 1 or more.",
+        "A-003-07: 0 days shows the N2 message");
+    Retention("{\"ArchiveRetention\":400}", null, 400, "400 days");
+    Check(InspectLiveSettings.ArchiveRetentionRefusal(400) == null, "A-003-07: 400 days shows no message (no upper bound)");
+    Check(InspectLiveSettings.ArchiveRetentionRefusal(-5) == "INSPECT's Archive retention is -5 days. RED does not clean the Archive until it is 1 or more.",
+        "N2: a negative value shows the message too");
+    Retention("{\"Username\":\"inspector@example.com\"}", "{\"ArchiveRetention\":15}", 40, "readable config.json without the key (INSPECT's default)");
+    Retention("{\"archiveretention\":9}", null, 9, "key matched ignoring case, as Newtonsoft");
+    Retention("{\"ArchiveRetention\":\"12\"}", null, 12, "a string holding a whole number, as Newtonsoft");
+    Retention("{\"ArchiveRetention\":8.5}", "{\"ArchiveRetention\":15}", 15, "a fraction makes config.json unreadable, so the .bak");
+    Retention("{\"ArchiveRetention\":null}", "{\"ArchiveRetention\":15}", 15, "null makes config.json unreadable, so the .bak");
+    Retention("{\"ArchiveRetention\":99999999999}", "{\"ArchiveRetention\":15}", 15, "out of range makes config.json unreadable, so the .bak");
+    Retention("{\"ArchiveRetention\":8", "{\"ArchiveRetention\":15}", 15, "truncated config.json, so the .bak");
+    Retention("{\"ArchiveRetention\":8", "not json", 40, "neither file readable");
+    Retention(null, null, 40, "no config files");
+    Check(InspectLiveSettings.ReadArchiveRetention(null) == 40 && InspectLiveSettings.ReadArchiveRetention(Path.Combine(rest, "nope")) == 40,
+        "N1: no Inspections folder -> 40");
+
+    // A-003-08 and A-003-12: the O6 stamping helper and initials.
+    var complete = new CompleteProfile(sbxIf, InspectUserKind.Inspector, "Pat Q Example", "inspector@example.com", "(555) 010-0100", "TX");
+    var stamped = JObject.Parse("{\"InspectorUsername\":null,\"InspectorName\":null,\"InspectorPhone\":null,\"State\":null,\"IsPreinspection\":true}");
+    InspectorProfileService.StampNewInspection(stamped, complete);
+    Check(stamped.Value<string>("InspectorName") == "Pat Q Example" && stamped.Value<string>("InspectorPhone") == "(555) 010-0100" &&
+          stamped.Value<string>("InspectorUsername") == "inspector@example.com" && stamped.Value<string>("State") == "TX" &&
+          InspectorProfileService.Initials("Pat Q Example") == "PQE",
+        "A-003-08: stamped name, phone, username and state; initials PQE");
+    Check(InspectorProfileService.Initials("  pat   q\texample ") == "PQE" && InspectorProfileService.Initials("") == "",
+        "O6: initials split on any whitespace and are upper-cased");
+    var numbered = JObject.Parse("{\"InspectionNumber\":\"\",\"JobNumber\":\"2642023\",\"InspectionCode\":\"HET\",\"Sections\":[]}");
+    Check(StrandMyListService.PrepareForm(numbered, new StrandRequestDetail { JobNumber = "2642023R1", Attempt = 1 }, "Pat Q Example", InspectUserKind.Inspector)
+          == "2642023-HET-1-PQE",
+        "A-003-08: Add to My List numbers the inspection with the same initials");
+    foreach (var kind in Enum.GetValues<InspectUserKind>())
+    {
+        var stampedKind = new JObject();
+        InspectorProfileService.StampNewInspection(stampedKind, complete with { Kind = kind });
+        Check(stampedKind.Value<bool>("IsPreinspection") == (kind == InspectUserKind.Preinspector), $"A-003-12: stamped IsPreinspection for {kind}");
+    }
+
+    // A-003-10 and A-003-13: the O9 guard.
+    var login = new StrandCredentials { Username = "inspector@example.com", Password = "pw" };
+    var full = new InspectorProfile { InspectorName = "Pat Example", Phone = "(555) 010-0100", DefaultState = "tx", UserType = "Inspector", InspectionsFolder = sbxIf };
+    Check(InspectorProfileService.RequireComplete(CloneWith(full, x => x.InspectorName = "Pat"), login) == null &&
+          InspectUserType.ProfileIncompleteMessage == "Complete your inspector profile in RED Settings first.",
+        "A-003-10: the guard refuses InspectorName \"Pat\" with \"Complete your inspector profile in RED Settings first.\"");
+    foreach (var (what, profile, strand) in new (string, InspectorProfile?, StrandCredentials?)[]
+             {
+                 ("blank user type", CloneWith(full, x => x.UserType = ""), login),
+                 ("whitespace user type", CloneWith(full, x => x.UserType = "   "), login),
+                 ("null user type", CloneWith(full, x => x.UserType = null), login),
+                 ("username without @", full, new StrandCredentials { Username = "inspector.example.com", Password = "pw" }),
+                 ("no Strand login", full, null),
+                 ("no profile", null, login),
+             })
+        Check(InspectorProfileService.RequireComplete(profile, strand) == null, $"O9 guard refuses: {what}");
+    // Owner, 2026-10-18: the guard checks O9's three items only; the start-up lock keeps the other three.
+    foreach (var (what, profile, strand) in new (string, InspectorProfile?, StrandCredentials?)[]
+             {
+                 ("no saved password", full, new StrandCredentials { Username = "inspector@example.com" }),
+                 ("blank default state", CloneWith(full, x => x.DefaultState = ""), login),
+                 ("missing Inspections folder", CloneWith(full, x => x.InspectionsFolder = Path.Combine(rest, "nope")), login),
+             })
+        Check(InspectorProfileService.RequireComplete(profile, strand) != null && InspectorProfileService.MissingItems(profile, strand).Count == 1,
+            $"O9 guard passes with {what} (the start-up lock still lists it)");
+    var passed = InspectorProfileService.RequireComplete(full, login);
+    Check(passed == new CompleteProfile(sbxIf, InspectUserKind.Inspector, "Pat Example", "inspector@example.com", "(555) 010-0100", "TX"),
+        "O9 guard passes a complete profile with the values Submit, Approve and Add stamp");
+
+    // A-003-11: reading INSPECT's settings, listing My List and opening Settings create nothing; a write creates only
+    // the one folder it writes into, and the helper never creates Temp, Documents, Data or Jobs.
+    string onlyMyList = Path.Combine(rest, "OnlyMyList");
+    Directory.CreateDirectory(Path.Combine(onlyMyList, "MyList"));
+    File.WriteAllText(Path.Combine(onlyMyList, "config.json"), "{\"InspectorName\":\"Pat Example\",\"UserType\":\"Inspector\",\"ArchiveRetention\":8}");
+    InspectorProfileService.ReadFromInspect(sbxUc, Array.Empty<string>(), "Inspect 2026", onlyMyList);
+    InspectLiveSettings.ReadArchiveRetention(onlyMyList);
+    InspectorProfileService.RequireComplete(CloneWith(full, x => x.InspectionsFolder = onlyMyList), login);
+    foreach (var folder in Enum.GetValues<InspectFolder>())
+        InspectFolders.PathOf(onlyMyList, folder);
+    Directory.GetFiles(StrandMyListService.MyListFolder(onlyMyList), "*.ins");
+    Check(Subfolders(onlyMyList) == "MyList", "A-003-11: reading settings, listing My List and the Settings reads create no folder");
+    bool allRefused = true;
+    foreach (var folder in new[] { InspectFolder.Temp, InspectFolder.Documents, InspectFolder.Data, InspectFolder.Jobs, InspectFolder.Review, InspectFolder.Logs })
+    {
+        try { InspectFolders.EnsureForWrite(onlyMyList, folder); allRefused = false; }
+        catch (InvalidOperationException) { }
+    }
+    Check(allRefused && Subfolders(onlyMyList) == "MyList", "O8: a write never creates Temp, Documents, Data, Jobs, Review or Logs");
+    InspectFolders.EnsureForWrite(onlyMyList, InspectFolder.Outbox);
+    InspectFolders.EnsureForWrite(onlyMyList, InspectFolder.Archive);
+    InspectFolders.EnsureForWrite(onlyMyList, InspectFolder.MyList);
+    Check(Subfolders(onlyMyList) == "Archive,MyList,Outbox", "O8: a write into Outbox or Archive creates only that folder");
+    InspectFolders.EnsureReviewForMoveToReview(onlyMyList);
+    InspectFolders.EnsureLogsForLogCopy(onlyMyList);
+    Check(Subfolders(onlyMyList) == "Archive,Logs,MyList,Outbox,Review", "O8: Review (F-018 Move to Review) and Logs (F-019 L5) only through their own calls");
+    string missingIf = Path.Combine(rest, "Missing");
+    bool missingRefused = false;
+    try { InspectFolders.EnsureForWrite(missingIf, InspectFolder.MyList); }
+    catch (DirectoryNotFoundException) { missingRefused = true; }
+    Check(missingRefused && !Directory.Exists(missingIf), "O8: RED never creates the Inspections folder itself");
+    string noMyList = Path.Combine(rest, "NoMyList");
+    Directory.CreateDirectory(noMyList);
+    string saved = StrandMyListService.SaveNewForm(noMyList, "2642023-HET-1-PE", JObject.Parse("{\"InspectionNumber\":\"2642023-HET-1-PE\"}"));
+    Check(Subfolders(noMyList) == "MyList" && saved == Path.Combine(noMyList, "MyList", "2642023-HET-1-PE.ins") && File.Exists(saved),
+        "O8: Add to My List creates MyList when it writes the first form, and nothing else");
+}
+finally
+{
+    Directory.Delete(rest, recursive: true);
+}
+
+// Wiring that only the source shows: the read-only rows and the one guard (A-003-10, A-003-12).
+string? plRoot = AppContext.BaseDirectory;
+while (plRoot != null && !File.Exists(Path.Combine(plRoot, "InspectionEditor.csproj")))
+    plRoot = Path.GetDirectoryName(plRoot.TrimEnd('\\'));
+Check(plRoot != null, "found the RED source folder");
+if (plRoot != null)
+{
+    string xaml = File.ReadAllText(Path.Combine(plRoot, "InspectionPickerWindow.xaml"));
+    Check(!System.Text.RegularExpressions.Regex.IsMatch(xaml, @"<(TextBox|ComboBox|CheckBox|RadioButton)\b[^>]*x:Name=""[^""]*(UserType|Retention)"),
+        "A-003-12/N4: no control edits the user type or the Archive retention");
+    Check(xaml.Contains("<TextBlock x:Name=\"ArchiveRetentionText\"") && xaml.Contains("<TextBlock x:Name=\"InspectUserTypeText\""),
+        "the user type and Archive retention rows are read-only text");
+    foreach (string file in new[] { "InspectionPickerWindow.AddToMyList.cs", "OrderRequestWindow.xaml.cs" })
+        Check(File.ReadAllText(Path.Combine(plRoot, file)).Contains("ProfileGuard.Require("), $"{file}: Add to My List goes through ProfileGuard.Require");
+    string guard = File.ReadAllText(Path.Combine(plRoot, "ProfileGuard.cs"));
+    Check(guard.Contains("InspectUserType.ProfileIncompleteMessage") && guard.Contains("OpenSettingsTab()") && guard.Contains("App.ShowHomeSettings()"),
+        "A-003-10: ProfileGuard shows the profile message and opens Settings");
+    Check(!File.ReadAllText(Path.Combine(plRoot, "Services", "StrandMyListService.cs")).Contains("Directory.CreateDirectory"),
+        "O8: Add to My List creates folders only through InspectFolders");
+}
+
 static InspectorProfile CloneWith(InspectorProfile source, Action<InspectorProfile> change)
 {
     var copy = source.Clone();
     change(copy);
     return copy;
 }
+
+static string Sha256Of(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+
+static string Subfolders(string folder) =>
+    string.Join(",", Directory.GetDirectories(folder).Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal));
 
 Console.WriteLine(failures == 0 ? "ALL PASS" : $"{failures} FAILED");
 return failures == 0 ? 0 : 1;
