@@ -15,21 +15,24 @@ def extract(name):
     return src[m.start():i]
 code = '''using System.ComponentModel;
 using System;
+using System.IO;
 using InspectionEditor.Models;
 namespace LifecycleControlFlow {
 class RoutedEventArgs : EventArgs { }
+class InspectionChangedOnDiskException : IOException { public bool TargetMissing => false; }
+class DispatcherStub { public void BeginInvoke(Delegate action, System.Windows.Threading.DispatcherPriority priority) { } }
 enum MessageBoxButton { YesNoCancel, OK }
-enum MessageBoxImage { Question, Error }
+enum MessageBoxImage { Question, Error, Information }
 enum MessageBoxResult { Yes, No, Cancel }
 static class MessageBox {
  public static MessageBoxResult Result = MessageBoxResult.No;
  public static MessageBoxResult Show(string text, string title, MessageBoxButton buttons, MessageBoxImage icon) => Result;
 }
 static class DiagnosticLogService { public static int Count; public static void Log(string context, Exception error) { Count++; } }
-class Activity { public int Closes; public void LogClose() => Closes++; }
+class Activity { public int Closes; public void LogClose() => Closes++; public void LogSave() { } }
 class Camera { public event Action? PhotoCaptured; public void StopSession() { } }
 public class LifecycleProbe {
- bool _hasUnsavedChanges, _savingEditorChanges, _skipResultCheck, _pdfSaveInProgress;
+ bool _hasUnsavedChanges, _savingEditorChanges, _skipResultCheck, _pdfSaveInProgress, _isLoadingFile;
  InspectionFile? _currentInspection = new();
  Activity _activityService = new(); Camera _cameraService = new();
  bool pending, fail, summary, unlocked, orientationActive, orientationReady = true; int writes;
@@ -56,11 +59,18 @@ public class LifecycleProbe {
  void GenerateSummaryInternal() { }
  void SaveCurrentInspectionInPlace() { SyncCurrentItemFromUI(); if (fail) throw new System.IO.IOException("simulated disk failure"); writes++; _hasUnsavedChanges = false; }
  void MarkUnsaved() => _hasUnsavedChanges = true;
+ void MarkSaved() => _hasUnsavedChanges = false;
  bool ShouldShowResultPicker() => false;
  bool ShowResultPicker(bool closeAfterPicker) => true;
  void SavePreferences() { }
  void ReleaseInspectionLocks() => unlocked = true;
  void OnPhotoCaptured() { }
+ DispatcherStub Dispatcher = new();
+ bool _diskConflictPending;
+ enum DiskConflictChoice { KeepEditing, Reload, CloseReport, Overwritten }
+ DiskConflictChoice ResolveChangedOnDisk(InspectionChangedOnDiskException error) => DiskConflictChoice.KeepEditing;
+ void ReloadCurrentInspectionFromDisk() { }
+ void CloseReportWithoutSaving() { }
  public static void Run() {
   void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS lifecycle " + name); }
   var p = new LifecycleProbe { pending = true };
@@ -85,9 +95,15 @@ public class LifecycleProbe {
   MessageBox.Result = MessageBoxResult.No; e = new(); p.MainWindow_Closing(null,e);
   Check(!e.Cancel && !p.orientationActive && p.cleanups == 1 && p.cleanedAfterSave && p.writes == 1 && !p._hasUnsavedChanges && p.unlocked && p._activityService.Closes == 1,
    "successful close cleans PDF session only after accepted leave and save");
-  Console.WriteLine("8 extracted lifecycle checks passed");
+  // F-002 Reload: while a report is opening, neither close nor save may act on either copy.
+  p = new LifecycleProbe { pending = true, _isLoadingFile = true }; e = new(); p.MainWindow_Closing(null,e);
+  Check(e.Cancel && p.writes == 0 && !p.unlocked && p._activityService.Closes == 0, "close refused while a report is opening");
+  p = new LifecycleProbe { _hasUnsavedChanges = true, _isLoadingFile = true };
+  Check(!p.TrySaveCurrentInspection() && p.writes == 0 && p._hasUnsavedChanges, "save refused while a report is opening");
+  Console.WriteLine("10 extracted lifecycle checks passed");
  }
 '''
 code += extract('MainWindow_Closing') + '\n' + extract('TrySaveCurrentInspection') + '\n}}\n'
+code += 'namespace System.Windows.Threading { enum DispatcherPriority { Background } }\n'
 (root / 'tests/SaveLossHarness/LifecycleProbe.Generated.cs').write_text(code)
 print('Generated actual close/save gate methods for control-flow harness')

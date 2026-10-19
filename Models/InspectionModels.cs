@@ -168,6 +168,10 @@ namespace InspectionEditor.Models
         [JsonProperty("ResultSortOrder")]
         public int ResultSortOrder { get; set; }
 
+        // In-memory only: the item this copy was made from. Save clones the source's JSON (F-002 A4).
+        [JsonIgnore]
+        public Item? CopiedFrom { get; set; }
+
         // Keep all other properties to preserve them
         [JsonExtensionData]
         public Dictionary<string, object>? ExtensionData { get; set; }

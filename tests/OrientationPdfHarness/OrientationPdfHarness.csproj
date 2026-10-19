@@ -10,7 +10,7 @@
     <Compile Include="../../Services/PdfWorkingSession.cs" Link="PdfWorkingSession.cs" />
     <Compile Include="../../Services/PdfEditMonitor.cs" Link="PdfEditMonitor.cs" />
     <Compile Include="../../Services/OrientationPdfForm.cs" Link="OrientationPdfForm.cs" />
-    <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" />
+    <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" /><Compile Include="../../Services/InspectionFileReader.cs" Link="InspectionFileReader.cs" /><Compile Include="../../Services/InspectProjectionWriter.cs" Link="InspectProjectionWriter.cs" />
     <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs" />
     <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs" />
     <Compile Include="../../Services/LastEditTime.cs" Link="LastEditTime.cs" />

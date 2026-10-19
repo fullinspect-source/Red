@@ -90,7 +90,7 @@ try {
     }
     Check(JObject.Parse(File.ReadAllText(p))["RedLastSuccessfulSaveUtc"] == null, "no INS schema addition");
     saver.Save(model);
-    Check(Read(p) == stamp && writes == 2, "no-op keeps timestamp and still calls writer");
+    Check(Read(p) == stamp && writes == 1, "no-op keeps timestamp and writes nothing (F-002 V2)");
     var reopened = saver.Load(p);
     saver.Save(reopened);
     Check(Read(p) == stamp, "reopen no-op preserves provenance");

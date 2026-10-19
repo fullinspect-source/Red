@@ -45,6 +45,7 @@ class TemplateFirstOpenTests(unittest.TestCase):
             methods = 'private void OfferSavedTemplateForBlankReport(bool isFirstTrip) {\n' + src[start:end] + '\n}'
             methods += method(src, 'private bool InspectionHasTemplateRelevantData()')
             links = ['Models/InspectionModels.cs', 'Models/TemplateModels.cs', 'Services/TemplateService.cs']
+        links.append('Services/InspectionFileReader.cs')  # F-002: Load reads through the tolerant reader
         methods += method(src, 'private static bool IsProperNameItem(')
         if 'private static bool IsAdministrativeTemplateDefault(' in src:
             methods += method(src, 'private static bool IsAdministrativeTemplateDefault(')
@@ -53,6 +54,10 @@ class TemplateFirstOpenTests(unittest.TestCase):
         methods += method(src, 'private void ApplyTemplateButton_Click(')
         load_src = (ROOT / 'Services/SurgicalSaveService.cs').read_text()
         load_methods = method(load_src, 'public InspectionFile Load(') + method(load_src, 'private void MapPictureFieldsFromIns(')
+        # F-002: Load also registers item/picture origins and hides empty picture shells.
+        for extra in ('private static void RegisterOrigins(', 'private static void RemoveEmptyPictureShells(',
+                      'private sealed class ItemOrigin', 'private sealed class PictureOrigin'):
+            load_methods += method(load_src, extra)
         legacy_src = (ROOT / 'Services/UserDataService.cs').read_text()
         legacy_methods = method(legacy_src, 'public Dictionary<string, string> GetTemplate(') + method(legacy_src, 'public bool HasTemplate(')
         program = (ROOT / 'tests/template_first_open_harness.cs.txt').read_text().replace('/*PRODUCTION_METHODS*/', methods).replace('/*PRODUCTION_LOAD_METHODS*/', load_methods).replace('/*PRODUCTION_LEGACY_METHODS*/', legacy_methods)

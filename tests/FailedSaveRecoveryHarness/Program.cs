@@ -57,6 +57,8 @@ try
     string blocked = Path.Combine(dir, "blocked-root"); File.WriteAllText(blocked, "occupied");
     var broken = new SurgicalSaveService(new FailedSaveRecoveryService(blocked), (_, _, _) => throw winError);
     var model = broken.Load(path);
+    // F-002 V2: an unedited save writes nothing, so make an edit to reach the failing writer.
+    model.Sections[0].Items[0].Comments = "edit that needs a write";
     var both = Fail(() => broken.Save(model));
     Check(both.Message.Contains("Local recovery also failed") && both.Message.Contains("1175") && ReferenceEquals(both.InnerException, winError) && !both.Message.Contains("was verified at"), "recovery I/O failure reported honestly without losing primary error");
 

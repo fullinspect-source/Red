@@ -481,7 +481,18 @@ namespace InspectionEditor
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
+            // While a report is opening (e.g. after Reload) no close-time decision may be applied to either copy.
+            if (_isLoadingFile)
+            {
+                e.Cancel = true;
+                MessageBox.Show("The report is still opening. Close RED again in a moment.",
+                    "Report opening", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             SyncCurrentItemFromUI();
+            // Saving is paused after a changed-on-disk stop: offer the choices first, because a PDF change that could
+            // not be captured into the newer file would otherwise block every way out (F-002 E1).
+            if (_diskConflictPending && _currentInspection != null && !TrySaveCurrentInspection()) { e.Cancel = true; return; }
             if (!FinishOrientationEditing(leaving: false)) { e.Cancel = true; return; }
             // Before close, offer the same trade-summary generation that the Save button provides.
             if (_hasUnsavedChanges && _currentInspection != null && ShouldPromptForTradeSummaryOnClose())
@@ -2429,18 +2440,35 @@ namespace InspectionEditor
             }
         }
 
-        private async void LoadInspectionFileAsync(string filePath)
+        // isReload: F-002 E1 Reload of the report already open; its rules were acknowledged when it was opened.
+        private async void LoadInspectionFileAsync(string filePath, bool isReload = false)
         {
             // Prevent double-loading
             if (_isLoadingFile) return;
             if (!FinishOrientationEditing(leaving: false)) return;
-            if (_hasUnsavedChanges && _currentInspection != null && !TrySaveCurrentInspection()) return;
+            // A Reload deliberately discards the edits (a recovery copy was just made), so it never saves them first.
+            if (!isReload && _hasUnsavedChanges && _currentInspection != null && !TrySaveCurrentInspection()) return;
             _isLoadingFile = true;
             ShowOpeningInspectionState(filePath);
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
             try
             {
+            // F-002 R4/R5: a busy or damaged file is reported before any lock is taken; it is never modified.
+            try
+            {
+                await Task.Run(() => InspectionFileReader.ParseDocument(InspectionFileReader.ReadBytes(filePath), out _));
+            }
+            catch (Exception readError) when (readError is InspectionFileBusyException || readError is InspectionFileDamagedException)
+            {
+                RestoreTitleAfterFailedOpen();
+                if (isReload) _diskConflictPending = true; // still unresolved; the report stays open with its edits and locks
+                MessageBox.Show(readError.Message + (isReload ? "\n\nRED did not reload; the report still shows your edits." : ""),
+                    readError is InspectionFileDamagedException ? "Inspection file damaged" : "Inspection file busy",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             // Reset read-only mode for new file
             _readOnlyMode = false;
             TripNumberBadge.Visibility = Visibility.Collapsed;
@@ -2463,9 +2491,14 @@ namespace InspectionEditor
                     .Replace("-", "").Substring(0, 16);
             }
             string fileMutexName = $"Global\\RED_FILE_{pathHash}";
-            
+            string inspTypeForLock = (filenameParts.Length > 1) ? filenameParts[1].ToUpperInvariant() : "";
+            Mutex newFileMutex = null!;
+            Mutex? newTypeMutex = null;
+
+            // A Reload keeps this window's file and type locks: nothing is released until the newer copy has loaded.
+            if (!isReload)
+            {
             bool fileLockAcquired = false;
-            Mutex newFileMutex;
             try
             {
                 newFileMutex = new Mutex(true, fileMutexName, out fileLockAcquired);
@@ -2475,7 +2508,7 @@ namespace InspectionEditor
                 fileLockAcquired = false;
                 newFileMutex = null!;
             }
-            
+
             if (!fileLockAcquired)
             {
                 newFileMutex?.Dispose();
@@ -2486,10 +2519,8 @@ namespace InspectionEditor
                     MessageBoxImage.Warning);
                 return;
             }
-            
+
             // Type-level lock: only one inspection of each type (IER, CPP, HET, etc.) across instances
-            string inspTypeForLock = (filenameParts.Length > 1) ? filenameParts[1].ToUpperInvariant() : "";
-            Mutex? newTypeMutex = null;
             if (!string.IsNullOrEmpty(inspTypeForLock))
             {
                 string typeMutexName = $"Global\\RED_TYPE_{inspTypeForLock}";
@@ -2518,23 +2549,34 @@ namespace InspectionEditor
                     return;
                 }
             }
+            }
 
             // Only end PDF sessions once the new report locks have been acquired.
             if (!FinishOrientationEditing())
             {
+                if (isReload)
+                {
+                    // Nothing was given up: the report stays open with its edits and locks; the conflict is unresolved.
+                    _diskConflictPending = true;
+                    RestoreTitleAfterFailedOpen();
+                    return;
+                }
                 newFileMutex.ReleaseMutex();
                 newFileMutex.Dispose();
                 newTypeMutex?.ReleaseMutex();
                 newTypeMutex?.Dispose();
                 return;
             }
-            // Release previous locks (from previously loaded file)
-            ReleaseInspectionLocks();
-            
-            // Store new locks
-            _fileMutex = newFileMutex;
-            _typeMutex = newTypeMutex;
-            WriteOpenInspectionLockMetadata(filePath, inspTypeForLock);
+            if (!isReload)
+            {
+                // Release previous locks (from previously loaded file)
+                ReleaseInspectionLocks();
+
+                // Store new locks
+                _fileMutex = newFileMutex;
+                _typeMutex = newTypeMutex;
+                WriteOpenInspectionLockMetadata(filePath, inspTypeForLock);
+            }
             // --- End multi-instance locking ---
             
             _currentInspection = await Task.Run(() => _saveService.Load(filePath));
@@ -2543,6 +2585,9 @@ namespace InspectionEditor
             _transcriptionOptionsByItem.Clear();
             _currentFilePath = filePath;
             _currentInspectionCode = _currentInspection.InspectionCode;
+            // A Reload skips the rules only when they were acknowledged for this same code and builder.
+            bool skipRules = isReload && _reloadRulesKey != null && _reloadRulesKey == RulesKey(_currentInspection);
+            _reloadRulesKey = null;
             _rulesAcknowledged = false;
 
             // Get builder/client name from inspection for rules matching
@@ -2557,7 +2602,7 @@ namespace InspectionEditor
             string myListFolder = insFolder ?? "";
 
             var freeAlerts = new List<InspectionEditor.Services.FreeReinspectionAlert>();
-            if (insTypeConfig != null && !string.IsNullOrEmpty(jobsFolderForChecker))
+            if (!skipRules && insTypeConfig != null && !string.IsNullOrEmpty(jobsFolderForChecker))
             {
                 try
                 {
@@ -2570,7 +2615,9 @@ namespace InspectionEditor
                 }
             }
 
-            if (!await ShowRulesWindowAsync(true, freeAlerts))
+            // A Reload of the same report and builder skips the rules window: declining it there would leave the editor
+            // bound to the discarded copy.
+            if (!skipRules && !await ShowRulesWindowAsync(true, freeAlerts))
             {
                 MessageBox.Show("You must acknowledge all rules before proceeding.",
                     "Rules Required", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -2603,6 +2650,7 @@ namespace InspectionEditor
                 (_userDataService?.HasTemplate(_currentInspectionCode ?? "") == true);
             WelcomePanel.Visibility = Visibility.Collapsed;
             _hasUnsavedChanges = false;
+            _diskConflictPending = false;
             _hasBeenEditedThisSession = false;
             _skipResultCheck = false;
 
@@ -2653,9 +2701,18 @@ namespace InspectionEditor
 
             PopulateTreeView();
             }
+            catch (Exception ex) when (ex is InspectionFileBusyException || ex is InspectionFileDamagedException)
+            {
+                // Changed between the pre-check and the load: same plain message, file untouched.
+                RestoreTitleAfterFailedOpen();
+                if (isReload) _diskConflictPending = true;
+                MessageBox.Show(ex.Message, ex is InspectionFileDamagedException ? "Inspection file damaged" : "Inspection file busy",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading inspection:\n\n{ex.Message}\n\n{ex.StackTrace}", 
+                if (isReload) _diskConflictPending = true;
+                MessageBox.Show($"Error loading inspection:\n\n{ex.Message}\n\n{ex.StackTrace}",
                     "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -2663,6 +2720,21 @@ namespace InspectionEditor
                 _isLoadingFile = false;
                 Cursor = Cursors.Arrow;
             }
+        }
+
+        private void RestoreTitleAfterFailedOpen()
+        {
+            if (_currentInspection == null)
+            {
+                Title = GetDefaultWindowTitle();
+                FileNameText.Text = "";
+                return;
+            }
+            FileNameText.Text = $"{_currentInspection.InspectionCode} - {_currentInspection.InspectionName}";
+            Title = _readOnlyMode
+                ? $"RED {AppIdentity.VersionDisplay} - {_currentInspection.InspectionCode} [READ-ONLY]"
+                : $"RED {AppIdentity.VersionDisplay} - {_currentInspection.InspectionCode}";
+            if (_hasUnsavedChanges) Title += " *";
         }
 
         private async Task<bool> ShowRulesWindowAsync(
@@ -10682,50 +10754,9 @@ namespace InspectionEditor
             
             if (parentSection == null || itemIndex < 0) return;
 
-            // Calculate ResultSortOrder - count existing items with same Number
-            int resultSortOrder = parentSection.Items
-                .Where(i => i.Number == itemToDuplicate.Number)
-                .Count(); // This will be 1 for first duplicate (original is 0)
-
-            // Create a duplicate matching INS format:
-            // - Same ItemId, Name, Number, ControlName, DisplayLabel
-            // - IsCopied = true, ResultSortOrder incremented
-            // - Value, Comments, Pictures reset (fresh entry)
-            var newItem = new Item
-            {
-                ItemId = itemToDuplicate.ItemId,  // Keep same ItemId
-                Name = itemToDuplicate.Name,       // Keep same Name
-                Number = itemToDuplicate.Number,   // Keep same Number
-                ControlName = itemToDuplicate.ControlName,
-                DisplayLabel = itemToDuplicate.DisplayLabel,
-                ValueList = itemToDuplicate.ValueList != null ? new List<string>(itemToDuplicate.ValueList) : null,
-                Required = itemToDuplicate.Required,
-                SortOrder = itemToDuplicate.SortOrder,
-                HidePicturesButton = itemToDuplicate.HidePicturesButton,
-                HideCommentsButton = itemToDuplicate.HideCommentsButton,
-                // Duplicate-specific fields
-                IsCopied = true,
-                ResultSortOrder = resultSortOrder,
-                // Reset values for fresh entry
-                Value = null,
-                Comments = null,
-                Pictures = new List<Picture>(),
-                // Copy ExtensionData for any other properties
-                ExtensionData = itemToDuplicate.ExtensionData != null 
-                    ? new Dictionary<string, object>(itemToDuplicate.ExtensionData) 
-                    : new Dictionary<string, object>()
-            };
-
-            // Find the last item with same Number and insert after it
-            int insertIndex = itemIndex;
-            for (int i = itemIndex; i < parentSection.Items.Count; i++)
-            {
-                if (parentSection.Items[i].Number == itemToDuplicate.Number)
-                    insertIndex = i;
-                else
-                    break;
-            }
-            parentSection.Items.Insert(insertIndex + 1, newItem);
+            // Copy as INSPECT's Item.Clone does, inserted directly after its source (F-002 A4). The next save
+            // clones every other key from the source item's JSON; ResultSortOrder follows SortResults.
+            var newItem = SurgicalSaveService.InsertCopy(_currentInspection, parentSection, itemToDuplicate);
 
             // Refresh tree with flag to prevent selection handler interference
             _isRefreshingTree = true;
@@ -10901,8 +10932,7 @@ namespace InspectionEditor
             try
             {
             _currentItem = item;
-            _currentSection = _currentInspection?.Sections?.FirstOrDefault(
-                s => s.Items.Any(i => i.ItemId == item.ItemId && i.ResultSortOrder == item.ResultSortOrder));
+            _currentSection = _currentInspection?.Sections?.FirstOrDefault(s => s.Items.Contains(item));
             _editorLoadedItem = item; // Track specifically what's in editor for Duplicate
             _currentPhotoData = null;
             CameraButton.Content = "📷 Camera"; // Reset camera button text when switching items
@@ -13918,12 +13948,8 @@ namespace InspectionEditor
                 targetItem = section1.Items.Last();
             }
             
-            // Calculate ResultSortOrder for the duplicate
-            int resultSortOrder = section1.Items
-                .Where(i => i.Number == targetItem.Number)
-                .Count();
-
-            // Create a duplicate of the target item with the summary as its comment
+            // Create a duplicate of the target item with the summary as its comment.
+            // Save clones the target's JSON (F-002 A4); ResultSortOrder follows SortResults.
             var summaryItem = new Item
             {
                 ItemId = targetItem.ItemId,
@@ -13934,17 +13960,20 @@ namespace InspectionEditor
                 ValueList = targetItem.ValueList != null ? new List<string>(targetItem.ValueList) : null,
                 Required = targetItem.Required,
                 SortOrder = targetItem.SortOrder,
-                HidePicturesButton = targetItem.HidePicturesButton,
-                HideCommentsButton = targetItem.HideCommentsButton,
                 IsCopied = true,
-                ResultSortOrder = resultSortOrder,
+                CopiedFrom = targetItem,
                 Value = targetItem.Value, // Copy parent's yes/no value for summary duplicates
                 Comments = summaryText,
                 Pictures = new List<Picture>()
             };
-            
-            // Add to Section 1
-            section1.Items.Add(summaryItem);
+
+            // Add to Section 1 at the end of the target's run of copies (oldest summary first), so the copy stays
+            // next to its source like an INSPECT copy and gets the next ResultSortOrder (F-002 A4/A5).
+            int insertAt = section1.Items.IndexOf(targetItem) + 1;
+            while (insertAt < section1.Items.Count && section1.Items[insertAt].ItemId == targetItem.ItemId)
+                insertAt++;
+            section1.Items.Insert(insertAt, summaryItem);
+            SurgicalSaveService.RecomputeResultSortOrder(_currentInspection);
         }
         
         private string BuildSummaryComment(string dateStr, List<(string Number, string Comments)> items)
@@ -13982,6 +14011,8 @@ namespace InspectionEditor
         private void DoSave()
         {
             if (_currentInspection == null || !_saveService.HasFile) return;
+            // Paused after a changed-on-disk stop: offer the choices before the PDF gate (see MainWindow_Closing).
+            if (_diskConflictPending && !TrySaveCurrentInspection()) return;
             if (!FinishOrientationEditing(leaving: false)) return;
 
             try
@@ -14073,6 +14104,9 @@ namespace InspectionEditor
         }
 
         private bool _savingEditorChanges;
+        // F-002 E1: the user chose to keep editing after a changed-on-disk stop. Focus-loss autosaves pause (they could
+        // only fail again) until an explicit save, close, reload or open resolves it.
+        private bool _diskConflictPending;
 
         private void CaptureCommentEdit(Item item, string text)
         {
@@ -14228,17 +14262,58 @@ namespace InspectionEditor
         {
             if (_isLoadingEditor || _isLoadingFile || _readOnlyMode || _finishingOrientationPdf || _orientationPdfUiBusy || !_hasUnsavedChanges || _currentInspection == null)
                 return;
+            if (_diskConflictPending)
+            {
+                // Saving is paused after a changed-on-disk stop; keep ONE rolling local recovery copy instead (replaced
+                // as the edits change; the report itself is not written, and no dialog is shown).
+                try { _saveService.PreserveUnsavedEditsRolling(_currentInspection); }
+                catch (Exception ex) { DiagnosticLogService.Log("Recovery copy while saving is paused failed", ex); }
+                return;
+            }
             TrySaveCurrentInspection();
         }
 
         private bool TrySaveCurrentInspection()
         {
             if (_savingEditorChanges) return false;
+            // While a report is opening (e.g. after Reload) its model and save baseline are being swapped; a save now
+            // could write one report's state through the other's baseline.
+            if (_isLoadingFile)
+            {
+                if (!_pdfSaveInProgress)
+                    MessageBox.Show("The report is still opening. Nothing was saved; try again in a moment.",
+                        "Report not saved", MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
             _savingEditorChanges = true;
+            DiskConflictChoice followUp = DiskConflictChoice.KeepEditing;
             try
             {
                 SaveCurrentInspectionInPlace();
+                _diskConflictPending = false;
                 return true;
+            }
+            catch (InspectionChangedOnDiskException ex)
+            {
+                // F-002 E1: never write RED's copy over a newer file. Nothing was written; edits stay in memory.
+                DiagnosticLogService.Log("Report save stopped; nothing written", new IOException(ex.TargetMissing
+                    ? "The report was moved or deleted outside RED." : "The report changed on disk since RED loaded it."));
+                MarkUnsaved();
+                // The save guard stays set while the choice is open, so focus-loss autosaves cannot stack dialogs.
+                if (!_pdfSaveInProgress)
+                {
+                    followUp = ResolveChangedOnDisk(ex);
+                    if (followUp == DiskConflictChoice.Overwritten)
+                    {
+                        // The confirmed overwrite is the save the caller asked for.
+                        _diskConflictPending = false;
+                        _activityService.LogSave();
+                        MarkSaved();
+                        return true;
+                    }
+                    _diskConflictPending = followUp == DiskConflictChoice.KeepEditing;
+                }
+                return false;
             }
             catch (Exception ex)
             {
@@ -14249,7 +14324,373 @@ namespace InspectionEditor
                     "Report not saved", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
-            finally { _savingEditorChanges = false; }
+            finally
+            {
+                _savingEditorChanges = false;
+                if (followUp == DiskConflictChoice.Reload)
+                    Dispatcher.BeginInvoke(new Action(ReloadCurrentInspectionFromDisk), System.Windows.Threading.DispatcherPriority.Background);
+                else if (followUp == DiskConflictChoice.CloseReport)
+                    Dispatcher.BeginInvoke(new Action(CloseReportWithoutSaving), System.Windows.Threading.DispatcherPriority.Background);
+            }
+        }
+
+        private enum DiskConflictChoice { KeepEditing, Reload, CloseReport, Overwritten }
+
+        /// <summary>
+        /// F-002 E1: the report on disk is newer than RED's copy (or gone). Offers Reload, Save As Copy, a confirmed
+        /// Overwrite, or closing a moved report; returns what should happen once the save guard is released.
+        /// </summary>
+        private DiskConflictChoice ResolveChangedOnDisk(InspectionChangedOnDiskException error)
+        {
+            // Every step below acts on this model only; if another report was opened meanwhile, nothing is written.
+            var model = _currentInspection;
+            if (model == null) return DiskConflictChoice.KeepEditing;
+            bool recoveryKept = error.RecoveryPath != null;
+            if (error.TargetMissing)
+            {
+                var missingChoice = MessageBox.Show(
+                    "This report is no longer where RED opened it (it may have been submitted or moved by INSPECT). " +
+                    "RED did not recreate it.\n\n" +
+                    "• Yes = Save As Copy: save your edits to a separate file outside the Inspections folders, then close the report\n" +
+                    (recoveryKept
+                        ? "• No = Close the report without saving (a recovery copy of your edits is kept in RED's local Recovery folder)\n"
+                        : "• No = Close the report without saving (RED could NOT make a recovery copy: your edits will be lost)\n") +
+                    "• Cancel = keep the report open with your edits (automatic saving pauses)",
+                    "Report moved outside RED", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                if (!IsStillCurrent(model)) return DiskConflictChoice.KeepEditing;
+                if (missingChoice == MessageBoxResult.Yes)
+                    return SaveEditsAsCopy("RED will now close this report.", model) ? DiskConflictChoice.CloseReport : DiskConflictChoice.KeepEditing;
+                return missingChoice == MessageBoxResult.No ? DiskConflictChoice.CloseReport : DiskConflictChoice.KeepEditing;
+            }
+
+            var choice = ShowChangedOnDiskChoice(recoveryKept);
+            if (!IsStillCurrent(model)) return DiskConflictChoice.KeepEditing;
+            switch (choice)
+            {
+                case ConflictButton.Reload:
+                    return DiskConflictChoice.Reload;
+                case ConflictButton.SaveAsCopy:
+                    return SaveEditsAsCopy("RED will now reload the newer report.", model) ? DiskConflictChoice.Reload : DiskConflictChoice.KeepEditing;
+                case ConflictButton.Overwrite:
+                    return ConfirmAndOverwrite(model) ? DiskConflictChoice.Overwritten : DiskConflictChoice.KeepEditing;
+                default:
+                    return DiskConflictChoice.KeepEditing;
+            }
+        }
+
+        // True while the given report is still the one open and nothing is loading over it.
+        private bool IsStillCurrent(InspectionFile model) => ReferenceEquals(model, _currentInspection) && !_isLoadingFile;
+
+        private enum ConflictButton { KeepEditing, Reload, SaveAsCopy, Overwrite }
+
+        // Four choices do not fit a MessageBox; Reload is the default and Escape keeps editing.
+        private ConflictButton ShowChangedOnDiskChoice(bool recoveryKept)
+        {
+            var choice = ConflictButton.KeepEditing;
+            var dialog = new Window
+            {
+                Title = "Report changed on disk",
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                MaxWidth = 560
+            };
+            var panel = new StackPanel { Margin = new Thickness(18) };
+            panel.Children.Add(new TextBlock
+            {
+                Text = "This report was changed on disk after RED opened it (by INSPECT, or a Dropbox sync from another " +
+                       "computer). RED did not save, so the newer file is untouched.",
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 14)
+            });
+            void AddChoice(string label, string detail, ConflictButton value, bool isDefault = false, bool isCancel = false)
+            {
+                var content = new StackPanel();
+                content.Children.Add(new TextBlock { Text = label, FontWeight = FontWeights.SemiBold });
+                content.Children.Add(new TextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+                var button = new Button
+                {
+                    Content = content,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Padding = new Thickness(10, 6, 10, 6),
+                    Margin = new Thickness(0, 0, 0, 8),
+                    IsDefault = isDefault,
+                    IsCancel = isCancel
+                };
+                button.Click += (_, _) => { choice = value; dialog.Close(); };
+                panel.Children.Add(button);
+            }
+            AddChoice("Reload the newer report", recoveryKept
+                    ? "Your unsaved RED edits leave the editor (a recovery copy is kept in RED's local Recovery folder)."
+                    : "Your unsaved RED edits leave the editor. RED could NOT make a recovery copy: they will be lost.",
+                ConflictButton.Reload, isDefault: recoveryKept);
+            AddChoice("Save my edits as a copy, then reload", "Your edits go to a separate file outside the Inspections folders.",
+                ConflictButton.SaveAsCopy);
+            AddChoice("Overwrite the newer report with my version...", "Use with caution: changes made outside RED since you opened it are replaced.",
+                ConflictButton.Overwrite);
+            AddChoice("Keep editing without saving", "Automatic saving pauses until you save, reload or close.",
+                ConflictButton.KeepEditing, isCancel: true);
+            dialog.Content = panel;
+            dialog.ShowDialog();
+            return choice;
+        }
+
+        // Owner decision 2026-10-18 (F-002 E1): an explicit, twice-confirmed overwrite. Fees stay as in the newer file.
+        private bool ConfirmAndOverwrite(InspectionFile model)
+        {
+            if (!IsStillCurrent(model)) return false;
+            var confirm = MessageBox.Show(
+                "Overwrite the newer report with your version in RED?\n\n" +
+                "Use with caution. This can have unexpected results. Everything changed outside RED since you opened " +
+                "this report (by INSPECT, a Dropbox sync from another computer, or anyone else) is replaced by what you " +
+                "see in RED. RED first keeps an exact copy of the newer file in its local Recovery folder (for support; " +
+                "it is not opened).\n\n" +
+                "Fee fields are not overwritten: the fees in the newer file are kept.\n\n" +
+                "Overwrite?",
+                "Overwrite newer report", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (confirm != MessageBoxResult.Yes) return false;
+            if (!IsStillCurrent(model))
+            {
+                MessageBox.Show("The report was reopened while the warning was open. Nothing was written.",
+                    "Overwrite newer report", MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
+            try
+            {
+                string keptCopy = _saveService.OverwriteChangedFile(model);
+                DiagnosticLogService.Info($"Overwrite after changed-on-disk stop: the newer file was kept at {keptCopy}");
+                return true;
+            }
+            catch (InspectionChangedOnDiskException ex)
+            {
+                MessageBox.Show(ex.TargetMissing
+                        ? "The report was moved or deleted while the warning was open. Nothing was written and it was not recreated."
+                        : "The report changed again while the warning was open. Nothing was written; save again to see the choices.",
+                    "Overwrite newer report", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogService.Log("Overwrite after changed-on-disk stop failed", ex);
+                MessageBox.Show($"The report could not be overwritten. It is still open with your edits.\n\n{ex.Message}",
+                    "Overwrite newer report", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        // Writes RED's edits to a new file chosen by the user; the open report keeps pointing at the original.
+        private bool SaveEditsAsCopy(string nextStep, InspectionFile model)
+        {
+            if (!IsStillCurrent(model) || _currentFilePath == null) return false;
+            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RED copies");
+            try { Directory.CreateDirectory(folder); } catch { folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments); }
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Save your edits as a copy",
+                InitialDirectory = folder,
+                FileName = $"{Path.GetFileNameWithoutExtension(_currentFilePath)} RED copy {DateTime.Now:yyyy-MM-dd HHmm}.ins",
+                Filter = "Inspection copy (*.ins)|*.ins",
+                OverwritePrompt = false
+            };
+            string[] inspectionFolders = { "MyList", "Review", "Archive", "Outbox", "Temp" };
+            string reportFolder = Path.GetDirectoryName(Path.GetFullPath(_currentFilePath)) ?? "";
+            // When the report lives in an Inspections tree, nothing may be written anywhere inside that tree.
+            string? inspectionsRoot = inspectionFolders.Any(name =>
+                    string.Equals(Path.GetFileName(reportFolder), name, StringComparison.OrdinalIgnoreCase))
+                ? Path.GetDirectoryName(reportFolder) : null;
+            while (dialog.ShowDialog(this) == true)
+            {
+                string chosen = Path.GetFullPath(dialog.FileName);
+                string chosenFolder = Path.GetDirectoryName(chosen) ?? "";
+                bool insideInspections = inspectionsRoot != null &&
+                    (string.Equals(chosenFolder, inspectionsRoot, StringComparison.OrdinalIgnoreCase) ||
+                     chosenFolder.StartsWith(inspectionsRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                         StringComparison.OrdinalIgnoreCase));
+                // A stray .ins in an Inspections folder would show up as a second report (or reach the back office).
+                if (insideInspections || string.Equals(chosenFolder, reportFolder, StringComparison.OrdinalIgnoreCase) ||
+                    inspectionFolders.Any(name => string.Equals(Path.GetFileName(chosenFolder), name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    MessageBox.Show("Choose a folder outside the Inspections folders (for example Documents\\RED copies).",
+                        "Save As Copy", MessageBoxButton.OK, MessageBoxImage.Information);
+                    continue;
+                }
+                if (File.Exists(chosen))
+                {
+                    MessageBox.Show("A file with that name already exists. Choose a new name.",
+                        "Save As Copy", MessageBoxButton.OK, MessageBoxImage.Information);
+                    continue;
+                }
+                if (!IsStillCurrent(model))
+                {
+                    MessageBox.Show("The report was reopened while the file dialog was open. Nothing was saved.",
+                        "Save As Copy", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+                try
+                {
+                    _saveService.SaveCopy(model, chosen);
+                    MessageBox.Show($"Your edits were saved to:\n{chosen}\n\n{nextStep}",
+                        "Save As Copy", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogService.Log("Save As Copy failed", ex);
+                    MessageBox.Show($"The copy could not be saved. The report is still open with your edits.\n\n{ex.Message}",
+                        "Save As Copy", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // Drops RED's in-memory copy and opens the file as it is on disk now. Transactional: this window keeps its locks
+        // and its edits until the newer file has actually loaded (LoadInspectionFileAsync, isReload).
+        private void ReloadCurrentInspectionFromDisk()
+        {
+            string? path = _currentFilePath;
+            var model = _currentInspection;
+            if (path == null || model == null || _isLoadingFile) return;
+            // Check the newer file opens before going further.
+            try { InspectionFileReader.ParseDocument(InspectionFileReader.ReadBytes(path), out _); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                _diskConflictPending = true;
+                MessageBox.Show($"RED could not reload the report. It stays open with your edits.\n\n{ex.Message}",
+                    "Reload", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (!OfferToLeavePendingPdfs("Reload the newer report"))
+            {
+                // Not paused: the next save offers the choices again, so Overwrite or Save As Copy stays reachable.
+                _diskConflictPending = false;
+                return;
+            }
+            // The question was modal: act only if this same report is still open and nothing started loading meanwhile.
+            if (!IsStillCurrent(model)) return;
+            if (!FinishOrientationEditing(leaving: false))
+            {
+                _diskConflictPending = true; // paused while the message is open (it deactivates the window)
+                MessageBox.Show("RED did not reload: PDF changes are still pending. Finish or close the PDF editor, " +
+                    "or save again and choose Overwrite or Save As Copy.", "Reload", MessageBoxButton.OK, MessageBoxImage.Information);
+                _diskConflictPending = false; // the next save offers the choices again
+                return;
+            }
+            // Edits made since the choice was shown (e.g. a photo) go into a fresh recovery copy before they leave.
+            if (_hasUnsavedChanges && !PreserveEditsBeforeDiscard(model)) return;
+            _reloadRulesKey = _rulesAcknowledged ? RulesKey(model) : null;
+            LoadInspectionFileAsync(path, isReload: true);
+        }
+
+        // F-002 E1: RED is about to leave this copy (Reload) or the report is gone (moved), so PDF edits that could not
+        // be saved into it never can be. Offer to leave the edited PDF files where they are (RED's PdfAttachments
+        // folder, which RED never cleans on its own) instead of blocking every way out.
+        private bool OfferToLeavePendingPdfs(string action)
+        {
+            var pending = _pdfSessions.Where(entry => !entry.Monitor.CanLeave(out _)).ToList();
+            if (pending.Count == 0) return true;
+            string files = string.Join("\n", pending.Select(entry => entry.Monitor.WorkingPath));
+            // Pause focus-loss autosave while the question is open: the MessageBox deactivates this window, and an
+            // unpaused autosave would stack another conflict choice (and possibly a second Reload) underneath it.
+            bool wasPaused = _diskConflictPending;
+            _diskConflictPending = true;
+            MessageBoxResult answer;
+            try
+            {
+                answer = MessageBox.Show(
+                    $"PDF changes for this report have not been saved into it.\n\n{action} anyway? The edited PDF files stay " +
+                    $"here, so they are not lost:\n{files}",
+                    "PDF changes still pending", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            }
+            finally { _diskConflictPending = wasPaused; }
+            if (answer != MessageBoxResult.Yes) return false;
+            DiagnosticLogService.Info($"{action} with uncaptured PDF edits left at: {files.Replace('\n', ';')}");
+            foreach (var entry in pending)
+            {
+                _pdfSessions.Remove(entry); // no Cleanup: the working file stays on disk
+                if (ReferenceEquals(_orientationPdf, entry.Monitor)) _orientationPdf = null;
+            }
+            if (_pdfSessions.Count == 0) _pdfTimer?.Stop();
+            UpdateOrientationPdfControls();
+            return true;
+        }
+
+        // The rules a report was acknowledged for: same code and same builder means a Reload need not ask again.
+        private string? _reloadRulesKey;
+        private static string RulesKey(InspectionFile report) =>
+            $"{report.InspectionCode}|{report.BuilderName ?? report.Contact ?? "Unknown"}";
+
+        // A verified recovery copy of the open edits before RED discards them. If it cannot be made, nothing is discarded.
+        private bool PreserveEditsBeforeDiscard(InspectionFile model)
+        {
+            try
+            {
+                _saveService.PreserveUnsavedEdits(model);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogService.Log("Recovery copy before discarding edits failed", ex);
+                _diskConflictPending = true;
+                MessageBox.Show($"RED could not make a recovery copy of your edits, so it kept the report open with them.\n\n{ex.Message}",
+                    "Edits kept", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+        }
+
+        // The report vanished from disk (F-002 E1, TargetMissing): leave it without writing anything.
+        private void CloseReportWithoutSaving()
+        {
+            var model = _currentInspection;
+            if (model == null || _isLoadingFile) return;
+            if (!OfferToLeavePendingPdfs("Close the report"))
+            {
+                _diskConflictPending = false;
+                return;
+            }
+            // The question was modal: act only if this same report is still open and nothing started loading meanwhile.
+            if (!IsStillCurrent(model)) return;
+            if (!FinishOrientationEditing())
+            {
+                _diskConflictPending = true; // paused while the message is open (it deactivates the window)
+                MessageBox.Show("RED did not close the report: PDF changes are still pending. Finish or close the PDF editor first.",
+                    "Close report", MessageBoxButton.OK, MessageBoxImage.Information);
+                _diskConflictPending = false; // the next save offers the choices again
+                return;
+            }
+            if (_hasUnsavedChanges && !PreserveEditsBeforeDiscard(model)) return;
+            _diskConflictPending = false;
+            _activityService.LogClose();
+            ReleaseInspectionLocks();
+
+            _currentInspection = null;
+            UpdateOrientationPdfControls();
+            _currentItem = null;
+            _editorLoadedItem = null;
+            _currentFilePath = null;
+            _currentInspectionCode = null;
+            _currentPhotoData = null;
+            _currentPhotoIndex = 0;
+            _selectedPrefix = null;
+            _selectedSuffixes.Clear();
+            _statsMode = StatsMode.Global;
+
+            SectionsTreeView.Items.Clear();
+            EditorPanel.Visibility = Visibility.Collapsed;
+            SelectItemPanel.Visibility = Visibility.Collapsed;
+            WelcomePanel.Visibility = Visibility.Visible;
+
+            Title = GetDefaultWindowTitle();
+            FileNameText.Text = "";
+            AddressText.Text = "";
+            BuilderText.Text = "";
+
+            SaveFileButton.IsEnabled = false;
+            SaveTemplateButton.IsEnabled = false;
+            ApplyTemplateButton.IsEnabled = false;
+
+            MarkSaved();
         }
 
         private void SyncCurrentItemFromUI()

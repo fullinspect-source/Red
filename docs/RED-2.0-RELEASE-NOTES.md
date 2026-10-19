@@ -1,5 +1,24 @@
 # RED 2.0 Release Notes
 
+## 2.2.1 — Saving that keeps INSPECT's files as INSPECT wrote them
+
+- **Saving changes only what you edited.** Everything else in the .ins file stays byte for byte as INSPECT wrote it. RED no longer adds its own item or header keys (the one RED-only addition left is the Plan Check result on CPP reports), keeps empty comments as they were, and leaves unchanged pictures untouched. Opening and closing a report without edits writes nothing.
+- **Copied items and result order follow INSPECT.** Duplicated items are made the way INSPECT makes them, and the result order is recomputed with INSPECT's rule when you save.
+- **A report changed elsewhere is never overwritten silently.** If the file changed on disk after RED opened it (in INSPECT or by Dropbox), Save stops and offers:
+  - **Reload**, to show the newer file;
+  - **Save As Copy**, outside the Inspections folder, then reload;
+  - **Overwrite**, with a second "use with caution" warning; RED first keeps an exact copy of the newer file in its local Recovery folder, and the fees stay as in the newer file;
+  - **Keep editing**, which pauses autosave until you choose.
+- **A moved or deleted report is never recreated.** You can save a copy and close, close without saving, or keep it open.
+- **Opening a report** that is still syncing shows "The inspection file is busy (probably syncing). Try again in a moment." A damaged file says so and is left unchanged. My List drops a file that disappears while it loads.
+- Temporary and backup files for Outbox, Archive and Review saves go in a hidden `.red-save-staging` folder inside My List, never next to those reports. This works on any drive or network share.
+- **Your edits are not lost:**
+  - While saving is paused after a conflict, RED keeps one local recovery copy of your edits and updates it as you edit.
+  - If a PDF edit can't be saved into a report that changed or moved, Save and Close show the conflict choices first. Reload or closing a moved report can leave the edited PDF file where it is instead of blocking.
+  - Reload and "close without saving" make a fresh recovery copy first, and a Reload that cannot finish leaves the report open with your edits.
+  - If the Inspections folder or drive is temporarily unavailable, Save says so and keeps your edits; RED does not treat it as a moved report.
+- Save and Close wait while a report is still opening. Reloading the same report does not show its rules again.
+
 ## 2.2.0 — ORDERS: the live Strand schedule, like INSPECT 2026
 
 - The **ORDERS** tab now shows the live Strand service-request list, matching INSPECT 2026's Schedule tab:

@@ -2,7 +2,7 @@
 <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
 <Compile Include="../../AppIdentity.cs" Link="AppIdentity.cs"/>
 <Compile Include="../../Models/InspectionModels.cs" Link="InspectionModels.cs"/>
-<Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs"/>
+<Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs"/><Compile Include="../../Services/InspectionFileReader.cs" Link="InspectionFileReader.cs" /><Compile Include="../../Services/InspectProjectionWriter.cs" Link="InspectProjectionWriter.cs" />
 <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs"/>
 <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs"/>
 <Compile Include="../../Services/LastEditTime.cs" Link="LastEditTime.cs"/>

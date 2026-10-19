@@ -4,6 +4,41 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-18 — RED 2.2.1 — F-002: INSPECT-faithful .ins saving, changed-on-disk stop with Overwrite
+
+- **Base:** 2.2.0 (`924c549`). F-002 was developed in the Dropbox copy and merged here file by file. MainWindow.xaml.cs, Models/InspectionModels.cs and InspectionPickerWindow.xaml.cs were three-way merged against 2.1.42 (`4653e33`); F-002's pre-change backups equal 2.1.42, so only F-002 hunks came over. The other files were unchanged here since 2.1.42 and were taken whole.
+- **Files changed:**
+  - New: `Services/InspectionFileReader.cs`, `Services/InspectProjectionWriter.cs`, `tests/InsRoundTripHarness/`.
+  - Modified: `Services/SurgicalSaveService.cs`, `Services/AtomicInspectionWriter.cs`, `Models/InspectionModels.cs` (`Item.CopiedFrom`), `MainWindow.xaml.cs` (save, load and duplicate code; the four-choice changed-on-disk window with Overwrite), and `InspectionPickerWindow.xaml.cs` (`ParseInspectionFile` drops vanished files).
+  - Also modified: six harness csproj files, `tests/LastEditHarness/Program.cs`, `tests/FailedSaveRecoveryHarness/Program.cs`, `tests/template_first_open_*`, `tests/generate_save_lifecycle_probe.py` and `tests/SaveLossHarness/LifecycleProbe.Generated.cs`; plus the version (2.2.1) in the csproj and the four release-metadata tests, these release notes and this handoff.
+- **Behavior:** spec `Dropbox/ios-port/program/features/F-002-ins-roundtrip` (SPEC, ACCEPTANCE, NOTES-windows.md; owner Q-02, Q-21, Q-48).
+  - Mode A preserving save: only edited values change.
+  - E1 changed-on-disk stop: Reload, Save As Copy, a twice-confirmed Overwrite that keeps the newer file's fees, or Keep editing. A moved report is never recreated.
+  - R2-R5 busy and damaged reads. A10 staging in `{IF}\MyList\.red-save-staging\{folder}` (changed from F-002's `%LOCALAPPDATA%\RED\SaveStaging`; see below).
+- **Release-review fixes made here** (port to Dropbox\P\PL; see shared notes `red-2.2.1-release.md`):
+  - `AtomicInspectionWriter.SidecarDirectory`:
+    - Review, Archive, Outbox and Temp\{date} stage in a hidden `MyList\.red-save-staging\{folder}` in the same tree. That is on the same volume for any drive, share, junction or mount point. Each tree and folder has its own trim pool, and A10 allows sidecars only in MyList.
+    - `ReportFolderAvailable`: a missing folder or drive is a retryable `folder-unavailable`, not a moved report.
+  - `InspectionChangedOnDiskException.RecoveryPath`: the conflict window promises a recovery copy only when one exists.
+  - `FailedSaveRecoveryService.PreserveReplaced` and `OverwriteChangedFile` (which now returns the kept path): the replaced newer file is kept, untrimmed, in Recovery before an Overwrite. If it can't be kept, nothing is overwritten.
+  - `SurgicalSaveService`: `MissingReport` (moved vs unavailable) and `PreserveUnsavedEdits`.
+  - `MainWindow`:
+    - no save or close while a report is loading;
+    - the conflict actions are bound to the model they were opened for (`IsStillCurrent`);
+    - Reload is transactional: locks and edits are kept until the newer copy loads, a recovery copy is made first, and the rules are skipped only for the same code and builder;
+    - close-without-saving makes a recovery copy first;
+    - a pending PDF capture no longer dead-ends the conflict: `DoSave` and `MainWindow_Closing` show the choices first when paused, and `OfferToLeavePendingPdfs` lets Reload or Close leave uncaptured PDF working copies on disk;
+    - while saving is paused, ONE rolling recovery copy is kept (`FailedSaveRecoveryService.PreserveRolling`, `paused-edits-*.ins`), not one per edit.
+  - `tests/generate_save_lifecycle_probe.py`: stubs and 2 new checks; `SaveLossHarness` probe regenerated.
+- **Verification:**
+  - Debug build: 0 errors.
+  - `tests/InsRoundTripHarness`: 71/71, with new checks for Overwrite's kept copy, MyList staging, the unavailable folder and the rolling paused copy.
+  - SaveLoss (with 10 lifecycle checks), FailedSaveRecovery (17), LastEdit (74), OrientationPdf (345), ChecklistVisibility (6), InspectUserType and FeeToken all pass.
+  - Python: 35/45 (PYTHONUTF8=1); the other 10 are the same environment failures as untouched 2.1.43.
+  - Corpus round trip on a sandbox copy of 1703 real files: 1703/1703 byte-identical, 0 load errors, no-edit save wrote nothing, 18/18 INSPECT Temp snapshots, fees 1703/1703.
+  - A multi-agent release review was run; its confirmed findings are fixed above.
+- **Deployment:** pending; this entry will be updated after the GitHub release `v2.2.1`.
+
 ### 2026-10-18 — RED 2.2.0 — ORDERS tab: live Strand schedule (INSPECT 2026 Schedule parity)
 
 - **Base:** `origin/main` at `f2ac28b` (2.1.43). The ORDERS work was developed in the Dropbox copy (2.1.42 base) and moved over file by file. The Dropbox copy's older `Services/GrokApiClient.cs` (gemini-3.5 fallback) was deliberately NOT carried over.

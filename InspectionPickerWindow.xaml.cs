@@ -1233,7 +1233,11 @@ namespace InspectionEditor
             }
             catch
             {
-                // Return basic info from file system
+                // F-002 R4: a file that disappeared between listing and reading is dropped silently.
+                if (!File.Exists(filePath))
+                    return null;
+
+                // Damaged but present (A-002-15): return basic info from file system
                 return new InspectionFileInfo
                 {
                     FilePath = filePath,

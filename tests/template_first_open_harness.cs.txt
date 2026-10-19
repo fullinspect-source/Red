@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using InspectionEditor.Models;
 using InspectionEditor.Services;
 using Newtonsoft.Json;
@@ -59,7 +60,7 @@ class Probe {
  }
  /*PRODUCTION_METHODS*/
 }
-class LoadProbe {private JObject? _originalJson;private string? _filePath;private byte[]? _lastSavedBytes;/*PRODUCTION_LOAD_METHODS*/}
+class LoadProbe {private JObject? _originalJson;private string? _filePath;private byte[]? _lastSavedBytes;private ConditionalWeakTable<Item, ItemOrigin> _items = new();private ConditionalWeakTable<Picture, PictureOrigin> _pictures = new();/*PRODUCTION_LOAD_METHODS*/}
 namespace InspectionEditor {static class AppIdentity {public static string AppDataFolderName {get;}=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".hermes/cache/scratch","red-template-test-"+Guid.NewGuid().ToString("N"));public static string LocalAppDataPath=>AppDataFolderName;}}
 namespace InspectionEditor.Services {class UserDataService {private string _userDataPath=AppIdentity.LocalAppDataPath;public bool Available {set {string f=Path.Combine(_userDataPath,"template_IER.json");if(value)File.WriteAllText(f,"{\"2.1\":\"Pass\"}");else File.Delete(f);}} /*PRODUCTION_LEGACY_METHODS*/}}
 namespace System.Windows {
