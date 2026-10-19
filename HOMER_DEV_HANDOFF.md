@@ -36,8 +36,10 @@ This file is the concise cross-session source of development context for work pe
   - SaveLoss (with 10 lifecycle checks), FailedSaveRecovery (17), LastEdit (74), OrientationPdf (345), ChecklistVisibility (6), InspectUserType and FeeToken all pass.
   - Python: 35/45 (PYTHONUTF8=1); the other 10 are the same environment failures as untouched 2.1.43.
   - Corpus round trip on a sandbox copy of 1703 real files: 1703/1703 byte-identical, 0 load errors, no-edit save wrote nothing, 18/18 INSPECT Temp snapshots, fees 1703/1703.
-  - A multi-agent release review was run; its confirmed findings are fixed above.
-- **Deployment:** pending; this entry will be updated after the GitHub release `v2.2.1`.
+  - Five multi-agent review and verify rounds were run; every confirmed release blocker is fixed above, and the final check found none.
+  - The packaged Red.exe (2.2.1+b847fd1) was started once on the build PC: "RED v2.2.1 - My List".
+- **Not clicked through in the running app:** the four-choice conflict window, Overwrite's second warning, Reload and the PDF-pending prompts (their service paths are covered by the harnesses).
+- **Deployment:** published 2026-10-18 as GitHub release `v2.2.1` (commit `b847fd1`, assets `Red-v2.2.1.zip` 89.2 MB and `update_red.bat`), marked Latest. `releases/latest` returns v2.2.1 and the zip downloads (HTTP 200). Installed copies update on their next start, at most one check per 24 hours.
 
 ### 2026-10-18 — RED 2.2.0 — ORDERS tab: live Strand schedule (INSPECT 2026 Schedule parity)
 
