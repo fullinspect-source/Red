@@ -33,7 +33,7 @@ This file is the concise cross-session source of development context for work pe
   - The corpus round trip was not re-run, because no save code changed.
   - Before the port, in the Dropbox copy, an isolated dev-build UI run showed the retention row and the 0-day line,
     and starting RED created no folders.
-- **Deployment:** pending.
+- **Deployment:** published 2026-10-18 as GitHub release `v2.2.2` (commit `aa33e4b`, assets `Red-v2.2.2.zip` 89.2 MB with 502 entries, and `update_red.bat`), marked Latest. `releases/latest` returns v2.2.2, the zip size matches the local build, and the download answers HTTP 200. The packaged Red.exe (2.2.2+aa33e4b) was started once on the build PC: "RED v2.2.2 - My List". Installed copies update on their next start, at most one check per 24 hours. Copies that had not picked up 2.2.1 go straight to 2.2.2, which contains it.
 
 ### 2026-10-18 — RED 2.2.1 — F-002: INSPECT-faithful .ins saving, changed-on-disk stop with Overwrite
 
