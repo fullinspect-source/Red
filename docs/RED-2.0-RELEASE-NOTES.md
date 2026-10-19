@@ -1,5 +1,25 @@
 # RED 2.0 Release Notes
 
+## 2.2.0 — ORDERS: the live Strand schedule, like INSPECT 2026
+
+- The **ORDERS** tab now shows the live Strand service-request list, matching INSPECT 2026's Schedule tab:
+  - groups Unassigned, Assigned, Field Complete, Completed and Deleted
+  - pending jobs highlighted
+  - sorting, and a 5-minute auto refresh that keeps your place
+- **Toolbar**, like INSPECT's Schedule ribbon:
+  - **Open** opens the order dialog: edit, Set Job Number, or Completed/Failed for surveys.
+  - **Delete…** is shown only to users with the Strand "Service Request Delete" or "Edit - All" permission.
+  - **Add to My List** assigns the order to you, downloads its inspection form from Strand and saves it to your Inspect My List folder, where INSPECT sees it right away.
+  - **Assign…** is reserved for the owner's account.
+- **Filter row** under every column, with INSPECT's 12 operators (Contains by default). Dates compare by day. Shows "Filtered: showing N of M" with Clear Filters.
+- **Settings > Inspector Profile**: RED keeps its own copy of your profile. The first time 2.2.0 starts, it imports everything from INSPECT on this PC: full name, phone, default state, Inspections folder, user type, your Strand login, and INSPECT's other settings. **Import from INSPECT** brings them over again at any time; when values differ, RED lists each change and asks first. Name, phone, state and folder can be edited in RED. The user type is read-only: change Type in INSPECT Settings, then press Import from INSPECT.
+- **Profile required**: if anything INSPECT itself requires at start is missing (full name, Strand username and password, default state, user type, an existing Inspections folder), RED opens on Settings with "Please insert missing profile information before anything else." My List and ORDERS stay locked until the profile is complete.
+- My List now follows the profile's Inspections folder, the same folder Add to My List saves into.
+- **Settings > Strand Account**: RED saves your Strand login protected for your Windows account and signs ORDERS in silently. Use Test & Save or Clear to manage it. Without a connection, Test & Save keeps the login untested.
+- As in INSPECT, a Preinspector's new forms are marked as preinspections, and only Inspectors ask Strand for the job's files.
+- Owner only: an **iPad fee token** generator. The token is shown once and never saved.
+- RED never shows, edits or recalculates fees.
+
 ## 2.1.23 — Enforce one selected checklist row
 
 - Every item-selection path now clears the previous left-pane highlight before painting the newly selected row.

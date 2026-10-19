@@ -10,7 +10,13 @@ namespace InspectionEditor.Services
             AppIdentity.LocalAppDataPath,
             "red_errors.log");
 
-        public static void Log(string context, Exception exception)
+        public static void Log(string context, Exception exception) =>
+            Append($"{context}{Environment.NewLine}{exception}{Environment.NewLine}");
+
+        // A one-line note for support (no exception), e.g. the settings RED started with.
+        public static void Info(string message) => Append(message);
+
+        private static void Append(string text)
         {
             try
             {
@@ -19,7 +25,7 @@ namespace InspectionEditor.Services
                     Directory.CreateDirectory(AppIdentity.LocalAppDataPath);
                     File.AppendAllText(
                         LogPath,
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} | {context}{Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}");
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} | {text}{Environment.NewLine}");
                 }
             }
             catch

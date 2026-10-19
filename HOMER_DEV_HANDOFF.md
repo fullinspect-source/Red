@@ -4,6 +4,27 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-18 — RED 2.2.0 — ORDERS tab: live Strand schedule (INSPECT 2026 Schedule parity)
+
+- **Base:** `origin/main` at `f2ac28b` (2.1.43). The ORDERS work was developed in the Dropbox copy (2.1.42 base) and moved over file by file. The Dropbox copy's older `Services/GrokApiClient.cs` (gemini-3.5 fallback) was deliberately NOT carried over.
+- **Files changed:**
+  - New: `InspectionPickerWindow.Orders.cs`, `.StrandAccount.cs`, `.AddToMyList.cs`, `.OrdersFilter.cs`, `OrderRequestWindow.xaml(.cs)`, `OrdersDialogs.cs`, `Services/StrandScheduleService.cs`, `Services/StrandCredentialService.cs`, `Services/StrandMyListService.cs`, `Services/InspectUserType.cs`, `Services/InspectorProfileService.cs`, `InspectionPickerWindow.InspectorProfile.cs`, `docs/ORDERS_SCHEDULE_SPEC.md`, `tests/FeeTokenHarness/`, `tests/InspectUserTypeHarness/`.
+  - Modified: `InspectionPickerWindow.xaml(.cs)`, `App.xaml.cs` (profile gate, My List folder, kind log), `MainWindow.xaml.cs` (Open picker folder only), `Services/DiagnosticLogService.cs` (`Info`), `InspectionEditor.csproj` (2.2.0, `System.Security.Cryptography.ProtectedData`), the four release-metadata tests, these release notes, and this handoff.
+- **Behavior:** see `docs/ORDERS_SCHEDULE_SPEC.md`. The Strand API, endpoints, Add to My List and the file format were reverse-engineered from INSPECT 2026 (2026.1012.2).
+  - The Strand login is saved with DPAPI in `%LOCALAPPDATA%\RED\strand_account.json`, or imported from Inspect's `config.json`.
+  - Assign is gated to the owner account. Delete follows the Strand permissions `Service Request Edit - All` / `Service Request Delete`.
+  - The iPad fee token (decision D-03 = B) is owner-only and never persisted.
+  - INSPECT user type (owner Q-22, F-003 O9/O10): one exact-ordinal classifier, `InspectUserType`. A blank type means Missing, never "Inspector"; only an absent key means "Inspector".
+  - Inspector profile (F-003, owner 2026-10-18): RED's own copy in `%LOCALAPPDATA%\RED\inspector_profile.json` (atomic writes; deliberately not `red_app_settings.json`, which Settings rewrites whole and Reset RED Preferences deletes). First run imports INSPECT's S1/S2 values and, when RED has none, the Strand login. Import from INSPECT re-imports with a changes list and confirmation. INSPECT files are only read (shared access, 100/200/400 ms retries, `.bak` fallback with the S4 message).
+  - Start-up lock (owner decisions 2026-10-18): required = two-word full name, Strand username with @, saved Strand password, default state, non-blank user type, existing Inspections folder (INSPECT's IsFormConfigValid). While any is missing RED opens on Settings with "Please insert missing profile information before anything else." and disables My List and ORDERS; a file argument opens the home window instead of the editor. The user type has no picker in RED. Add to My List uses the profile (folder, user type, initials) and refuses an incomplete one before any server call. My List follows the profile's Inspections folder (O7). The user kind is logged once per launch (O10).
+- **Verification:**
+  - Debug build: 0 errors.
+  - 34 of 45 Python tests pass. The other 11 fail identically on untouched 2.1.43 for environmental reasons: no pymupdf, Mac-only fixture paths, temporary harness builds.
+  - `tests/FeeTokenHarness`: ALL PASS.
+  - `tests/InspectUserTypeHarness`: ALL PASS (69 checks: user type, blank UserType, Preinspector with no RequestFiles PUT, INSPECT config reading, full import, required items, changes list, profile store).
+  - Multiple multi-agent review and verify rounds; all confirmed findings fixed.
+- **Deployment:** pending. The owner live-tests the release candidate first; this entry will be updated after the GitHub release.
+
 ### 2026-09-01 — RED 2.1.23 — enforce one selected checklist row
 
 - **Files changed:** `InspectionEditor.csproj`, `MainWindow.xaml.cs`, `tests/red_21_layout_static_test.py`, release metadata tests, release notes, and this handoff.

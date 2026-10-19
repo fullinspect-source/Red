@@ -2374,11 +2374,8 @@ namespace InspectionEditor
             // Pick the file first, then decide what to do with it
             string? selectedFile = null;
             
-            // Default to user's Dropbox Inspections folder
-            string defaultPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Dropbox", "Inspections", "MyList"
-            );
+            // My List in the profile's Inspections folder (F-003 O7), else the user's Dropbox Inspections folder
+            string defaultPath = InspectorProfileService.MyListFolder();
 
             // Show inspection picker modal
             if (Directory.Exists(defaultPath))

@@ -18,6 +18,15 @@ class AiReleasePackagingRegressionTests(unittest.TestCase):
     def test_generated_key_source_remains_gitignored(self):
         self.assertIn("EmbeddedApiKeyProvider.Generated.cs", GITIGNORE)
 
+    def test_private_sources_never_reach_the_release_package(self):
+        # Source Link would embed gitignored ("untracked") *.Generated.cs files into Red.pdb.
+        self.assertIn("<EmbedUntrackedSources>false</EmbedUntrackedSources>", PROJECT)
+        self.assertIn("<CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>", PROJECT)
+
+    def test_release_build_requires_private_inspect_cipher_secret(self):
+        self.assertIn('Name="RequireInspectCipherSecretForRelease"', PROJECT)
+        self.assertIn("Services/InspectCipherSecrets.Generated.cs", GITIGNORE)
+
     def test_inline_ai_buttons_do_not_disappear_when_key_is_missing(self):
         self.assertIn("bool canUseAi = hasPhoto;", MAIN)
         self.assertNotIn("bool canUseAi = _grokClient != null && hasPhoto;", MAIN)

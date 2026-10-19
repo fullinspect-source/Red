@@ -123,8 +123,16 @@ namespace InspectionEditor
 
             // Show the right startup surface BEFORE closing splash — closing the last
             // visible window triggers WPF's OnLastWindowClose shutdown.
+            // While the inspector profile is incomplete, or the first-run import has something to say, RED opens on
+            // Settings, even for a file argument (owner, 2026-10-18).
+            InspectorProfileService.EnsureImportedOnFirstRun();
+            bool profileComplete = InspectorProfileService.IsCompleteNow();
+            // F-003 O10: the user kind (never the value) once per launch, so a support log shows which path RED takes.
+            DiagnosticLogService.Info($"Started RED {AppIdentity.VersionDisplay}: user kind {InspectUserType.Classify(InspectorProfileService.Load()?.UserType)}, " +
+                                      $"profile {(profileComplete ? "complete" : "incomplete")}");
+            bool openEditor = profileComplete && InspectorProfileService.FirstRunMessage == null;
             MainWindow? mainWindow = null;
-            if (e.Args.Length > 0 && !string.IsNullOrEmpty(e.Args[0]))
+            if (openEditor && e.Args.Length > 0 && !string.IsNullOrEmpty(e.Args[0]))
             {
                 mainWindow = new MainWindow();
                 mainWindow.Show();
@@ -157,10 +165,7 @@ namespace InspectionEditor
 
         private static InspectionPickerWindow CreateHomeListWindow()
         {
-            string defaultPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Dropbox", "Inspections", "MyList"
-            );
+            string defaultPath = InspectorProfileService.MyListFolder();
 
             var homeWindow = new InspectionPickerWindow(defaultPath, stayOpenHome: true);
             homeWindow.InspectionOpenRequested += (_, filePath) =>

@@ -12,11 +12,19 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.1.43</Version>
-    <ReleaseDate>2026-10-13</ReleaseDate>
+    <Version>2.2.0</Version>
+    <ReleaseDate>2026-10-18</ReleaseDate>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
     <Product>RED $(Version)</Product>
+  </PropertyGroup>
+  <!-- Never ship private sources: the .Generated.cs files are gitignored, and Source Link would otherwise embed
+       "untracked" sources into Red.pdb. Release packages also leave .pdb files out entirely. -->
+  <PropertyGroup>
+    <EmbedUntrackedSources>false</EmbedUntrackedSources>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,6 +37,7 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <PackageReference Include="QRCoder" Version="1.4.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
@@ -115,5 +124,10 @@
   <Target Name="VerifyPhotoDependencyPublish" AfterTargets="Publish">
     <Error Condition="!Exists('$(PublishDir)SixLabors.ImageSharp.dll')"
            Text="Published RED is missing SixLabors.ImageSharp.dll; refusing an incomplete photo-capable release." />
+  </Target>
+  <!-- ORDERS needs Inspect's cipher secret (login import, new-form fee fields). It lives only in a gitignored file. -->
+  <Target Name="RequireInspectCipherSecretForRelease" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\Services\InspectCipherSecrets.Generated.cs')"
+           Text="Release builds require the gitignored Services\InspectCipherSecrets.Generated.cs so ORDERS can import Inspect logins and write new My List forms." />
   </Target>
 </Project>

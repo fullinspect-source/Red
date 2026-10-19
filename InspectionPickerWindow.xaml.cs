@@ -61,7 +61,6 @@ namespace InspectionEditor
         private bool _hasAppliedColumnSettingsOnce = false;
         private readonly System.Windows.Threading.DispatcherTimer _columnWidthSaveTimer;
         private readonly System.Windows.Threading.DispatcherTimer _lastEditTimer = new() { Interval = TimeSpan.FromMinutes(1) };
-        private int _ordersLoadVersion = 0;
         private readonly HashSet<string> _openingFilePaths = new(StringComparer.OrdinalIgnoreCase);
         private int _aboutLogoClickCount = 0;
         private DateTime _lastAboutLogoClick = DateTime.MinValue;
@@ -115,9 +114,27 @@ namespace InspectionEditor
             InspectionListView.SizeChanged += (_, _) => FitColumnsToViewport();
             Loaded += InspectionPickerWindow_Loaded;
             _lastEditTimer.Tick += (_, _) => RefreshLastEditLabels(false);
-            Activated += (_, _) => { if (!_isLoading) RefreshLastEditLabels(true); };
+            Activated += (_, _) => { if (!_isLoading) RefreshLastEditLabels(true); SyncOrdersWithStrandSession(); };
+            // Another RED window may have changed the profile or the Strand login.
+            Activated += (_, _) =>
+            {
+                if (!IsLoaded) return;
+                if (SettingsPanel.Visibility == Visibility.Visible) LoadInspectorProfileUi();
+                else UpdateProfileLock();
+                RepointIfProfileFolderChanged();
+            };
             Loaded += (_, _) => _lastEditTimer.Start();
-            Closed += (_, _) => { _pickerClosed = true; ++_lastEditRefreshGeneration; _lastEditTimer.Stop(); _columnWidthSaveTimer.Stop(); };
+            Closed += (_, _) => { _pickerClosed = true; ++_lastEditRefreshGeneration; _lastEditTimer.Stop(); _columnWidthSaveTimer.Stop(); _ordersRefreshTimer?.Stop(); };
+            // Any sign-in or sign-out, in any picker window, clears this window's iPad fee token at once.
+            Action onStrandSessionChanged = () => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_pickerClosed)
+                    return;
+                ClearFeeToken();
+                UpdateFeeTokenUi();
+            }));
+            Services.StrandScheduleService.SessionChanged += onStrandSessionChanged;
+            Closed += (_, _) => Services.StrandScheduleService.SessionChanged -= onStrandSessionChanged;
             if (_stayOpenHome)
             {
                 OpenButton.Content = "Open";
@@ -134,6 +151,13 @@ namespace InspectionEditor
                 savedPath = null;
             if (savedPath != null && !Directory.Exists(savedPath))
                 savedPath = null;
+            // My List follows the profile's Inspections folder (F-003 O7): a remembered folder outside it is dropped.
+            string? inspectionsFolder = InspectorProfileService.Load()?.InspectionsFolder;
+            if (savedPath != null && !string.IsNullOrWhiteSpace(inspectionsFolder) && Directory.Exists(inspectionsFolder) &&
+                !InspectorProfileService.IsInside(savedPath, inspectionsFolder))
+            {
+                savedPath = null;
+            }
             LoadInspections(savedPath ?? defaultFolderPath);
         }
 
@@ -195,7 +219,7 @@ namespace InspectionEditor
             ApplyColumnSettings();
 
             LoadSettingsTabValues();
-            ShowMyListTab();
+            ShowStartTab();
 
             // Restore sort state — RefreshList (called later) will pick it up
             if (!string.IsNullOrEmpty(_settings?.SortColumn))
@@ -453,6 +477,13 @@ namespace InspectionEditor
 
         private void ShowMyListTab()
         {
+            // Locked until the inspector profile is complete (owner, 2026-10-18).
+            if (_profileLocked)
+            {
+                ShowSettingsTab();
+                return;
+            }
+
             bool shouldRefresh = _myListTabHasBeenShown && IsLoaded;
             _myListTabHasBeenShown = true;
             MyListPanel.Visibility = Visibility.Visible;
@@ -464,144 +495,6 @@ namespace InspectionEditor
                 RefreshCurrentMyListFolder();
         }
 
-        private void ShowOrdersTab()
-        {
-            MyListPanel.Visibility = Visibility.Collapsed;
-            SettingsPanel.Visibility = Visibility.Collapsed;
-            OrdersPanel.Visibility = Visibility.Visible;
-            AboutPanel.Visibility = Visibility.Collapsed;
-            ShowOrdersNotConnectedMessage();
-            SetActiveTab(OrdersTabButton);
-        }
-
-        private void RefreshOrdersButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowOrdersNotConnectedMessage();
-        }
-
-        private void ShowOrdersNotConnectedMessage()
-        {
-            OrdersListView.ItemsSource = null;
-            OrdersStatusText.Text = "Live Dallas orders feed is not wired yet. The Inspect2022 offline job cache is intentionally hidden because it does not match the live Schedule tab.";
-        }
-
-        private async Task LoadOrdersFromInspectCacheAsync()
-        {
-            int loadVersion = ++_ordersLoadVersion;
-            RefreshOrdersButton.IsEnabled = false;
-            OrdersStatusText.Text = "Loading Inspect2022 order cache...";
-
-            try
-            {
-                string? cachePath = FindNewestInspectOfflineJobsPath();
-                if (string.IsNullOrWhiteSpace(cachePath) || !File.Exists(cachePath))
-                {
-                    OrdersListView.ItemsSource = null;
-                    OrdersStatusText.Text = "Inspect2022 order cache not found yet.";
-                    return;
-                }
-
-                var loadResult = await Task.Run(() => LoadOrdersFromCacheFile(cachePath));
-                if (loadVersion != _ordersLoadVersion)
-                    return;
-
-                OrdersListView.ItemsSource = loadResult.Rows;
-                var view = CollectionViewSource.GetDefaultView(OrdersListView.ItemsSource);
-                view.GroupDescriptions.Clear();
-                view.SortDescriptions.Clear();
-                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(OrderFileInfo.StatusGroup)));
-                view.SortDescriptions.Add(new SortDescription(nameof(OrderFileInfo.StatusGroup), ListSortDirection.Descending));
-                view.SortDescriptions.Add(new SortDescription(nameof(OrderFileInfo.ScheduleDate), ListSortDirection.Ascending));
-                view.Refresh();
-
-                string updated = File.GetLastWriteTime(cachePath).ToString("M/d/yyyy h:mm tt");
-                string capped = loadResult.WasCapped ? " Showing newest 300." : "";
-                OrdersStatusText.Text = $"Loaded {loadResult.Rows.Count} cached scheduled/request jobs from Inspect2022. Cache updated {updated}.{capped}";
-            }
-            catch (Exception ex)
-            {
-                OrdersListView.ItemsSource = null;
-                OrdersStatusText.Text = $"Could not load Inspect2022 order cache: {ex.Message}";
-            }
-            finally
-            {
-                RefreshOrdersButton.IsEnabled = true;
-            }
-        }
-
-        private static (List<OrderFileInfo> Rows, bool WasCapped) LoadOrdersFromCacheFile(string cachePath)
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(cachePath));
-            if (document.RootElement.ValueKind != JsonValueKind.Array)
-                return (new List<OrderFileInfo>(), false);
-
-            var recentFloor = DateTime.Today.AddDays(-14);
-            var rows = new List<OrderFileInfo>();
-            foreach (var item in document.RootElement.EnumerateArray())
-            {
-                string jobNumber = FirstStringProperty(item, "JobNumber");
-                string address = FirstStringProperty(item, "Address");
-                string subdivision = FirstStringProperty(item, "Subdivision");
-                string builder = FirstStringProperty(item, "BuilderName");
-                string city = FirstStringProperty(item, "City");
-                string requests = FirstStringProperty(item, "Requests");
-                string superintendent = FirstStringProperty(item, "Superintendent");
-                string scheduleRaw = FirstStringProperty(item, "ScheduleDate");
-
-                DateTime? scheduleDate = null;
-                if (DateTime.TryParse(scheduleRaw, out var parsedSchedule))
-                    scheduleDate = parsedSchedule;
-
-                bool hasRecentSchedule = scheduleDate.HasValue && scheduleDate.Value.Date >= recentFloor;
-                bool hasRequestNote = !string.IsNullOrWhiteSpace(requests) &&
-                                      (!scheduleDate.HasValue || scheduleDate.Value.Date >= recentFloor);
-                if (!hasRecentSchedule && !hasRequestNote)
-                    continue;
-
-                rows.Add(new OrderFileInfo
-                {
-                    StatusGroup = string.IsNullOrWhiteSpace(superintendent) ? "Unassigned" : "Assigned",
-                    JobNumber = jobNumber,
-                    Address = address,
-                    Subdivision = subdivision,
-                    Builder = builder,
-                    City = city,
-                    Service = "",
-                    ScheduleDate = scheduleDate,
-                    Assigned = superintendent,
-                    Note = requests
-                });
-            }
-
-            rows = rows
-                .OrderBy(r => r.StatusGroup == "Unassigned" ? 0 : 1)
-                .ThenBy(r => r.ScheduleDate ?? DateTime.MaxValue)
-                .ThenBy(r => r.Builder)
-                .ThenBy(r => r.Address)
-                .ToList();
-
-            bool wasCapped = rows.Count > 300;
-            if (wasCapped)
-                rows = rows.Take(300).ToList();
-
-            return (rows, wasCapped);
-        }
-
-        private static string? FindNewestInspectOfflineJobsPath()
-        {
-            string root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Strand",
-                "Inspect");
-
-            if (!Directory.Exists(root))
-                return null;
-
-            return Directory.GetFiles(root, "OfflineJobs.json", SearchOption.AllDirectories)
-                .OrderByDescending(File.GetLastWriteTime)
-                .FirstOrDefault();
-        }
-
         private void ShowSettingsTab()
         {
             MyListPanel.Visibility = Visibility.Collapsed;
@@ -609,6 +502,8 @@ namespace InspectionEditor
             OrdersPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Collapsed;
             SetActiveTab(SettingsTabButton);
+            LoadStrandAccountUi();
+            LoadInspectorProfileUi();
         }
 
         private void ShowAboutTab()
@@ -1091,8 +986,10 @@ namespace InspectionEditor
             
             if (!Directory.Exists(folderPath))
             {
+                RefreshList(SearchBox.Text); // empty the list, so the previous folder's rows can't be opened under this path
                 StatusText.Text = "Folder not found";
                 _isLoading = false;
+                RunPendingMyListRepoint();
                 return;
             }
             
@@ -1173,9 +1070,10 @@ namespace InspectionEditor
             {
                 InspectionListView.IsEnabled = true;
                 _isLoading = false;
+                RunPendingMyListRepoint();
             }
         }
-        
+
         private InspectionFileInfo? ParseInspectionFile(string filePath)
         {
             string inspectionCodeFromName = GetInspectionCodeFromFileName(filePath);
@@ -1946,7 +1844,9 @@ namespace InspectionEditor
                 Close();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Enter && !(e.OriginalSource is TextBox))
+            // Enter opens the selected inspection only on My List; elsewhere (ORDERS, Settings) it belongs to the focused control.
+            else if (e.Key == Key.Enter && MyListPanel.Visibility == Visibility.Visible &&
+                     e.OriginalSource is not TextBox && e.OriginalSource is not ButtonBase)
             {
                 OpenSelectedInspection();
                 e.Handled = true;
@@ -2280,7 +2180,10 @@ namespace InspectionEditor
             {
                 if (current is T target)
                     return target;
-                current = VisualTreeHelper.GetParent(current);
+                // Inline text (a Run in a TextBlock) is not a Visual; step to its logical parent instead.
+                current = current is Visual || current is System.Windows.Media.Media3D.Visual3D
+                    ? VisualTreeHelper.GetParent(current)
+                    : LogicalTreeHelper.GetParent(current);
             }
             return null;
         }
@@ -2415,21 +2318,6 @@ namespace InspectionEditor
 
             return false;
         }
-    }
-
-    public class OrderFileInfo
-    {
-        public string StatusGroup { get; set; } = "Unassigned";
-        public string JobNumber { get; set; } = "";
-        public string Address { get; set; } = "";
-        public string Subdivision { get; set; } = "";
-        public string Builder { get; set; } = "";
-        public string City { get; set; } = "";
-        public string Service { get; set; } = "";
-        public DateTime? ScheduleDate { get; set; }
-        public string ScheduleDateText => ScheduleDate?.ToString("M/d/yyyy") ?? "";
-        public string Assigned { get; set; } = "";
-        public string Note { get; set; } = "";
     }
 
     public class PickerSettings

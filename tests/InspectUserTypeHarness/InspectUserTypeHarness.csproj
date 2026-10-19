@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><NoWarn>CA1416</NoWarn></PropertyGroup>
+<ItemGroup>
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+<Compile Include="../../AppIdentity.cs" Link="AppIdentity.cs" />
+<Compile Include="../../Services/DiagnosticLogService.cs" Link="DiagnosticLogService.cs" />
+<Compile Include="../../Services/InspectUserType.cs" Link="InspectUserType.cs" />
+<Compile Include="../../Services/InspectorProfileService.cs" Link="InspectorProfileService.cs" />
+<Compile Include="../../Services/StrandCredentialService.cs" Link="StrandCredentialService.cs" />
+<!-- Private, gitignored; PrepareForm encrypts the zero fees. -->
+<Compile Include="../../Services/InspectCipherSecrets.Generated.cs" Link="InspectCipherSecrets.Generated.cs" />
+<Compile Include="../../Services/StrandScheduleService.cs" Link="StrandScheduleService.cs" />
+<Compile Include="../../Services/StrandMyListService.cs" Link="StrandMyListService.cs" />
+</ItemGroup></Project>

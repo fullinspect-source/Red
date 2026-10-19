@@ -57,3 +57,6 @@ Desktop.ini
 ._*
 .Spotlight-V100
 .Trashes
+
+# Inspect's cipher secret for ORDERS (private; required by Release builds)
+Services/InspectCipherSecrets.Generated.cs

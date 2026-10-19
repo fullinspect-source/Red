@@ -35,6 +35,49 @@
             <Setter Property="FontSize" Value="15"/>
         </Style>
 
+        <!-- ORDERS headers: title plus Inspect-style filter row (operator menu + text). -->
+        <Style x:Key="OrdersColumnHeaderStyle" TargetType="GridViewColumnHeader" BasedOn="{StaticResource ColumnHeaderStyle}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Top"/>
+            <Setter Property="Padding" Value="8,8,8,6"/>
+        </Style>
+
+        <DataTemplate x:Key="OrdersFilterHeaderTemplate">
+            <StackPanel>
+                <TextBlock Text="{Binding}" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                <DockPanel x:Name="FilterRow" Margin="0,6,0,0" LastChildFill="True">
+                    <Button DockPanel.Dock="Left"
+                            Width="30"
+                            Padding="0"
+                            Margin="0,0,4,0"
+                            Background="White"
+                            BorderBrush="#C5CDD4"
+                            FontWeight="Normal"
+                            Focusable="False"
+                            Cursor="Hand"
+                            Content="~"
+                            ToolTip="Contains"
+                            Click="OrdersFilterOpButton_Click"
+                            Loaded="OrdersFilterOpButton_Loaded"/>
+                    <TextBox MinWidth="40"
+                             Padding="4,3"
+                             FontWeight="Normal"
+                             BorderBrush="#C5CDD4"
+                             ToolTip="Type to filter this column"
+                             TextChanged="OrdersFilterBox_TextChanged"
+                             PreviewKeyDown="OrdersFilterBox_PreviewKeyDown"
+                             Loaded="OrdersFilterBox_Loaded"
+                             Unloaded="OrdersFilterBox_Unloaded"/>
+                </DockPanel>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <!-- The checkbox column has no title and no filter. -->
+                <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                    <Setter TargetName="FilterRow" Property="Visibility" Value="Hidden"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
         <Style x:Key="SideTabStyle" TargetType="Button">
             <Setter Property="Height" Value="58"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
@@ -44,6 +87,7 @@
             <Setter Property="BorderBrush" Value="#D2D8DE"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="Template">
@@ -62,6 +106,11 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="TabChrome" Property="Background" Value="#FFFFFF"/>
                                 <Setter TargetName="TabChrome" Property="BorderBrush" Value="#A7B0B8"/>
+                            </Trigger>
+                            <!-- Locked while the inspector profile is incomplete. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="TabChrome" Property="Opacity" Value="0.4"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -569,10 +618,139 @@
                                FontSize="15"
                                Foreground="#66737F"
                                Margin="0,5,0,0"/>
+
+                    <!-- Shown while the inspector profile is incomplete; My List and ORDERS stay locked (owner, 2026-10-18). -->
+                    <Border x:Name="ProfileBanner" Visibility="Collapsed" Margin="0,12,0,0" Padding="14,12"
+                            CornerRadius="6" BorderThickness="1" Background="#FEF3F2" BorderBrush="#F04438">
+                        <DockPanel>
+                            <Button x:Name="ProfileBannerImportButton" DockPanel.Dock="Right" Content="Import from INSPECT"
+                                    Click="ProfileImportButton_Click" Style="{StaticResource QuietButtonStyle}"
+                                    VerticalAlignment="Center" Margin="14,0,0,0"/>
+                            <StackPanel>
+                                <TextBlock x:Name="ProfileBannerTitle" FontSize="16" FontWeight="SemiBold" Foreground="#B42318" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ProfileBannerDetail" Foreground="#1F2933" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
                 </StackPanel>
 
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="1" x:Name="SettingsScrollViewer" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
+                        <!-- Inspector Profile: RED's own copy, imported from INSPECT (F-003) and saved as you type.
+                             The user type is read-only; RED has no picker for it (owner, 2026-10-18). -->
+                        <Border Background="White" BorderBrush="#D0D5DA" BorderThickness="1"
+                                CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Inspector Profile" FontSize="18" FontWeight="SemiBold" Foreground="#1F2933" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="ProfileImportedText" TextWrapping="Wrap" Foreground="#66737F" Margin="0,0,0,14"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="360"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Text="Full name:" Foreground="#52616F" VerticalAlignment="Center" Margin="0,0,10,10"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="ProfileNameBox" Padding="8,6" Margin="0,0,0,10"
+                                             TextChanged="ProfileText_Changed"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" x:Name="ProfileNameError" Foreground="#B42318"
+                                               VerticalAlignment="Center" Margin="12,0,0,10" TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="1" Text="Phone:" Foreground="#52616F" VerticalAlignment="Center" Margin="0,0,10,10"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="ProfilePhoneBox" Padding="8,6" Margin="0,0,0,10"
+                                             TextChanged="ProfileText_Changed"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="2" x:Name="ProfilePhoneError" Foreground="#B42318"
+                                               VerticalAlignment="Center" Margin="12,0,0,10" TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="2" Text="Default state:" Foreground="#52616F" VerticalAlignment="Center" Margin="0,0,10,10"/>
+                                    <ComboBox Grid.Row="2" Grid.Column="1" x:Name="ProfileStateCombo" Width="110" HorizontalAlignment="Left"
+                                              Padding="8,5" Margin="0,0,0,10" SelectionChanged="ProfileState_Changed"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="2" x:Name="ProfileStateError" Foreground="#B42318"
+                                               VerticalAlignment="Center" Margin="12,0,0,10" TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="3" Text="Inspections folder:" Foreground="#52616F" VerticalAlignment="Center" Margin="0,0,10,10"/>
+                                    <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,10">
+                                        <Button x:Name="ProfileFolderBrowseButton" DockPanel.Dock="Right" Content="Browse..."
+                                                Click="ProfileFolderBrowseButton_Click" Style="{StaticResource QuietButtonStyle}" Margin="8,0,0,0"/>
+                                        <TextBox x:Name="ProfileFolderBox" Padding="8,6" VerticalContentAlignment="Center"
+                                                 TextChanged="ProfileText_Changed"/>
+                                    </DockPanel>
+                                    <TextBlock Grid.Row="3" Grid.Column="2" x:Name="ProfileFolderError" Foreground="#B42318"
+                                               VerticalAlignment="Center" Margin="12,0,0,10" TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="4" Text="User type:" Foreground="#52616F" VerticalAlignment="Top" Margin="0,0,10,0"/>
+                                    <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2">
+                                        <TextBlock x:Name="InspectUserTypeText" Foreground="#1F2933" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="InspectUserTypeKindText" Foreground="#52616F" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        <TextBlock Foreground="#66737F" TextWrapping="Wrap" Margin="0,4,0,0">
+                                            <Run x:Name="InspectUserTypeHintRun"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="Your Strand username and password are under Strand Account below."
+                                           Foreground="#66737F" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                <TextBlock x:Name="ProfileOtherText" Foreground="#66737F" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                <DockPanel Margin="0,14,0,0">
+                                    <Button x:Name="ProfileImportButton" Content="Import from INSPECT" Click="ProfileImportButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}" VerticalAlignment="Top"/>
+                                    <TextBlock x:Name="ProfileStatusText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                               Foreground="#52616F" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="White" BorderBrush="#D0D5DA" BorderThickness="1"
+                                CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Strand Account" FontSize="18" FontWeight="SemiBold" Foreground="#1F2933" Margin="0,0,0,4"/>
+                                <TextBlock Text="Used by the ORDERS tab and required by the profile. Import from INSPECT (above) copies it from INSPECT; change it here if needed."
+                                           TextWrapping="Wrap" Foreground="#66737F" Margin="0,0,0,14"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="280"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="220"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Username/Email:" Foreground="#52616F" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox Grid.Column="1" x:Name="StrandUsernameBox" Padding="8,6"/>
+                                    <TextBlock Grid.Column="2" Text="Password:" Foreground="#52616F" VerticalAlignment="Center" Margin="18,0,10,0"/>
+                                    <PasswordBox Grid.Column="3" x:Name="StrandPasswordBox" Padding="8,6"/>
+                                </Grid>
+                                <DockPanel Margin="0,14,0,0">
+                                    <Button x:Name="StrandTestSaveButton" Content="Test &amp; Save" Click="StrandTestSaveButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" VerticalAlignment="Top"/>
+                                    <Button x:Name="StrandClearButton" Content="Clear" Click="StrandClearButton_Click"
+                                            Style="{StaticResource QuietButtonStyle}" VerticalAlignment="Top"/>
+                                    <TextBlock x:Name="StrandAccountStatusText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                               Foreground="#52616F" TextWrapping="Wrap"/>
+                                </DockPanel>
+
+                                <!-- Owner only (super-user account). The token is shown here once and never saved or logged. -->
+                                <StackPanel x:Name="FeeTokenPanel" Visibility="Collapsed" Margin="0,18,0,0">
+                                    <TextBlock Text="iPad fee token (owner only)" FontWeight="SemiBold" Foreground="#1F2933"/>
+                                    <TextBlock Text="Paste this into RED on the iPad, Settings > Strand Account > Fee token."
+                                               TextWrapping="Wrap" Foreground="#66737F" Margin="0,4,0,10"/>
+                                    <DockPanel>
+                                        <Button x:Name="FeeTokenMakeButton" DockPanel.Dock="Left" Content="Make Fee Token"
+                                                Click="FeeTokenMakeButton_Click" Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0"/>
+                                        <Button x:Name="FeeTokenCopyButton" DockPanel.Dock="Right" Content="Copy"
+                                                Click="FeeTokenCopyButton_Click" Style="{StaticResource QuietButtonStyle}" Margin="8,0,0,0"
+                                                IsEnabled="False"/>
+                                        <TextBox x:Name="FeeTokenBox" IsReadOnly="True" Padding="8,6" FontFamily="Consolas"
+                                                 VerticalContentAlignment="Center" IsUndoEnabled="False"/>
+                                    </DockPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <Border Background="White" BorderBrush="#D0D5DA" BorderThickness="1"
                                 CornerRadius="6" Padding="18" Margin="0,0,0,14">
                             <StackPanel>
@@ -995,10 +1173,11 @@
             <Grid x:Name="OrdersPanel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid Grid.Row="0" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -1009,28 +1188,63 @@
                                    FontWeight="SemiBold"
                                    Foreground="#1F2933"/>
                         <TextBlock x:Name="OrdersStatusText"
-                                   Text="Live Dallas orders feed is not wired yet. Inspect2022's offline job cache is not shown here because it can include stale/non-schedule jobs."
+                                   Text="Sign in to Strand to load the live schedule."
                                    FontSize="15"
                                    Foreground="#66737F"
+                                   TextWrapping="Wrap"
                                    Margin="0,5,0,0"/>
                     </StackPanel>
-                    <Button x:Name="RefreshOrdersButton"
-                            Grid.Column="1"
-                            Content="Refresh Orders"
-                            Click="RefreshOrdersButton_Click"
-                            Style="{StaticResource QuietButtonStyle}"
-                            Margin="12,6,0,0"
-                            VerticalAlignment="Top"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,6,0,0">
+                        <TextBlock x:Name="OrdersSignedInText"
+                                   Text="Not signed in"
+                                   Foreground="#66737F"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <Button x:Name="OrdersSignInButton"
+                                Content="Sign In"
+                                Click="OrdersSignInButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"
+                                Margin="0,0,8,0"/>
+                        <Button x:Name="RefreshOrdersButton"
+                                Content="Refresh"
+                                Click="RefreshOrdersButton_Click"
+                                Style="{StaticResource QuietButtonStyle}"/>
+                    </StackPanel>
                 </Grid>
 
+                <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
+                    <!-- Same Action buttons as Inspect's Schedule ribbon: Open, Delete, Add to My List, Assign. -->
+                    <Button x:Name="OrdersOpenButton" Content="Open" Click="OrdersOpenButton_Click"
+                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"/>
+                    <Button x:Name="OrdersDeleteButton" Content="Delete…" Click="OrdersDeleteButton_Click"
+                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"
+                            Visibility="Collapsed"/>
+                    <Button x:Name="OrdersAddToMyListButton" Content="Add to My List" Click="OrdersAddToMyListButton_Click"
+                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"/>
+                    <Button x:Name="OrdersAssignButton" Content="Assign…" Click="OrdersAssignButton_Click"
+                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"
+                            ToolTipService.ShowOnDisabled="True"/>
+                    <TextBlock x:Name="OrdersSelectionText" Foreground="#66737F" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    <Button x:Name="OrdersClearFiltersButton" DockPanel.Dock="Right" Content="Clear Filters" Click="OrdersClearFiltersButton_Click"
+                            Style="{StaticResource QuietButtonStyle}" Margin="8,0,0,0" Visibility="Collapsed"/>
+                    <TextBlock x:Name="OrdersFilterText" DockPanel.Dock="Right" Foreground="#99000F" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Visibility="Collapsed"/>
+                </DockPanel>
+
                 <ListView x:Name="OrdersListView"
-                          Grid.Row="1"
+                          Grid.Row="2"
                           Background="White"
                           BorderBrush="#D0D5DA"
                           BorderThickness="1"
+                          SelectionMode="Multiple"
+                          ScrollViewer.CanContentScroll="False"
+                          VirtualizingPanel.ScrollUnit="Pixel"
                           FontSize="{Binding ElementName=InspectionListView, Path=FontSize}"
                           ScrollViewer.VerticalScrollBarVisibility="Hidden"
                           ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                          SelectionChanged="OrdersListView_SelectionChanged"
+                          PreviewGotKeyboardFocus="OrdersListView_PreviewGotKeyboardFocus"
+                          GridViewColumnHeader.Click="OrdersColumnHeader_Click"
                           PreviewMouseLeftButtonDown="InspectionListView_PreviewMouseLeftButtonDown"
                           PreviewMouseMove="InspectionListView_PreviewMouseMove"
                           PreviewMouseLeftButtonUp="InspectionListView_PreviewMouseLeftButtonUp">
@@ -1042,6 +1256,9 @@
                                         <Setter.Value>
                                             <ControlTemplate TargetType="{x:Type GroupItem}">
                                                 <Expander IsExpanded="True"
+                                                          Loaded="OrdersGroupExpander_Loaded"
+                                                          Expanded="OrdersGroupExpander_Expanded"
+                                                          Collapsed="OrdersGroupExpander_Collapsed"
                                                           Background="Transparent"
                                                           BorderThickness="0">
                                                     <Expander.Header>
@@ -1050,13 +1267,22 @@
                                                                 BorderThickness="0,0,0,1"
                                                                 Padding="14,10"
                                                                 MinWidth="{Binding ElementName=OrdersListView, Path=ActualWidth, Mode=OneWay}">
-                                                            <TextBlock FontWeight="SemiBold"
-                                                                       Foreground="#1F2933">
-                                                                <Run Text="{Binding Name, Mode=OneWay}"/>
-                                                                <Run Text="  "/>
-                                                                <Run Text="{Binding ItemCount, StringFormat=({0} orders), Mode=OneWay}"
-                                                                     Foreground="#66737F"/>
-                                                            </TextBlock>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <!-- Like Inspect's group-row checkbox: selects or clears every order in the group. -->
+                                                                <CheckBox VerticalAlignment="Center"
+                                                                          Margin="0,0,10,0"
+                                                                          ToolTip="Select every order in this group"
+                                                                          Click="OrdersGroupCheckBox_Click"
+                                                                          Loaded="OrdersGroupCheckBox_Loaded"
+                                                                          Unloaded="OrdersGroupCheckBox_Unloaded"/>
+                                                                <TextBlock FontWeight="SemiBold"
+                                                                           Foreground="#1F2933">
+                                                                    <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                                    <Run Text="  "/>
+                                                                    <Run Text="{Binding ItemCount, StringFormat=({0} orders), Mode=OneWay}"
+                                                                         Foreground="#66737F"/>
+                                                                </TextBlock>
+                                                            </StackPanel>
                                                         </Border>
                                                     </Expander.Header>
                                                     <ItemsPresenter/>
@@ -1075,19 +1301,55 @@
                             <Setter Property="BorderThickness" Value="0"/>
                             <Setter Property="Background" Value="#FFFFFF"/>
                             <Setter Property="MinHeight" Value="48"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OrderRow_PreviewMouseLeftButtonDown"/>
+                            <EventSetter Event="PreviewMouseLeftButtonUp" Handler="OrderRow_PreviewMouseLeftButtonUp"/>
+                            <Style.Triggers>
+                                <!-- Pending-job rows stand out the same way Inspect shades them (salmon fading to seashell). -->
+                                <DataTrigger Binding="{Binding IsPendingJob}" Value="True">
+                                    <Setter Property="Background">
+                                        <Setter.Value>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="Salmon" Offset="0"/>
+                                                <GradientStop Color="SeaShell" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.View>
-                        <GridView ColumnHeaderContainerStyle="{StaticResource ColumnHeaderStyle}">
-                            <GridViewColumn Header="Job" Width="120" DisplayMemberBinding="{Binding JobNumber}"/>
-                            <GridViewColumn Header="Address" Width="250" DisplayMemberBinding="{Binding Address}"/>
-                            <GridViewColumn Header="Subdivision" Width="250" DisplayMemberBinding="{Binding Subdivision}"/>
-                            <GridViewColumn Header="Builder" Width="230" DisplayMemberBinding="{Binding Builder}"/>
-                            <GridViewColumn Header="City" Width="150" DisplayMemberBinding="{Binding City}"/>
-                            <GridViewColumn Header="Service" Width="190" DisplayMemberBinding="{Binding Service}"/>
-                            <GridViewColumn Header="Schedule Date" Width="150" DisplayMemberBinding="{Binding ScheduleDateText}"/>
-                            <GridViewColumn Header="Assigned" Width="150" DisplayMemberBinding="{Binding Assigned}"/>
-                            <GridViewColumn Header="Note" Width="240" DisplayMemberBinding="{Binding Note}"/>
+                        <GridView ColumnHeaderContainerStyle="{StaticResource OrdersColumnHeaderStyle}"
+                                  ColumnHeaderTemplate="{StaticResource OrdersFilterHeaderTemplate}"
+                                  AllowsColumnReorder="False">
+                            <GridViewColumn Width="44">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Cursor="Arrow"
+                                                  IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn Header="Job" Width="110" DisplayMemberBinding="{Binding JobNumber}"/>
+                            <GridViewColumn Header="Address" Width="230" DisplayMemberBinding="{Binding Address}"/>
+                            <GridViewColumn Header="Subdivision" Width="200" DisplayMemberBinding="{Binding SubdivisionName}"/>
+                            <GridViewColumn Header="Builder" Width="190" DisplayMemberBinding="{Binding BuilderName}"/>
+                            <GridViewColumn Header="City" Width="120" DisplayMemberBinding="{Binding City}"/>
+                            <GridViewColumn Header="Service" Width="180" DisplayMemberBinding="{Binding ServiceName}"/>
+                            <GridViewColumn Header="Schedule Date" Width="170" DisplayMemberBinding="{Binding ScheduleDateText}"/>
+                            <GridViewColumn Header="Assigned" Width="150" DisplayMemberBinding="{Binding AssignedName}"/>
+                            <!-- Inspect's visible columns; Status, Pending Job and Time Required are hidden there too
+                                 (pending jobs still show the salmon row color). -->
+                            <GridViewColumn Header="Note" Width="300">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding SpecialRequest}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SpecialRequest}"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
                         </GridView>
                     </ListView.View>
                 </ListView>
