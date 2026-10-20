@@ -1,5 +1,14 @@
 # RED 2.0 Release Notes
 
+## 2.3.3 — The report comes back when you close the camera; tidy backup photos
+
+- **Closing the camera brings your report back to the front.** Before, the report could stay hidden behind RED's list
+  window after you pressed Close, so you had to find it to see the new photos.
+- **Backup photos have their own folder and clean themselves up.** RED's camera still keeps a backup copy of each photo,
+  now in **Camera Roll\red-camera**. Copies older than twice your Archive setting are deleted automatically (for
+  example, with Archive set to 8 days, backups are kept for 16 days). Only RED's own backup photos in that folder are
+  ever deleted.
+
 ## 2.3.2 — A camera built into RED that keeps working after the tablet sleeps
 
 - **RED has its own camera.** Press Camera on an item and RED's camera opens on the right of the screen, with a big

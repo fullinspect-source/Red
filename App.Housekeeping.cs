@@ -55,6 +55,10 @@ namespace InspectionEditor
                     DiagnosticLogService.Info("Job folder purge waiting for the owner's supervised check; nothing was deleted.");
             }
             catch (Exception ex) { DiagnosticLogService.Log("Job folder purge failed", ex); }
+            // F-027 C9 (owner Q-59): RED's own backup photos in Camera Roll\red-camera older than 2 x Archive retention.
+            // Local copies only, so not behind the shared-folder gate above.
+            try { Services.Camera.CameraRollCopy.PurgeOld(DateTime.Now, InspectLiveSettings.ReadArchiveRetention(folder)); }
+            catch (Exception ex) { DiagnosticLogService.Log("Camera backup photo cleanup failed", ex); }
         });
 
         // F-020 R2: the stale offline caches at home-window load, once more 10 s later. A dev build makes no website

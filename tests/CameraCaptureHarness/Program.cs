@@ -57,9 +57,35 @@ static class CameraHarness
             string fallback = CameraRollCopy.TargetFolder();
             var when = new DateTime(2026, 10, 20, 9, 5, 7, 123);
             string? written = CameraRollCopy.TrySave(new byte[] { 0xFF, 0xD8, 0xFF, 0xD9 }, when, redirected);
-            Check("C9-dev", redirected == Path.Combine(folder, "roll") && !fallback.StartsWith(pictures, StringComparison.OrdinalIgnoreCase)
-                && written != null && Path.GetFileName(written) == "RED_20261020_090507_123.jpg",
-                $"a dev build writes its camera-roll copies to RED_DEV_CAMERA_ROLL or its app data, never Pictures ({fallback})");
+            Check("C9-dev", redirected == Path.Combine(folder, "roll", "red-camera") && !fallback.StartsWith(pictures, StringComparison.OrdinalIgnoreCase)
+                && fallback.EndsWith("\\red-camera", StringComparison.OrdinalIgnoreCase)
+                && written != null && Path.GetFileName(written) == "RED_20261020_090507_123.jpg"
+                && Path.GetDirectoryName(written) == redirected,
+                $"backup copies go to <camera roll>\\red-camera; a dev build uses RED_DEV_CAMERA_ROLL or its app data, never Pictures ({fallback})");
+
+            // Owner Q-59: copies older than 2 x Archive retention are deleted; only RED_*.jpg directly in red-camera.
+            string backups = Path.Combine(folder, "purge", "red-camera");
+            Directory.CreateDirectory(Path.Combine(backups, "keep-subfolder"));
+            var now = new DateTime(2026, 10, 20, 12, 0, 0);
+            string Make(string name, double daysOld)
+            {
+                string path = Path.Combine(backups, name);
+                File.WriteAllBytes(path, new byte[] { 0xFF, 0xD8, 0xFF, 0xD9 });
+                File.SetLastWriteTime(path, now.AddDays(-daysOld));
+                return path;
+            }
+            string old11 = Make("RED_20261009_120000_000.jpg", 11);   // retention 5 → kept for 10 days → deleted
+            string young9 = Make("RED_20261011_120000_000.jpg", 9);   // kept
+            string other = Make("holiday.jpg", 30);                    // not RED's → kept
+            string nested = Path.Combine(backups, "keep-subfolder", "RED_20260901_120000_000.jpg");
+            File.WriteAllBytes(nested, new byte[] { 1 });
+            File.SetLastWriteTime(nested, now.AddDays(-60));          // in a subfolder → kept
+            int none = CameraRollCopy.PurgeOld(now, 0, backups);       // retention 0 → nothing deleted
+            bool allThere = File.Exists(old11) && File.Exists(young9);
+            int deleted = CameraRollCopy.PurgeOld(now, 5, backups);
+            Check("C9-purge", none == 0 && allThere && deleted == 1 && !File.Exists(old11) && File.Exists(young9)
+                && File.Exists(other) && File.Exists(nested),
+                "backup photos older than 2 x Archive retention (5 → 10 days) are deleted; younger ones, other files and subfolders stay; 0 days deletes nothing");
         }
         finally
         {
@@ -116,6 +142,11 @@ static class CameraHarness
             "the shutter is never hidden or disabled and sits above every overlay");
         Check("C10-ui", code.Contains("CameraResetFlow") && code.Split("RunResetAsync(").Length == 3,
             "the reset flow has exactly one caller, the Reset camera button");
+        int closing = code.IndexOf("private void OnClosing(", StringComparison.Ordinal);
+        string closingBody = closing < 0 ? string.Empty : code[closing..code.IndexOf("\n        }", closing, StringComparison.Ordinal)];
+        Check("C12-focus", code.Contains("Closing += OnClosing;") && closingBody.Contains("owner.Activate();")
+            && closingBody.Contains("WindowState.Minimized"),
+            "closing the camera brings the report back in front (owner tablet test 2026-10-20: it stayed behind the list)");
 
         // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.
         string coreFolder = Path.Combine(root, "RedCamera.Core");

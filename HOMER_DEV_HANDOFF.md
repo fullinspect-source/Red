@@ -4,6 +4,39 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-20 — RED 2.3.3 — the report comes back on camera Close; backup photos in Camera Roll\red-camera
+
+- **Base:** 2.3.2 (`b67a3fe`). Both changes come from the owner's tablet test of 2.3.2 and the answer to owner question
+  Q-59. Built in `Dropbox\P\PL`; released by owner decision.
+  - The four changed files had the same content in PL and in this tree apart from these changes, so they were copied
+    (CRLF).
+- **Files changed:** `CameraCaptureWindow.xaml.cs` (`OnClosing` activates the report window and restores it if it is
+  minimized), `Services/Camera/CameraRollCopy.cs` (the `red-camera` subfolder, `PurgeOld`, `PurgeOldInBackground`),
+  `App.Housekeeping.cs` (the purge after the lists load), `tests/CameraCaptureHarness/Program.cs` (C9-dev, C9-purge,
+  C12-focus). Also: the version (2.3.3) in the csproj and the four release-metadata tests, these release notes and this
+  handoff. RedCamera.Core is unchanged (1.0.0).
+- **Behavior:**
+  - Closing RED's camera brings the report it was opened from back in front. Before, Windows activated RED's list window,
+    because photos never activate the report.
+  - Backup copies go to `<camera roll>\red-camera`, else `Pictures\Camera Roll\red-camera`. RED deletes its own
+    `RED_*.jpg` copies there (top level only) once they are older than 2 x INSPECT's ArchiveRetention days. It does this
+    at launch after the lists load and when the camera opens. 0 or less deletes nothing. The owner accepted that
+    INSPECT2026, which watches subfolders, may also pick these copies up when it runs at the same time.
+  - Live-risk safeguards unchanged (Q-55 housekeeping gate, first-live Submit/Approve, Buyer Walk §18). The new purge
+    touches only RED's own local backup copies.
+- **Verification:**
+  - Debug build `--no-incremental`: 0 errors, 29 warnings (unchanged).
+  - 35 harnesses, all exit 0: the 33 unchanged from 2.3.2, CameraCapture 10 (new: C9-purge, C12-focus) and RedCameraCore 34.
+  - Python: 35/45, the same 10 environment failures.
+  - CameraLiveCheck on the PC's webcam: 12/12.
+  - In-app test in an isolated Red2Dev build of this tree: 13/13. New checks:
+    - opening the camera deleted an 81-day-old backup at retention 40 and kept a 79-day-old one;
+    - with RED's list window in front, Close brought the report forward (report active, list not). The same check FAILS on
+      the build without the fix (list active), as the owner saw on the tablet.
+  - Corpus round trip not run: the save code is unchanged. The packaged exe was not smoke-started: a non-dev Red.exe would
+    use the real profile.
+- **Deployment:** pending.
+
 ### 2026-10-20 — RED 2.3.2 — F-027: a camera built into RED that keeps working after the tablet sleeps
 
 - **Base:** 2.3.1 (`072571d`). Built in `Dropbox\P\PL` (program feature F-027: `Dropbox/ios-port/program/features/F-027-reliable-camera`,

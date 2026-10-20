@@ -80,7 +80,26 @@ namespace InspectionEditor
             DevHintText.Visibility = AppIdentity.IsDevBuild ? Visibility.Visible : Visibility.Collapsed;
             CountText.Text = "No photos yet";
             Loaded += OnLoaded;
+            Closing += OnClosing;
             Closed += OnClosed;
+        }
+
+        // Bring the report back in front. Photos never activate the report (C7), so without this Windows activates the
+        // next RED window in line, usually the list, and the report stays hidden behind it (owner, tablet test 2026-10-20).
+        // Activating the owner while this window is still open is the reliable WPF way to hand the focus back.
+        private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            var owner = Owner;
+            if (owner == null || !owner.IsVisible) return;
+            try
+            {
+                if (owner.WindowState == WindowState.Minimized) owner.WindowState = WindowState.Normal;
+                owner.Activate();
+            }
+            catch (InvalidOperationException)
+            {
+                // the report window is itself closing
+            }
         }
 
         public CameraState State => _controller.State;
@@ -97,6 +116,7 @@ namespace InspectionEditor
                 _holds.TrackWindow(this); // H1: this window or RED's main window minimized
                 _timer.Start();
                 UpdateUi();
+                _ = CameraRollCopy.PurgeOldInBackground(); // F-027 C9: backups older than 2 x Archive retention
                 await _controller.OpenAsync();
             }
             catch (Exception ex)
