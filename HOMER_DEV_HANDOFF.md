@@ -59,7 +59,7 @@ This file is the concise cross-session source of development context for work pe
     skipped for an open copy; an unattachable PDF did not open at all, now a read-only copy).
   - Corpus round trip not run: the save code (SurgicalSaveService, the projection writer's logic) is unchanged. The
     packaged exe was not smoke-started: a non-dev Red.exe would use the real profile.
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-20: GitHub v2.3.4 (fullinspect-source/Red), Latest since 22:36 UTC; release commit `a36869c`. `releases/latest` = v2.3.4; Red-v2.3.4.zip 93,835,872 bytes (503 entries, sha256 `19645edafaf79311df4a1fca68e872c6ca35f6deb6c5091aeb26d8ff27625edb`) answers HEAD 200 and downloads byte-identical; update_red.bat attached; AppUpdateHarness 34/34. RedCamera.Core unchanged (1.0.0).
 
 ### 2026-10-20 — RED 2.3.3 — the report comes back on camera Close; backup photos in Camera Roll\red-camera
 
