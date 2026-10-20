@@ -35,7 +35,7 @@ This file is the concise cross-session source of development context for work pe
       the build without the fix (list active), as the owner saw on the tablet.
   - Corpus round trip not run: the save code is unchanged. The packaged exe was not smoke-started: a non-dev Red.exe would
     use the real profile.
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-20: GitHub v2.3.3 (fullinspect-source/Red), Latest since 16:18 UTC; release commit `79a3d85`. `releases/latest` = v2.3.3; Red-v2.3.3.zip 93,835,858 bytes (503 entries, sha256 `e375db605289b98d5ad1b93b030fc85fafb8de1a9fabbfdcfb37b51f1cfad4af`) answers HEAD 200 and downloads byte-identical; update_red.bat attached; AppUpdateHarness 34/34 twice. RedCamera.Core unchanged (1.0.0).
 
 ### 2026-10-20 — RED 2.3.2 — F-027: a camera built into RED that keeps working after the tablet sleeps
 
