@@ -54,7 +54,7 @@ This file is the concise cross-session source of development context for work pe
   - Python: 35/45, the same 10 environment failures as 2.3.0 and 2.3.1.
   - Corpus round trip not run: the save code is unchanged.
   - The packaged exe was not smoke-started: a non-dev Red.exe would use the real profile and Inspections folder.
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-20: GitHub v2.3.2 (fullinspect-source/Red), Latest since 15:35 UTC; release commit `be4de76`. `releases/latest` = v2.3.2; Red-v2.3.2.zip 93,835,457 bytes (503 entries, sha256 `83b04bda52b19d9a4400001329cace4b7a225d67f9b3e7ccebb485b4536d618b`) answers HEAD 200 and downloads byte-identical; update_red.bat attached. RedCamera.Core 1.0.0 packed from `be4de76` (`Documents\Codex\red-2.2.0\packages\RedCamera.Core.1.0.0.nupkg`, sha256 `57458522e5dd67c55dfa0566428e128675492886b1933961443f95ac5e7f39cb`). Owner tablet sleep/wake checklist pending on the released build.
 
 ### 2026-10-20 — RED 2.3.1 — owner fix list: My List tabs, result button, no "please confirm" popups
 
