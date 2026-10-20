@@ -1,0 +1,87 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace RedCamera.Core
+{
+    /// <summary>F-027 C11: where a camera sits. External cameras have no enclosure location.</summary>
+    public enum CameraPanelKind { Unknown, Front, Back, External }
+
+    /// <summary>One colour camera RED can open (F-027 C11: infrared sensors are never listed).</summary>
+    public sealed record CameraInfo(string Id, string Name, CameraPanelKind Panel, int MountRotationClockwise);
+
+    /// <summary>F-027 C3: signals that make RED let go of the camera without closing the capture screen.</summary>
+    public enum CameraHold { Minimized, Suspended, DisplayOff, Locked }
+
+    public enum CameraState { Closed, Starting, Live, Restarting, Paused, GaveUp }
+
+    /// <summary>F-027 C8: why RED gave up, which picks the message.</summary>
+    public enum CameraFailureKind { None, AccessDenied, NoCamera, InUse, Blocked, NotResponding }
+
+    /// <summary>A preview frame, BGRA8, already scaled for the screen. The pixel buffer is reused by the backend.</summary>
+    public sealed record CameraPreviewFrame(int Width, int Height, int Stride, byte[] Pixels, bool AllBlack);
+
+    /// <summary>A still as captured (before F-023 processing). Width/Height are the stored pixel size.</summary>
+    public sealed record CapturedStill(byte[] Jpeg, int Width, int Height, string Source, int ExifOrientation);
+
+    public interface ICameraBackend
+    {
+        Task<IReadOnlyList<CameraInfo>> FindCamerasAsync();
+
+        /// <summary>Opens a new capture session (F-027 C4). Throws with the HRESULT in <see cref="Exception.HResult"/>.</summary>
+        Task<ICameraStream> OpenAsync(CameraInfo camera, CancellationToken cancellationToken);
+    }
+
+    public interface ICameraStream : IAsyncDisposable
+    {
+        CameraInfo Camera { get; }
+
+        /// <summary>True when only read-only shared access was available (another app holds the camera).</summary>
+        bool Shared { get; }
+
+        /// <summary>Raised on a worker thread for every preview frame.</summary>
+        event Action<CameraPreviewFrame>? FrameArrived;
+
+        /// <summary>Raised on any thread when the capture object reports a failure (F-027 W4).</summary>
+        event Action<int, string>? Failed;
+
+        Task<CapturedStill> CaptureStillAsync(int exifOrientation, CancellationToken cancellationToken);
+
+        /// <summary>Dev builds only: stops the preview frames underneath the controller (simulated stall, A-027-16).</summary>
+        Task DebugStopFramesAsync();
+    }
+
+    /// <summary>The remembered camera (F-027 C11).</summary>
+    public interface ICameraPreferences
+    {
+        string? DeviceId { get; }
+        CameraPanelKind? Panel { get; }
+        void Remember(CameraInfo camera);
+    }
+
+    /// <summary>F-027 timings; the harness shortens nothing, it drives a fake clock.</summary>
+    public sealed class CameraTimings
+    {
+        public TimeSpan SettleDelay { get; init; } = TimeSpan.FromSeconds(1.5);
+        public TimeSpan FirstFrameTimeout { get; init; } = TimeSpan.FromSeconds(5);
+        public TimeSpan StallTimeout { get; init; } = TimeSpan.FromSeconds(2);
+        public TimeSpan BlackTimeout { get; init; } = TimeSpan.FromSeconds(3);
+        public TimeSpan OpenTimeout { get; init; } = TimeSpan.FromSeconds(10);
+        public TimeSpan CaptureTimeout { get; init; } = TimeSpan.FromSeconds(8);
+        public TimeSpan[] SameCameraRetryDelays { get; init; } =
+            { TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(3) };
+        public TimeSpan OtherCameraDelay { get; init; } = TimeSpan.FromSeconds(0.5);
+        public TimeSpan HealthyReset { get; init; } = TimeSpan.FromSeconds(30);
+        public TimeSpan RecoveryWindow { get; init; } = TimeSpan.FromMinutes(5);
+        public int MaxRecoveriesInWindow { get; init; } = 6;
+    }
+
+    /// <summary>Result of a shutter press (F-027 C6).</summary>
+    public sealed record CaptureOutcome(CapturedStill? Still, string? Message)
+    {
+        public static CaptureOutcome Taken(CapturedStill still) => new(still, null);
+        public static CaptureOutcome NotTaken(string message) => new(null, message);
+        public static readonly CaptureOutcome Ignored = new(null, null);
+    }
+}

@@ -1,0 +1,109 @@
+<Window x:Class="InspectionEditor.CameraCaptureWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RED Camera"
+        Width="800" Height="600" MinWidth="360" MinHeight="360"
+        Background="#111111"
+        ShowInTaskbar="False"
+        WindowStartupLocation="Manual"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <!-- F-027: RED's own capture screen. The shutter is always visible (C6); every status is shown here, never as a popup. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Background="#1E1E1E" LastChildFill="True">
+            <Button x:Name="CloseCameraButton" DockPanel.Dock="Right" Content="✕ Close" FontSize="16" MinWidth="96" MinHeight="44"
+                    Margin="6" Padding="12,4" Click="CloseCameraButton_Click" AutomationProperties.AutomationId="CloseCameraButton"/>
+            <Button x:Name="SwitchCameraButton" DockPanel.Dock="Right" Content="🔄 Switch camera" FontSize="16" MinHeight="44"
+                    Margin="6" Padding="12,4" Click="SwitchCameraButton_Click" Visibility="Collapsed"
+                    AutomationProperties.AutomationId="SwitchCameraButton"/>
+            <StackPanel VerticalAlignment="Center" Margin="12,6">
+                <TextBlock x:Name="TargetText" Foreground="White" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                           AutomationProperties.AutomationId="CameraTargetText"/>
+                <TextBlock x:Name="CameraNameText" Foreground="#A0A7AE" FontSize="12" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </DockPanel>
+
+        <Grid Grid.Row="1" Background="Black" ClipToBounds="True">
+            <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality">
+                <Image.LayoutTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="PreviewMirror" ScaleX="1"/>
+                        <RotateTransform x:Name="PreviewRotation" Angle="0"/>
+                    </TransformGroup>
+                </Image.LayoutTransform>
+            </Image>
+            <Border x:Name="FlashOverlay" Background="White" Opacity="0" IsHitTestVisible="False"/>
+
+            <Border x:Name="StatusOverlay" Background="#B0000000" CornerRadius="8" Padding="22,14"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="StatusText" Foreground="White" FontSize="22" TextAlignment="Center" TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="CameraStatusText"/>
+            </Border>
+
+            <Border x:Name="FailurePanel" Background="#F2202020" Visibility="Collapsed" Padding="24">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalAlignment="Center">
+                    <StackPanel MaxWidth="560">
+                        <TextBlock x:Name="FailureTitleText" Foreground="White" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"
+                                   Margin="0,0,0,10" AutomationProperties.AutomationId="CameraFailureTitle"/>
+                        <TextBlock x:Name="FailureDetailText" Foreground="#D0D5DA" FontSize="15" TextWrapping="Wrap" Margin="0,0,0,16"/>
+                        <WrapPanel>
+                            <Button x:Name="TryAgainButton" Content="Try again" FontSize="16" MinHeight="48" MinWidth="130" Margin="0,0,10,10"
+                                    Padding="14,4" Click="TryAgainButton_Click" AutomationProperties.AutomationId="TryAgainButton"/>
+                            <Button x:Name="UseWindowsCameraButton" Content="Use Windows Camera app" FontSize="16" MinHeight="48" Margin="0,0,10,10"
+                                    Padding="14,4" Click="UseWindowsCameraButton_Click" AutomationProperties.AutomationId="UseWindowsCameraButton"/>
+                            <Button x:Name="ResetCameraButton" Content="Reset camera…" FontSize="16" MinHeight="48" Margin="0,0,10,10"
+                                    Padding="14,4" Click="ResetCameraButton_Click" AutomationProperties.AutomationId="ResetCameraButton"/>
+                            <Button x:Name="PrivacySettingsButton" Content="Open camera privacy settings" FontSize="16" MinHeight="48"
+                                    Margin="0,0,10,10" Padding="14,4" Click="PrivacySettingsButton_Click" Visibility="Collapsed"
+                                    AutomationProperties.AutomationId="PrivacySettingsButton"/>
+                            <Button Content="Close" FontSize="16" MinHeight="48" MinWidth="100" Margin="0,0,10,10" Padding="14,4"
+                                    Click="CloseCameraButton_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border x:Name="NoteBorder" Background="#E0333333" CornerRadius="6" Padding="14,8" Margin="12"
+                    HorizontalAlignment="Center" VerticalAlignment="Bottom" Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="NoteText" Foreground="White" FontSize="15" TextWrapping="Wrap" TextAlignment="Center"
+                           AutomationProperties.AutomationId="CameraNoteText"/>
+            </Border>
+            <TextBlock x:Name="DevHintText" Foreground="#80FFFFFF" FontSize="11" Margin="8" HorizontalAlignment="Left"
+                       VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"
+                       Text="Dev: Ctrl+Shift+F5 suspend/resume · F6 display off/on · F7 lock/unlock · F8 stall"/>
+        </Grid>
+
+        <Grid Grid.Row="2" Background="#1E1E1E" MinHeight="108">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0">
+                <Border Width="72" Height="72" Background="#2A2A2A" CornerRadius="4" ClipToBounds="True">
+                    <Image x:Name="LastPhotoImage" Stretch="UniformToFill"/>
+                </Border>
+                <TextBlock x:Name="CountText" Foreground="White" FontSize="15" VerticalAlignment="Center" Margin="10,0,0,0"
+                           AutomationProperties.AutomationId="CameraCountText"/>
+            </StackPanel>
+            <Button x:Name="ShutterButton" Panel.ZIndex="100" Width="88" Height="88" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Margin="0,10" Click="ShutterButton_Click" Focusable="False" Cursor="Hand"
+                    AutomationProperties.AutomationId="ShutterButton" AutomationProperties.Name="Take photo" ToolTip="Take photo (Space)">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Ring" Stroke="White" StrokeThickness="5" Fill="Transparent"/>
+                            <Ellipse x:Name="Core" Margin="10" Fill="White"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Core" Property="Fill" Value="#FFD0D0D0"/>
+                                <Setter TargetName="Core" Property="Margin" Value="14"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

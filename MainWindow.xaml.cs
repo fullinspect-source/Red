@@ -1,6 +1,8 @@
 using InspectionEditor.Models;
 using InspectionEditor.Services;
+using InspectionEditor.Services.Camera;
 using Microsoft.Win32;
+using RedCamera.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -46,6 +48,9 @@ namespace InspectionEditor
         private UserDataService? _userDataService;
         private InspectionRulesService _rulesService = new InspectionRulesService();
         private CameraService _cameraService = new CameraService();
+        private CameraCaptureWindow? _cameraCaptureWindow; // F-027: RED's own capture screen while open
+        private bool _photoFromCaptureScreen;
+        private bool _redCameraUnsupportedShown;
         private TemplateService _templateService = new TemplateService();
         private InspectorStatsService _statsService = new InspectorStatsService();
         private QuickCommentsService _quickCommentsService = new QuickCommentsService();
@@ -2142,7 +2147,93 @@ namespace InspectionEditor
                 MessageBox.Show("Please select an item first.", "No Item Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            
+
+            // F-027 C1: RED's own capture screen, unless this device is set to the Windows Camera app (F1) or the WinRT
+            // capture API is missing (F2).
+            bool supported = WinRtCameraBackend.IsSupported();
+            if (new CameraSettingsService().UsesWindowsCameraApp || !supported)
+            {
+                if (!supported && !_redCameraUnsupportedShown)
+                {
+                    _redCameraUnsupportedShown = true;
+                    MessageBox.Show("RED's camera is not available on this version of Windows, so the Windows Camera app opens instead.",
+                        "Camera", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                OpenWindowsCameraApp();
+                return;
+            }
+            OpenRedCamera();
+        }
+
+        private void OpenRedCamera()
+        {
+            try
+            {
+                if (_cameraCaptureWindow == null)
+                {
+                    _cameraService.DismissKeyboard();
+                    var window = new CameraCaptureWindow(this, () => (_editorLoadedItem, CameraTargetLabel()));
+                    window.PhotoTaken += OnRedCameraPhoto;
+                    window.UseWindowsCameraAppRequested += () =>
+                    {
+                        if (_editorLoadedItem != null) OpenWindowsCameraApp();
+                    };
+                    window.Closed += (_, _) =>
+                    {
+                        _cameraCaptureWindow = null;
+                        if (!_cameraService.IsActive) CameraButton.Content = "📷 Camera";
+                    };
+                    _cameraCaptureWindow = window;
+                    window.Show();
+                }
+                else
+                {
+                    _cameraCaptureWindow.BringToFront();
+                }
+                CameraButton.Content = "📷 Camera Open";
+            }
+            catch (Exception ex)
+            {
+                // F-027 F2: a failure in RED's camera never blocks photos; fall back to the Windows Camera app.
+                DiagnosticLogService.Log("RED camera screen could not open", ex);
+                _cameraCaptureWindow = null;
+                OpenWindowsCameraApp();
+            }
+        }
+
+        private string CameraTargetLabel() =>
+            _editorLoadedItem == null ? string.Empty : $"{_editorLoadedItem.Number} {_editorLoadedItem.Name}".Trim();
+
+        /// <summary>F-027 C7: a still from RED's capture screen goes only to the item loaded when the shutter was pressed.</summary>
+        private void OnRedCameraPhoto(CameraPhoto photo)
+        {
+            if (_editorLoadedItem == null || !ReferenceEquals(photo.BoundItem, _editorLoadedItem))
+            {
+                photo.Note = photo.CameraRollPath != null
+                    ? "The item changed before the photo was ready, so it was not added. It is in the camera roll."
+                    : "The item changed before the photo was ready, so it was not added.";
+                return;
+            }
+            Item item = _editorLoadedItem;
+            int before = item.Pictures.Count;
+            _photoFromCaptureScreen = true;
+            try
+            {
+                OnPhotoCaptured(photo.Jpeg);
+            }
+            finally
+            {
+                _photoFromCaptureScreen = false;
+            }
+            photo.Added = item.Pictures.Count > before;
+            if (!photo.Added)
+                photo.Note = photo.CameraRollPath != null ? "The photo was not added to this item. It is in the camera roll."
+                    : "The photo was not added to this item.";
+        }
+
+        /// <summary>The Windows Camera app path (F-027 F1), unchanged from before F-027.</summary>
+        private void OpenWindowsCameraApp()
+        {
             try
             {
                 // Subscribe to photo events if not already
@@ -2185,11 +2276,14 @@ namespace InspectionEditor
                 // Update required field highlighting
                 UpdateRequiredFieldHighlighting(_editorLoadedItem);
 
-                if (WindowState == WindowState.Minimized)
-                    WindowState = WindowState.Normal;
-                Activate();
-                Focus();
-                
+                if (!_photoFromCaptureScreen) // F-027 C7: RED's capture screen stays in front for the next photo
+                {
+                    if (WindowState == WindowState.Minimized)
+                        WindowState = WindowState.Normal;
+                    Activate();
+                    Focus();
+                }
+
                 // Brief visual feedback on the button
                 CameraButton.Content = $"📷 {_editorLoadedItem.Pictures.Count} photo(s)";
             }
@@ -11144,7 +11238,8 @@ namespace InspectionEditor
             _currentSection = _currentInspection?.Sections?.FirstOrDefault(s => s.Items.Contains(item));
             _editorLoadedItem = item; // Track specifically what's in editor for Duplicate
             _currentPhotoData = null;
-            CameraButton.Content = "📷 Camera"; // Reset camera button text when switching items
+            // Reset camera button text when switching items (F-027: RED's capture screen stays open and follows the item)
+            CameraButton.Content = _cameraCaptureWindow != null ? "📷 Camera Open" : "📷 Camera";
             _currentPhotoIndex = 0;
             SelectItemPanel.Visibility = Visibility.Collapsed;
             EditorPanel.Visibility = Visibility.Visible;

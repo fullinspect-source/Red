@@ -1,5 +1,21 @@
 # RED 2.0 Release Notes
 
+## 2.3.2 — A camera built into RED that keeps working after the tablet sleeps
+
+- **RED has its own camera.** Press Camera on an item and RED's camera opens on the right of the screen, with a big
+  round shutter that is always there. Photos go straight into the item, at the same size and brightness as before.
+  Keep the camera open and take as many photos as you need; it follows the item you select.
+- **It keeps working after sleep.** RED lets go of the camera when the tablet sleeps, the screen turns off, the PC
+  locks or RED is minimized, and starts it fresh when you are back. If the picture freezes or goes black, RED shows
+  "Restarting camera…" and fixes it by itself.
+- **If the camera really is stuck,** RED says so plainly and offers Try again, Use Windows Camera app, and Reset camera
+  (Windows asks for administrator permission first). Restarting the tablet always works too.
+- **Each photo is also kept in your Camera Roll,** as the Windows Camera app does.
+- **Switch camera** appears when the tablet has a front and a back camera, and RED remembers your choice.
+- **Settings → Camera** can switch a device back to the Windows Camera app if RED's camera does not work there.
+- RED now finds the Camera Roll folder exactly as INSPECT does (this matters only on PCs with more than one Camera Roll
+  folder).
+
 ## 2.3.1 — My List tabs, a result button, and no "please confirm" popups
 
 - **My List is quicker to use:**

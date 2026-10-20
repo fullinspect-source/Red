@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- F-027: RED's reusable camera engine (WinRT MediaCapture session, sleep/wake holds, frame watchdog, bounded
+       recovery, camera choice, full-resolution stills, hung-driver detection). It has no dependency on RED; RED and the
+       RED Camera companion both reference it. Nothing RED-specific (items, F-023 processing, RED settings) belongs here.
+       Versioned on its own: raise <Version> for every change a consumer must pick up. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>RedCamera.Core</RootNamespace>
+    <AssemblyName>RedCamera.Core</AssemblyName>
+    <Version>1.0.0</Version>
+    <Company>Full Inspection Services</Company>
+    <Product>RED Camera engine</Product>
+    <Description>Reliable WinRT camera engine shared by RED and the RED Camera companion.</Description>
+    <PackageId>RedCamera.Core</PackageId>
+    <Authors>Full Inspection Services</Authors>
+    <EmbedUntrackedSources>false</EmbedUntrackedSources>
+  </PropertyGroup>
+
+</Project>

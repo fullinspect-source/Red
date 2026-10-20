@@ -79,35 +79,8 @@ namespace InspectionEditor.Services
         /// (case-insensitively deduplicated); the most recently created "Camera Roll*" subfolder of the existing roots
         /// wins; else the first existing root; else null.
         /// </summary>
-        public static string? ResolveCameraRoll(Func<string, string?>? environment = null, string? picturesFolder = null)
-        {
-            environment ??= Environment.GetEnvironmentVariable;
-            var roots = new List<string>();
-            void Add(string? root)
-            {
-                if (string.IsNullOrWhiteSpace(root)) return;
-                string full;
-                try { full = Path.GetFullPath(root); } catch (Exception) { return; }
-                if (!roots.Any(r => string.Equals(r.TrimEnd('\\'), full.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)))
-                    roots.Add(full);
-            }
-            Add(picturesFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
-            foreach (string variable in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial", "USERPROFILE" })
-                if (environment(variable) is { Length: > 0 } value) Add(Path.Combine(value, "Pictures"));
-
-            var existing = roots.Where(Directory.Exists).ToList();
-            DirectoryInfo? newest = null;
-            foreach (string root in existing)
-            {
-                try
-                {
-                    foreach (var folder in new DirectoryInfo(root).GetDirectories("Camera Roll*"))
-                        if (newest == null || folder.CreationTimeUtc > newest.CreationTimeUtc) newest = folder;
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            }
-            return newest?.FullName ?? existing.FirstOrDefault();
-        }
+        public static string? ResolveCameraRoll(Func<string, string?>? environment = null, string? picturesFolder = null) =>
+            RedCamera.Core.CameraFiles.ResolveCameraRoll(environment, picturesFolder); // F-027: one copy, shared with the camera engine
 
         /// <summary>
         /// Fired each time a new photo is captured. Byte array is the photo data.
@@ -517,6 +490,9 @@ namespace InspectionEditor.Services
             }
             catch { }
         }
+
+        /// <summary>F-027 C2: RED's own capture screen dismisses the touch keyboard as the Camera app path does.</summary>
+        public void DismissKeyboard() => DismissTouchKeyboard();
 
         private void DismissTouchKeyboard()
         {

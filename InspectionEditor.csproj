@@ -12,7 +12,7 @@
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>red2_dev.ico</ApplicationIcon>
-    <Version>2.3.1</Version>
+    <Version>2.3.2</Version>
     <ReleaseDate>2026-10-20</ReleaseDate>
     <AssemblyTitle>RED - Inspection Editor</AssemblyTitle>
     <Company>Full Inspection Services</Company>
@@ -47,12 +47,23 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- F-027: RED's reusable camera engine, shared with the RED Camera companion. Test and dev builds pass
+         AssemblyName=Red2Dev (and test overlays) as global properties; they must not rename or alter the library. -->
+    <ProjectReference Include="RedCamera.Core\RedCamera.Core.csproj"
+                      GlobalPropertiesToRemove="AssemblyName;CustomAfterMicrosoftCommonTargets" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
     <Compile Remove="tests\FramingDesignParserHarness\**\*.cs" />
     <Compile Remove="tests\EquipmentAirflowHarness\**\*.cs" />
     <Compile Remove="tests\SaveLossHarness\**\*.cs" />
     <Compile Remove="tests\PhotoProcessingHarness\**\*.cs" />
     <Compile Remove="red-release-pre-sync-backups\**\*.cs" />
+    <!-- F-027: the camera engine is its own project (RedCamera.Core), referenced below. -->
+    <Compile Remove="RedCamera.Core\**" />
+    <Page Remove="RedCamera.Core\**" />
+    <None Remove="RedCamera.Core\**" />
     <Page Remove="red-release-pre-sync-backups\**\*.xaml" />
     <EmbeddedResource Remove="red-release-pre-sync-backups\**\*" />
     <None Remove="red-release-pre-sync-backups\**\*" />

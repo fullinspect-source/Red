@@ -852,6 +852,20 @@
                                            TextWrapping="Wrap" Foreground="#66737F" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
+
+                        <!-- F-027 C1: camera mode, stored in camera_settings.json -->
+                        <Border Background="White" BorderBrush="#D0D5DA" BorderThickness="1"
+                                CornerRadius="6" Padding="18" Margin="0,0,0,14" Loaded="CameraSettingsCard_Loaded">
+                            <StackPanel>
+                                <TextBlock Text="Camera" FontSize="18" FontWeight="SemiBold" Foreground="#1F2933" Margin="0,0,0,12"/>
+                                <RadioButton x:Name="RedCameraRadioButton" Content="RED camera (recommended)" GroupName="CameraMode"
+                                             MinHeight="40" FontSize="15" Checked="CameraModeRadioButton_Checked"/>
+                                <RadioButton x:Name="WindowsCameraAppRadioButton" Content="Windows Camera app" GroupName="CameraMode"
+                                             MinHeight="40" FontSize="15" Checked="CameraModeRadioButton_Checked"/>
+                                <TextBlock Text="RED's camera lets go of the camera when the tablet sleeps and starts it again on wake. Choose the Windows Camera app only if RED's camera does not work on this device."
+                                           TextWrapping="Wrap" Foreground="#66737F" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
                         <Border Background="White"
                                 BorderBrush="#D0D5DA"
                                 BorderThickness="1"

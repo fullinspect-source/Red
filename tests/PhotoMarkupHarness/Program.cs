@@ -185,7 +185,8 @@ static class Harness
             Directory.CreateDirectory(roll);
             var env = new Dictionary<string, string?> { ["OneDrive"] = oneDrive, ["USERPROFILE"] = Path.Combine(root, "Profile") };
             string? resolved = CameraService.ResolveCameraRoll(v => env.TryGetValue(v, out var x) ? x : null, pictures);
-            // The newest Camera Roll* folder of all roots wins; a root with no Camera Roll falls back to the first root.
+            // INSPECT2026's IL (R-red-camera-companion §3): the first root, in order, that has any Camera Roll* folder wins
+            // (its newest by last-write time); with no match, the first existing root. OneDrive comes before USERPROFILE.
             string older = Path.Combine(root, "Profile", "Pictures", "Camera Roll");
             Directory.CreateDirectory(older);
             Directory.SetCreationTimeUtc(older, DateTime.UtcNow.AddDays(-30));
@@ -196,7 +197,7 @@ static class Harness
             string? none = CameraService.ResolveCameraRoll(_ => null, Path.Combine(root, "Missing"));
             Check("A-023-07", string.Equals(resolved, roll, StringComparison.OrdinalIgnoreCase) && string.Equals(withTwo, roll, StringComparison.OrdinalIgnoreCase) &&
                               string.Equals(fallback, bare, StringComparison.OrdinalIgnoreCase) && none == null,
-                "%OneDrive%\\Pictures\\Camera Roll 2026 resolves (newest Camera Roll* wins; else the first existing root; else none). The watcher on it is not driven here");
+                "%OneDrive%\\Pictures\\Camera Roll 2026 resolves (first root with a Camera Roll* wins; else the first existing root; else none). The watcher on it is not driven here");
 
             // ---------- A-023-15 Existing pictures are not reprocessed ----------
             string ins = Path.Combine(root, "MyList", "1234567-CPP-1-PQE.ins");

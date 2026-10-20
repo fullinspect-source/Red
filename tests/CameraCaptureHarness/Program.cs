@@ -1,0 +1,130 @@
+// F-027 harness, RED side: RED's camera settings file and camera-roll copy, and source checks of MainWindow and the capture
+// window (ACCEPTANCE A-027-01, -12, -18, -20, C10). The camera engine itself is tested by tests\RedCameraCoreHarness.
+// Exit 0 = all passed.
+using System.IO;
+using InspectionEditor.Services.Camera;
+using RedCamera.Core;
+
+return CameraHarness.Run(args);
+
+static class CameraHarness
+{
+    private static int _passed, _failed;
+
+    private static void Check(string id, bool ok, string what)
+    {
+        Console.WriteLine($"{(ok ? "PASS" : "FAIL")} {id} {what}");
+        if (ok) _passed++; else _failed++;
+    }
+
+    private static readonly CameraInfo Front = new("cam-front", "Front Camera", CameraPanelKind.Front, 0);
+
+    public static int Run(string[] args)
+    {
+        try
+        {
+            SettingsAndRollCopy();
+            SourceChecks(args.Length > 0 ? args[0] : FindRepoRoot());
+        }
+        catch (Exception ex)
+        {
+            Check("harness", false, ex.ToString());
+        }
+        Console.WriteLine($"{_passed} passed, {_failed} failed");
+        return _failed == 0 ? 0 : 1;
+    }
+
+    private static void SettingsAndRollCopy()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "red-f027-harness-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var settings = new CameraSettingsService(Path.Combine(folder, "camera_settings.json"));
+            bool defaultRed = !settings.UsesWindowsCameraApp && settings.DeviceId == null && settings.Panel == null;
+            settings.Remember(Front);
+            settings.SetMode(windowsCameraApp: true);
+            var reloaded = new CameraSettingsService(Path.Combine(folder, "camera_settings.json"));
+            bool kept = reloaded.UsesWindowsCameraApp && reloaded.DeviceId == Front.Id && reloaded.Panel == CameraPanelKind.Front;
+            reloaded.SetMode(windowsCameraApp: false);
+            Check("C11-settings", defaultRed && kept && !reloaded.UsesWindowsCameraApp && reloaded.DeviceId == Front.Id,
+                "camera mode defaults to RED camera; mode and remembered camera survive each other's saves (own file)");
+
+            // This harness runs as the Red2Dev assembly, so the copy must never resolve to the real Pictures folder.
+            string pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            Environment.SetEnvironmentVariable(CameraRollCopy.DevFolderVariable, Path.Combine(folder, "roll"));
+            string redirected = CameraRollCopy.TargetFolder();
+            Environment.SetEnvironmentVariable(CameraRollCopy.DevFolderVariable, null);
+            string fallback = CameraRollCopy.TargetFolder();
+            var when = new DateTime(2026, 10, 20, 9, 5, 7, 123);
+            string? written = CameraRollCopy.TrySave(new byte[] { 0xFF, 0xD8, 0xFF, 0xD9 }, when, redirected);
+            Check("C9-dev", redirected == Path.Combine(folder, "roll") && !fallback.StartsWith(pictures, StringComparison.OrdinalIgnoreCase)
+                && written != null && Path.GetFileName(written) == "RED_20261020_090507_123.jpg",
+                $"a dev build writes its camera-roll copies to RED_DEV_CAMERA_ROLL or its app data, never Pictures ({fallback})");
+        }
+        finally
+        {
+            try { Directory.Delete(folder, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "InspectionEditor.csproj"))) dir = dir.Parent;
+        return dir?.FullName ?? string.Empty;
+    }
+
+    private static void SourceChecks(string root)
+    {
+        string mainPath = Path.Combine(root, "MainWindow.xaml.cs");
+        if (!File.Exists(mainPath))
+        {
+            Check("source", false, "RED source not found (pass the PL folder as the first argument)");
+            return;
+        }
+        string main = File.ReadAllText(mainPath);
+        string Method(string signature)
+        {
+            int start = main.IndexOf(signature, StringComparison.Ordinal);
+            if (start < 0) return string.Empty;
+            int end = main.IndexOf("\n        }", start, StringComparison.Ordinal);
+            return end < 0 ? main[start..] : main[start..end];
+        }
+
+        string cameraClick = Method("private void CameraButton_Click(");
+        Check("A-027-01", cameraClick.Contains("UsesWindowsCameraApp") && cameraClick.Contains("OpenWindowsCameraApp(")
+            && Method("private void OpenWindowsCameraApp(").Contains("_cameraService.OpenOrFocusCamera()"),
+            "Camera mode \"Windows Camera app\" keeps the CameraService path");
+
+        string redPhoto = Method("private void OnRedCameraPhoto(");
+        string captured = Method("private void OnPhotoCaptured(");
+        Check("A-027-18", redPhoto.Contains("ReferenceEquals(") && redPhoto.Contains("_editorLoadedItem") && redPhoto.Contains("OnPhotoCaptured(")
+            && redPhoto.IndexOf("ReferenceEquals(", StringComparison.Ordinal) < redPhoto.IndexOf("OnPhotoCaptured(", StringComparison.Ordinal),
+            "a capture-screen photo is added only to the item bound at the press");
+        Check("A-027-20", captured.Length > 0 && captured[..Math.Min(400, captured.Length)].Contains("AddPhotoToCurrentItem(photoData);")
+            && captured.Contains("_photoFromCaptureScreen"),
+            "capture-screen photos use OnPhotoCaptured → AddPhotoToCurrentItem (F-023 T1, read-only, ink, auto-Fail unchanged)");
+
+        string xamlPath = Path.Combine(root, "CameraCaptureWindow.xaml");
+        string xaml = File.Exists(xamlPath) ? File.ReadAllText(xamlPath) : string.Empty;
+        int shutter = xaml.IndexOf("x:Name=\"ShutterButton\"", StringComparison.Ordinal);
+        string shutterTag = shutter < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', shutter)..xaml.IndexOf('>', shutter)];
+        string code = File.Exists(xamlPath + ".cs") ? File.ReadAllText(xamlPath + ".cs") : string.Empty;
+        Check("A-027-12b", shutter >= 0 && !shutterTag.Contains("Visibility") && !shutterTag.Contains("IsEnabled")
+            && shutterTag.Contains("Panel.ZIndex=\"100\"")
+            && !code.Contains("ShutterButton.Visibility") && !code.Contains("ShutterButton.IsEnabled"),
+            "the shutter is never hidden or disabled and sits above every overlay");
+        Check("C10-ui", code.Contains("CameraResetFlow") && code.Split("RunResetAsync(").Length == 3,
+            "the reset flow has exactly one caller, the Reset camera button");
+
+        // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.
+        string coreFolder = Path.Combine(root, "RedCamera.Core");
+        var coreSources = Directory.Exists(coreFolder)
+            ? Directory.GetFiles(coreFolder, "*.cs", SearchOption.TopDirectoryOnly).Select(File.ReadAllText).ToList()
+            : new List<string>();
+        string coreProject = File.Exists(Path.Combine(coreFolder, "RedCamera.Core.csproj")) ? File.ReadAllText(Path.Combine(coreFolder, "RedCamera.Core.csproj")) : "";
+        Check("LIB-boundary", coreSources.Count >= 8 && !coreProject.Contains("ProjectReference")
+            && coreSources.All(s => !s.Contains("InspectionEditor") && !s.Contains("AppIdentity") && !s.Contains("DiagnosticLogService")),
+            $"RedCamera.Core ({coreSources.Count} files) references no RED code or project");
+    }
+}

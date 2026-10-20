@@ -4,6 +4,58 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-20 — RED 2.3.2 — F-027: a camera built into RED that keeps working after the tablet sleeps
+
+- **Base:** 2.3.1 (`072571d`). Built in `Dropbox\P\PL` (program feature F-027: `Dropbox/ios-port/program/features/F-027-reliable-camera`,
+  research `research/R-windows-camera-reliability.md`). Released by owner decision; the owner does the tablet sleep/wake
+  checklist on the released build.
+  - Ported as context-checked hunks per changed file (PL before F-027 → PL now), applied to this tree and written back
+    with CRLF. `InspectionPickerWindow.xaml`, `Services/CameraService.cs` and `tests/PhotoMarkupHarness/Program.cs` had
+    the same content as PL before F-027. `MainWindow.xaml.cs` keeps this tree's release-only lines.
+- **Files changed:**
+  - New: `RedCamera.Core/` (the reusable camera engine library, version 1.0.0: `RedCamera.Core.csproj`, `README.md`,
+    `CameraModels`, `CameraSessionController`, `WinRtCameraBackend`, `CameraOrientation`, `CameraOrientationProvider`,
+    `CameraHoldWatcher`, `CameraDeviceReset`, `CameraFiles`, `CameraPreviewRenderer`, `JsonCameraPreferences`);
+    `CameraCaptureWindow.xaml(.cs)`, `InspectionPickerWindow.Camera.cs`, `Services/Camera/{CameraSettingsService,
+    CameraRollCopy}.cs`; tests `RedCameraCoreHarness`, `CameraCaptureHarness`, `CameraLiveCheck` (needs a camera; not
+    in the automatic suite).
+  - Modified: `InspectionEditor.csproj` (excludes `RedCamera.Core\**` from compile; ProjectReference with
+    `GlobalPropertiesToRemove="AssemblyName;CustomAfterMicrosoftCommonTargets"`), `MainWindow.xaml.cs`
+    (`CameraButton_Click` → `OpenRedCamera` / `OpenWindowsCameraApp`, `OnRedCameraPhoto`, no `Activate` for
+    capture-screen photos, the item-switch label), `InspectionPickerWindow.xaml` (Settings Camera card),
+    `Services/CameraService.cs` (`DismissKeyboard()`; `ResolveCameraRoll` calls `RedCamera.Core.CameraFiles`),
+    `tests/PhotoMarkupHarness/Program.cs` (comment).
+  - Also: the version (2.3.2) in the csproj and the four release-metadata tests, these release notes and this handoff.
+- **Behavior:**
+  - Camera opens RED's own capture screen on the right half: live preview, an always-visible shutter, the target item,
+    photo count, Switch camera. Photos go to the item loaded at the press, through `OnPhotoCaptured` →
+    `AddPhotoToCurrentItem` (F-023 processing unchanged); a full-size copy goes to the camera roll (`RED_*.jpg`).
+  - The camera is held only while the screen is open: it is released on close, minimize (screen or RED), suspend,
+    display off and session lock, and a fresh session starts 1.5 s after the last hold clears.
+  - Frame watchdog: no first frame in 5 s, no frame for 2 s, or 3 s of all-black frames gives "Restarting camera…".
+    Recovery makes 3 more attempts (0.5/1.5/3 s), then tries the other cameras, then gives up with a plain message
+    (Try again, Use Windows Camera app, Reset camera…). The elevated disable/enable reset runs only after the user
+    confirms. No popups except that confirmation.
+  - Settings → Camera: "RED camera (recommended)" (default) or "Windows Camera app" (the unchanged old path), stored in
+    `camera_settings.json`.
+  - INSPECT2026's camera-roll rule from its IL (F-023 T3 corrected): the first candidate root with a `Camera Roll*`
+    folder wins, its newest by last-write time.
+  - Live-risk safeguards unchanged (Q-55 housekeeping gate, first-live Submit/Approve, Buyer Walk §18).
+- **Verification:**
+  - Debug build `--no-incremental`: 0 errors, 29 warnings (unchanged; none in the new code).
+  - 35 harnesses, all exit 0: the 33 of 2.3.1 unchanged (ItemGroupGrid 53, InkItem 21, HeaderSections 47, Cpr 12,
+    BuyerWalkFamily 20, SciForms 11, InspectorSignature 17, CompletionCheck 48, Submit 54, FolderViews 24,
+    ArchiveRetention 27, JobFiles 26, PdfAnnotation 11, Approve 28, Housekeeping 23, OfflineCache 18, AddService 40,
+    InsRoundTrip 71, ItemControls 78, SaveLoss 22, FailedSaveRecovery 17, LastEdit 74, ChecklistVisibility 7,
+    OrientationPdf 345, InspectUserType, FeeToken, Report 35, PhotoProcessing 16, PhotoMarkup 10, CommentLibrary 6,
+    BuyerWalk 40, History 4, ValueFlash 9), plus CameraCapture 8 and RedCameraCore 34.
+  - CameraLiveCheck on the PC's webcam: 12/12. In-app test in an isolated Red2Dev build of this tree (own app-data
+    folder, synthetic sandbox, dead proxy, camera roll redirected): 11/11. Test photos and sandbox changes deleted.
+  - Python: 35/45, the same 10 environment failures as 2.3.0 and 2.3.1.
+  - Corpus round trip not run: the save code is unchanged.
+  - The packaged exe was not smoke-started: a non-dev Red.exe would use the real profile and Inspections folder.
+- **Deployment:** pending.
+
 ### 2026-10-20 — RED 2.3.1 — owner fix list: My List tabs, result button, no "please confirm" popups
 
 - **Base:** 2.3.0 (`6a06e32`). Built in `Dropbox\P\PL` from the owner's marked-up list (`Dropbox\Red for windows fixes
