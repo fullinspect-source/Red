@@ -4,6 +4,63 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-20 — RED 2.3.4 — fixes from the owner's tablet test of 2.3.3
+
+- **Base:** 2.3.3 (`5225e82`). Program features F-011, F-013, F-015, F-016, F-018 to F-023 (`Dropbox/ios-port/program`,
+  CHANGELOG 2026-10-20). Built in `Dropbox\P\PL`; released by owner decision ("tablet fixes shoudl be released when
+  vetted").
+  - Ported per file. Files whose content matched PL before the change were written from PL keeping each file's line
+    endings. `MainWindow.xaml` (mixed endings) and `InspectionPickerWindow.Orders.cs`, `InspectionPickerWindow.xaml`,
+    `Services/StrandScheduleService.cs` got only these hunks: PL also holds the ORDERS Unassign change, which is not
+    in this release. `MainWindow.xaml.cs` got its four hunks by context and keeps this tree's release-only lines.
+- **Files changed:**
+  - New: `Services/SubmitAvailability.cs`; tests `ReviewHarness` (replaces `ApproveHarness`) and `TabletUiHarness`.
+  - Deleted: `MainWindow.Approve.cs`, `tests/ApproveHarness/`.
+  - Modified: `App.Housekeeping.cs`, `ImageEditorWindow.xaml.cs`, `InspectionPickerWindow.{BuyerWalk,FolderViews,
+    Housekeeping,Orders}.cs`, `InspectionPickerWindow.xaml(.cs)` (comments), `MainWindow.xaml` (toolbar WrapPanel,
+    Sign button), `MainWindow.{CompletionCheck,HeaderSections,JobFiles,Print,ResultButton,Signature,Submit}.cs`,
+    `MainWindow.xaml.cs` (plan and prior buttons), `ProfileGuard.cs`, `ReportPreviewWindow.cs`, `SignaturePad.cs`,
+    `Services/{AddServiceService,ArchiveRetentionService,InspectLiveSettings,InspectProjectionWriter,
+    InspectionValidator,InspectorProfileService,JobFilesService,JobFolderPurgeService,OfflineCacheService,
+    PhotoProcessingService,ReviewAccess,StrandScheduleService,SubmitService,TickedRowsService}.cs`; tests
+    `AddService`, `ArchiveRetention`, `CompletionCheck`, `Housekeeping`, `InspectUserType`, `JobFiles`, `OfflineCache`,
+    `PhotoMarkup`, `PhotoProcessing`. Also the version (2.3.4) in the csproj and the four release-metadata tests, the
+    release notes and this handoff.
+- **Behavior:**
+  - Add (F-020/F-021): with stale or missing offline lists, online and with a saved login, Add downloads them under
+    INSPECT's "Receiving offline work requirements..." / "Stay Connected To WiFi" window and then opens the wizard.
+    The launch refresh uses the saved login (RED's, else INSPECT's for the same account); `SessionChanged` now fires
+    after the login is complete, so the first-sign-in refresh runs. The dev-build network guard stays (dev only).
+  - Sign/Submit (F-011/F-013): "✍ Sign" beside the result button jumps to the signature; Submit right after Save with a
+    reason hint ("Submit: only from My List", "Submit: save first"); the editor toolbar wraps. No new popups.
+  - Touch (F-022/F-011): the print preview pans by finger with inertia; the signature pad keeps finger strokes as ink.
+  - Archive cleanup (F-015): runs at each start with no supervised check; cutoff now − (INSPECT setting + 1) days.
+  - Job-folder purge (F-019): runs at each start like INSPECT (live = My List, Outbox, Review; Archive not counted), its
+    own gate. Dev builds run either only with RED_DEV_HOUSEKEEPING=1. The Dropbox log prune still waits for
+    `LiveCleanupVerified`.
+  - Photos (F-023): new and edited photos carry no EXIF/XMP/IPTC/ICC, after orientation is applied.
+  - Plan/prior buttons (F-016): open through the Job Files working copy (reference-only attachment; markups make it
+    an attachment with AnnotatedPages; unedited copies dropped at Submit; the shared file only read).
+  - Review (F-018): Approve removed; no Submit for Review files; Submit refuses a file in a Review folder; pending
+    deletes never touch Review files.
+  - Live-risk safeguards otherwise unchanged (first-live Submit, Buyer Walk §18).
+- **Verification:**
+  - Debug build `--no-incremental` of this tree: 0 errors, 29 warnings (unchanged).
+  - 36 harnesses on this tree, all exit 0 (ReviewHarness 13 replaces ApproveHarness; new TabletUiHarness 14;
+    JobFiles 33, Housekeeping 24, ArchiveRetention 35, OfflineCache 23, AddService 43, PhotoProcessing 16, PhotoMarkup 11),
+    plus CommentSnippetHarness 53. Python: 35/45, the same 10 environment failures.
+  - In-app checks in an isolated Red2Dev build of PL (own app data, synthetic sandbox, dead proxy, loopback mock): Add
+    downloading under the "Stay Connected To WiFi" window then opening the wizard; the launch refresh on the saved login;
+    Sign jump; Submit placement and hints; Review shows no Submit; toolbar wrap; Archive setting 5 keeps 10/15 and later;
+    the purge removed an Archive-only and an orphan job folder and kept live ones; an imported GPS-tagged photo stored with
+    no EXIF and upright; the plan and ◀ Trip buttons attached reference copies, a markup on page 3 gave AnnotatedPages [2]
+    and one extra preview page, Submit dropped an unedited copy, and the O4 question still appears for a newer plan.
+  - A code review of the plan-button, purge and photo changes found two gaps, both fixed before this commit (O4 was
+    skipped for an open copy; an unattachable PDF did not open at all, now a read-only copy).
+  - Corpus round trip not run: the save code (SurgicalSaveService, the projection writer's logic) is unchanged. The
+    packaged exe was not smoke-started: a non-dev Red.exe would use the real profile.
+- **Deployment:** pending.
+
 ### 2026-10-20 — RED 2.3.3 — the report comes back on camera Close; backup photos in Camera Roll\red-camera
 
 - **Base:** 2.3.2 (`b67a3fe`). Both changes come from the owner's tablet test of 2.3.2 and the answer to owner question

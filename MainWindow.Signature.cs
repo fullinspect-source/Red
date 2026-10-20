@@ -152,6 +152,42 @@ namespace InspectionEditor
                 marker.Visibility = HasInspectorSignature() ? Visibility.Collapsed : Visibility.Visible;
             RefreshHeaderMarkers();
             RefreshTopDateDisplay();
+            UpdateSignButton();
+        }
+
+        // Owner tablet test 2026-10-20 ("could not find how to sign"): the Sign button beside the result button shows
+        // whether the report is signed and opens the End section at the signature pad. It writes nothing itself.
+        private void UpdateSignButton()
+        {
+            if (ResultButton.Visibility != Visibility.Visible)
+            {
+                SignButton.Visibility = Visibility.Collapsed;
+                return;
+            }
+            var look = SignButtonLook.For(HasInspectorSignature(), _readOnlyMode); // Services\SubmitAvailability.cs
+            SignButton.Content = look.Text;
+            SignButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(look.Background));
+            SignButton.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(look.Foreground));
+            SignButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(look.Border));
+            SignButton.BorderThickness = new Thickness(1);
+            SignButton.ToolTip = look.ToolTip;
+            System.Windows.Automation.AutomationProperties.SetName(SignButton, look.Text);
+            SignButton.Visibility = Visibility.Visible;
+        }
+
+        private void SignButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!HeaderSectionsAvailable || _isLoadingFile)
+                return;
+            var report = _currentInspection;
+            AutoApplyCurrentItem();
+            // As the result button: a save that stopped on a changed-on-disk file queues its own choices first.
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!HeaderSectionsAvailable || _isLoadingFile || !ReferenceEquals(_currentInspection, report))
+                    return;
+                JumpToProblem(new CompletionProblem("Sign", "", "Signature", null, false));
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         // T5: the Top date shows the new DateInspected at once.

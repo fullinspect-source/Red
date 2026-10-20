@@ -32,6 +32,15 @@ namespace InspectionEditor
             _ink.DefaultDrawingAttributes.Color = Color.FromRgb(0, 0, 255);
             _ink.StrokeCollected += (_, _) => StrokeFinished?.Invoke(this, EventArgs.Empty);
             Children.Add(_ink);
+            // Owner tablet test 2026-10-20: the pad sits inside scroll areas that pan by touch (the inline checklist, the
+            // End window). Taking the touch manipulation here, and cancelling it, keeps a finger stroke on the pad from
+            // scrolling the page; the stroke itself still reaches the InkCanvas as stylus input.
+            IsManipulationEnabled = true;
+            ManipulationStarting += (_, e) =>
+            {
+                e.Cancel();
+                e.Handled = true;
+            };
         }
 
         public bool IsEnabledForInk

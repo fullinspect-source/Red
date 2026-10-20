@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,13 +14,17 @@ using Newtonsoft.Json.Linq;
 
 namespace InspectionEditor
 {
-    // F-013 Submit from the editor (My List only; Review uses F-018 Approve). The work is Services\SubmitService.cs;
-    // this file holds the preconditions (P1-P6), the practice label, the first-live-run question and the result.
+    // F-013 Submit from the editor (My List only; a Review file shows no Submit, F-018 owner 2026-10-20: no Approve). The
+    // work is Services\SubmitService.cs; this file holds the preconditions (P1-P6), the practice label, the first-live-run
+    // question and the result.
     public partial class MainWindow
     {
         private Button? _submitButton;
+        private TextBlock? _submitHint;
         private bool _submitRunning;
 
+        // Owner tablet test 2026-10-20 ("could not find how to submit"): Submit sits right after Save, larger, and a hint
+        // beside it says why it cannot run (Services\SubmitAvailability.cs). No popup.
         private void InstallSubmitButton()
         {
             if (SaveFileButton.Parent is not Panel panel || _submitButton != null)
@@ -30,40 +35,88 @@ namespace InspectionEditor
                 Background = new SolidColorBrush(Color.FromRgb(21, 101, 192)),
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
+                FontWeight = FontWeights.Bold,
+                FontSize = 14,
                 IsEnabled = false,
                 ToolTip = "Finish this report and send it to Strand through the Outbox"
             };
-            // F-018 W3: in a file opened from {IF}\Review the same button is Approve.
-            _submitButton.Click += async (_, _) =>
+            ToolTipService.SetShowOnDisabled(_submitButton, true);
+            System.Windows.Automation.AutomationProperties.SetAutomationId(_submitButton, "SubmitButton");
+            _submitButton.Click += async (_, _) => await SubmitCurrentReportAsync();
+            _submitHint = new TextBlock
             {
-                if (CurrentFileCanBeApproved()) await ApproveCurrentReportAsync();
-                else await SubmitCurrentReportAsync();
+                Foreground = new SolidColorBrush(Color.FromRgb(254, 226, 226)),
+                FontStyle = FontStyles.Italic,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 8, 0),
+                Visibility = Visibility.Collapsed
             };
-            int index = _completionCheckButton != null ? panel.Children.IndexOf(_completionCheckButton) + 1 : panel.Children.IndexOf(SaveFileButton) + 1;
+            System.Windows.Automation.AutomationProperties.SetAutomationId(_submitHint, "SubmitHint");
+            int index = panel.Children.IndexOf(SaveFileButton) + 1;
             panel.Children.Insert(index, _submitButton);
+            panel.Children.Insert(index + 1, _submitHint);
+            InstallToolbarWrap();
         }
 
-        // P2: only from My List (Outbox and Archive copies cannot be submitted; Review uses Approve, F-018).
-        private bool CurrentFileIsInMyList() =>
-            !string.IsNullOrEmpty(_currentFilePath) &&
-            string.Equals(Path.GetFileName(Path.GetDirectoryName(_currentFilePath)), "MyList", StringComparison.OrdinalIgnoreCase);
+        // P2: only from My List (Outbox and Archive copies cannot be submitted; Review files never, F-018).
+        private bool CurrentFileIsInMyList() => SubmitAvailability.IsInFolder(_currentFilePath, "MyList");
 
         private void UpdateSubmitButton()
         {
             UpdatePrintButton(); // F-022
             if (_submitButton == null)
                 return;
-            // F-018 V2/W3: a Review file shows Approve instead of Submit.
-            bool approve = _currentFilePath != null && CurrentFileCanBeApproved();
-            _submitButton.Content = approve ? "✅ Approve" : "📤 Submit";
             // L2: a locked BWT can still be submitted.
-            _submitButton.IsEnabled = _currentInspection != null && _saveService.HasFile && (approve || CurrentFileIsInMyList()) && !_submitRunning;
-            _submitButton.ToolTip = approve
-                ? "Approve this inspection and send it to Strand through the Outbox"
-                : CurrentFileIsInMyList()
-                    ? "Finish this report and send it to Strand through the Outbox"
-                    : "Submit works from My List only";
+            var state = SubmitAvailability.For(_currentInspection != null, _saveService.HasFile, _currentFilePath, _submitRunning);
+            _submitButton.Visibility = state.Visible ? Visibility.Visible : Visibility.Collapsed;
+            _submitButton.IsEnabled = state.Enabled;
+            _submitButton.ToolTip = state.Enabled || state.Hint.Length == 0 ? "Finish this report and send it to Strand through the Outbox" : state.Hint;
+            if (_submitHint != null)
+            {
+                _submitHint.Text = state.Hint;
+                _submitHint.Visibility = state.Visible && state.Hint.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
+
+        // The toolbar starts and wraps inside the part of this window that is on screen (a window wider than its screen, as
+        // RED's 1100 px minimum on a tablet in portrait, keeps every button on screen), leaving room for the Help button
+        // when the window's right edge is on screen.
+        private void InstallToolbarWrap()
+        {
+            TopBarGrid.SizeChanged += (_, _) => UpdateToolbarWrap();
+            LocationChanged += (_, _) => UpdateToolbarWrap();
+            Loaded += (_, _) => UpdateToolbarWrap();
+        }
+
+        // Measured on the window's client area: the top bar itself reports its full content width once the buttons overflow.
+        private void UpdateToolbarWrap()
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero || PresentationSource.FromVisual(TopBarGrid) == null)
+                return;
+            try
+            {
+                double scale = VisualTreeHelper.GetDpi(TopBarGrid).DpiScaleX;
+                var client = new NativePoint();
+                if (scale <= 0 || !GetClientRect(hwnd, out var rect) || !ClientToScreen(hwnd, ref client))
+                    return;
+                var origin = TopBarGrid.PointToScreen(new Point(0, 0)); // device pixels
+                double barRight = client.X + rect.Right - 8 * scale;    // the top bar's 8 px padding
+                var area = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Math.Max(origin.X, 0), (int)origin.Y)).WorkingArea;
+                double left = Math.Max(origin.X, area.Left), right = Math.Min(barRight, area.Right);
+                double help = barRight <= area.Right ? 60 : 8; // Help button: 36 px wide, 12 px from the window's right edge
+                double leftCut = (left - origin.X) / scale;
+                EditorToolbar.Margin = new Thickness(leftCut, 0, 0, 0);
+                EditorToolbar.MaxWidth = Math.Max(240, (right - left) / scale - help);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException) { }
+        }
+
+        [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
+        [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hwnd, out NativeRect rect);
+        [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hwnd, ref NativePoint point);
 
         // Step 3: RED's Save command, including the V5c sweep that only the Save button ran (A-013-45), then V5d.
         private bool SaveForSubmit()

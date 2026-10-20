@@ -6,7 +6,7 @@ using System.Linq;
 namespace InspectionEditor.Services
 {
     /// <summary>
-    /// Owner 2026-10-19: the My List row tick boxes. Remove, Move to My List and Approve act on the ticked rows that the
+    /// Owner 2026-10-19: the My List row tick boxes. Remove and Move to My List act on the ticked rows that the
     /// list shows (a search can hide rows), in file-name order like the old pick list. Ticks are kept by full path, so
     /// they survive a reload of the same folder and are dropped for files that are gone.
     /// </summary>

@@ -40,7 +40,47 @@ namespace InspectionEditor
 
         private Window DialogOwner => Application.Current.Windows.OfType<DocsViewerWindow>().FirstOrDefault(w => w.IsActive) ?? (Window)this;
 
-        private void OpenJobFile(InspectionFile? owner, string path, JobFile file)
+        // Owner Q-56 (2026-10-20): the plan/slab ("Slab Eng", "FD Plan", ...) and "◀ Prior" buttons open a shared job PDF
+        // exactly as Job Files does: a reference-only attachment and a working copy in the PDF app; edits saved there make
+        // it a real attachment with AnnotatedPages, only those pages print, and an unedited copy is dropped at Submit. The
+        // shared file is only read. A file outside {IF}\Jobs, a read-only report or a PreInspector gets a read-only copy.
+        private void OpenSharedJobPdf(string fullPath, string caption)
+        {
+            if (_currentInspection == null || string.IsNullOrEmpty(_currentFilePath)) return;
+            if (!File.Exists(fullPath))
+            {
+                MessageBox.Show(this, $"File not found:\n{fullPath}", caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            var profile = InspectorProfileService.Load();
+            var file = JobFilesService.JobFileFor(fullPath, profile?.InspectionsFolder, _currentInspection.Attachments);
+            try
+            {
+                bool opened = false;
+                if (file != null && !JobFilesService.IsBlockedFor(profile?.UserType))
+                {
+                    try { opened = OpenJobFile(_currentInspection, _currentFilePath, file); }
+                    catch (IOException ex)
+                    {
+                        DiagnosticLogService.Info($"{caption}: the PDF could not be attached, opening a read-only copy ({ex.Message})");
+                    }
+                }
+                // Not attachable (outside Jobs, PreInspector, unsafe name, unreadable or over 100 MiB, embedding declined,
+                // the report could not be saved): the plan must still open, as a read-only copy; the shared file stays read only.
+                if (!opened)
+                    DocsViewerWindow.OpenReadOnlyCopy(fullPath);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException ||
+                                       ex is System.ComponentModel.Win32Exception)
+            {
+                DiagnosticLogService.Info($"{caption}: the PDF could not be opened ({ex.GetType().Name})");
+                MessageBox.Show(this, $"The PDF could not be opened. {ex.Message}", caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // Returns false when the job file was not attached and nothing was opened (large-PDF embedding declined, or the
+        // report could not be saved); the plan buttons then open a read-only copy. A cancelled O3/O4 question returns true.
+        private bool OpenJobFile(InspectionFile? owner, string path, JobFile file)
         {
             if (owner == null || !ReferenceEquals(owner, _currentInspection) || path != _currentFilePath)
                 throw new InvalidOperationException("This report is no longer open.");
@@ -48,7 +88,7 @@ namespace InspectionEditor
             {
                 // A read-only report gets no attachment; the job file still never opens for editing.
                 DocsViewerWindow.OpenReadOnlyCopy(file.FullPath);
-                return;
+                return true;
             }
             if (!PdfAttachmentService.SafeFilename(file.Filename))
                 throw new IOException("This job file's name cannot be used as an attachment name.");
@@ -64,7 +104,7 @@ namespace InspectionEditor
                     if (bytes.LongLength > PdfAttachmentService.WarningBytes && MessageBox.Show(DialogOwner,
                             $"This PDF is {AttachmentsWindow.ReadableSize(bytes.LongLength)}, larger than 15 MiB. Embed the complete PDF in this INS?\n\n{file.Filename}",
                             "Large PDF attachment", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
-                        return;
+                        return false;
                     var expected = PdfAttachmentService.Snapshot(owner);
                     var replacement = (JArray)expected.DeepClone();
                     replacement.Add(JobFilesService.ReferenceAttachment(file.Filename, bytes, DateTime.Now));
@@ -72,7 +112,7 @@ namespace InspectionEditor
                     {
                         MessageBox.Show(DialogOwner, "The report could not be saved, so the job file was not attached.", "Job Files",
                             MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
+                        return false;
                     }
                     index = replacement.Count - 1;
                     break;
@@ -84,17 +124,20 @@ namespace InspectionEditor
                     index = plan.Index!.Value;
                     // A copy that was already opened in the PDF app this session is never replaced without a question.
                     if (FindPdfMonitor(index)?.HasLaunched == true) break;
-                    if (!ReplaceWithJobFile(owner, path, index, file)) return;
+                    if (!ReplaceWithJobFile(owner, path, index, file)) return false;
                     break;
                 default:
                 {
                     index = plan.Index!.Value;
+                    // The marked-up copy is already open in the PDF app this session: reopen it, nothing to choose. A newer
+                    // Dropbox file (O4) is still asked about, so a revised plan is never hidden behind the old markup.
+                    if (plan.Action == JobFileOpenAction.AskMarkedUp && FindPdfMonitor(index)?.HasLaunched == true) break;
                     string question = plan.Action == JobFileOpenAction.AskMarkedUp
                         ? JobFilesService.MarkedUpQuestion(file.Filename)
                         : JobFilesService.DropboxNewerQuestion(file.Filename);
                     var answer = MessageBox.Show(DialogOwner, question, "Job Files", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-                    if (answer == MessageBoxResult.Cancel) return;
-                    if (answer == MessageBoxResult.No && !ReplaceWithJobFile(owner, path, index, file)) return;
+                    if (answer == MessageBoxResult.Cancel) return true;
+                    if (answer == MessageBoxResult.No && !ReplaceWithJobFile(owner, path, index, file)) return true;
                     break;
                 }
             }
@@ -110,6 +153,7 @@ namespace InspectionEditor
             service.PrepareForOpen(monitor);
             monitor.MarkLaunched();
             using var process = Process.Start(PdfAppLauncher.StartInfoFor(monitor.WorkingPath)); // F-017 A1: the PDF app from Settings
+            return true;
         }
 
         // O3/O4 "No" and a reference refresh: the attachment takes the job file's current bytes, ReferenceOnly true.

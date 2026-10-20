@@ -113,13 +113,28 @@ static class Harness
                 "1111111 deleted, 2222222 kept; INSPECT's four Info lines in order");
         }
 
-        // ---------- A-019-04 Purge keeps Archive-referenced jobs ----------
+        // ---------- A-019-04 Archive does not keep a job folder (owner 2026-10-20, INSPECT's rule; was the Q-26 default) ----------
         using (var box = new Box())
         {
             box.Ins("Archive", "7654321-ME-1-AB");
-            string kept = box.Job("7654321");
-            JobFolderPurgeService.Run(box.IF, box.Log, settings: on);
-            Check("A-019-04", Directory.Exists(kept), "a job referenced only by an Archive inspection remains (owner Q-26 default)");
+            box.Ins("MyList", "2222222-CPP-1-PQE");
+            box.Ins("Outbox", "3333333-FRM-1-PQE");
+            box.Ins("Review", "4444444-FRM-1-PQE");
+            string archivedOnly = box.Job("7654321", files: 2);
+            string myList = box.Job("2222222"), outbox = box.Job("3333333"), review = box.Job("4444444");
+            var result = JobFolderPurgeService.Run(box.IF, box.Log, settings: on);
+            Check("A-019-04", !Directory.Exists(archivedOnly) && Directory.Exists(myList) && Directory.Exists(outbox) && Directory.Exists(review) &&
+                              result.Removed == 1 && File.Exists(Path.Combine(box.IF, "Archive", "7654321-ME-1-AB.ins")) &&
+                              JobFolderPurgeService.LiveFolders.SequenceEqual(new[] { InspectFolder.MyList, InspectFolder.Outbox, InspectFolder.Review }),
+                "a job used only by an Archive inspection is purged (the Archive .ins stays); My List, Outbox and Review keep theirs");
+        }
+        using (var box = new Box())
+        {
+            box.Ins("Archive", "7654321-ME-1-AB");
+            string job = box.Job("7654321");
+            var result = JobFolderPurgeService.Run(box.IF, box.Log, settings: on);
+            Check("A-019-04", result.Declined && Directory.Exists(job),
+                "with only Archive inspections there are no live ones: the purge declines and deletes nothing (P2)");
         }
 
         // ---------- A-019-05 Purge declines with no live inspections ----------

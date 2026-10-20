@@ -37,6 +37,12 @@ return result;
 
 sealed record MockRequest(string Method, string PathAndQuery);
 
+sealed class QuietLog : ISubmitLog
+{
+    public void Inspect(string line) { }
+    public void Red(string line) { }
+}
+
 // A tiny loopback HTTP server: LogOn sets cookies, other paths answer the scripted status.
 sealed class MockStrand : IDisposable
 {
@@ -321,6 +327,116 @@ static class Harness
             Check("A-016-09", !JobFilesService.IsBlockedFor("Preinspector") && !JobFilesService.IsBlockedFor("Inspector") &&
                               !JobFilesService.IsBlockedFor("NonDropBoxInspector") && !JobFilesService.IsBlockedFor(null),
                 "\"Preinspector\", \"Inspector\" and \"NonDropBoxInspector\" open Job Files normally");
+
+            // ---------- A-016-10 The editor's plan/slab and prior buttons resolve to job files (owner Q-56, 2026-10-20) ----------
+            {
+                var slab = JobFilesService.JobFileFor(Path.Combine(engineering, "1234567R2 Plans.pdf"), inspections, null);
+                var prior = JobFilesService.JobFileFor(Path.Combine(inspectionPdfs, "1234567-CPP-1-PQE.pdf"), inspections, null);
+                string outside = Path.Combine(root, "elsewhere.pdf");
+                File.WriteAllBytes(outside, Pdf("outside"));
+                Check("A-016-10", slab is { Filename: "1234567R2 Plans.pdf", FileType: "Engineering", Version: "2" } &&
+                                  prior is { Filename: "1234567-CPP-1-PQE.pdf", FileType: "Inspection" } &&
+                                  JobFilesService.JobFileFor(outside, inspections, null) == null &&
+                                  JobFilesService.JobFileFor(Path.Combine(engineering, "missing.pdf"), inspections, null) == null &&
+                                  JobFilesService.JobFileFor(Path.Combine(root, "Inspections", "Jobs", "..", "elsewhere.pdf"), inspections, null) == null,
+                    "a PDF under {IF}\\Jobs becomes a job file (type and version as Job Files lists them); outside Jobs, missing or a '..' path: none (read-only copy)");
+            }
+
+            // ---------- A-016-11 Edit page 3 of 5 through a button: one annotated page, only it prints, original untouched ----------
+            {
+                string fivePager = Path.Combine(engineering, "1234567 Foundation Plan.pdf");
+                using (var document = new PdfDocument())
+                {
+                    for (int i = 0; i < 5; i++) document.AddPage();
+                    document.Info.Subject = "five page plan";
+                    document.Save(fivePager);
+                }
+                string fiveHash = Hash(fivePager);
+                string ins2 = Path.Combine(inspections, "MyList", "1234567-CPP-2-PQE.ins");
+                var doc2 = Report();
+                doc2["InspectionNumber"] = "1234567-CPP-2-PQE";
+                File.WriteAllText(ins2, doc2.ToString(Formatting.None), new UTF8Encoding(false));
+                var saver2 = new SurgicalSaveService();
+                var model2 = saver2.Load(ins2);
+                bool Save2() { saver2.Save(model2); return true; }
+                // What OpenSharedJobPdf → OpenJobFile does for a first open (CreateReference), then a second press (UseExisting).
+                var file = JobFilesService.JobFileFor(fivePager, inspections, model2.Attachments)!;
+                var first = JobFilesService.Plan(model2.Attachments, file.Filename, file.Modified);
+                var replacement = Snapshot(model2);
+                replacement.Add(JobFilesService.ReferenceAttachment(file.Filename, PdfAttachmentService.ReadPdf(file.FullPath), DateTime.Now));
+                bool attached = first.Action == JobFileOpenAction.CreateReference && Transact(model2, replacement, Save2);
+                var again = JobFilesService.Plan(model2.Attachments, file.Filename, File.GetLastWriteTime(fivePager));
+                var monitor = new PdfAttachmentService(model2).Open(0, ins2, workingRoot);
+                Check("A-016-11", attached && again.Action == JobFileOpenAction.UseExisting && model2.Attachments!.Count == 1 &&
+                                  !monitor.WorkingPath.StartsWith(inspections, StringComparison.OrdinalIgnoreCase),
+                    "first press: one reference-only attachment and a working copy outside Inspections; second press reuses it (no second attachment)");
+
+                // The PDF app saves a markup on page 3 (index 2) of the working copy.
+                using (var working = PdfSharp.Pdf.IO.PdfReader.Open(monitor.WorkingPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify))
+                {
+                    var note = new PdfSharp.Pdf.Annotations.PdfTextAnnotation { Title = "Inspector", Contents = "check this beam" };
+                    note.Rectangle = new PdfRectangle(new PdfSharp.Drawing.XRect(72, 72, 20, 20));
+                    working.Pages[2].Annotations.Add(note);
+                    working.Save(monitor.WorkingPath);
+                }
+                var t0 = DateTimeOffset.UtcNow;
+                monitor.Poll(t0, Save2);
+                bool captured = monitor.Poll(t0 + PdfEditMonitor.Debounce + TimeSpan.FromMilliseconds(50), Save2);
+                var a = (JObject)((JArray)Read(ins2)["Attachments"]!)[0];
+                int storedPages;
+                using (var stored = PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(Convert.FromBase64String((string)a["FileData"]!)), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
+                    storedPages = stored.PageCount;
+                Check("A-016-11", captured && (bool?)a["ReferenceOnly"] == false && a["AnnotatedPages"] is JArray { Count: 1 } ap && (int)ap[0] == 2 &&
+                                  (bool?)a["CanExcludePages"] == true && storedPages == 5 && a["ReducedFileData"] == null,
+                    "after the markup: a real attachment, AnnotatedPages [2], the full 5-page PDF kept in FileData (INSPECT's format, no reduced copy)");
+
+                var rendered = InspectionEditor.Services.Reports.ReportService.Render(Read(ins2), new InspectionEditor.Services.Reports.ReportSettings(),
+                    new InspectionEditor.Services.Reports.ReportOptions(false, true, true), DateTime.Now);
+                int previewPages;
+                using (var preview = PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(rendered.Pdf), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
+                    previewPages = preview.PageCount;
+                Check("A-016-11", rendered.AttachmentsAdded == 1 && previewPages == rendered.ReportPages + 1,
+                    $"the report preview adds exactly 1 page for the attachment ({rendered.ReportPages} report page(s) + 1)");
+                monitor.Cleanup();
+                Check("A-016-11", Hash(fivePager) == fiveHash, "the shared 5-page plan is byte-for-byte unchanged");
+
+                // ---------- A-016-12 An unedited copy is dropped at Submit ----------
+                string ins3 = Path.Combine(inspections, "MyList", "1234567-CPP-3-PQE.ins");
+                var doc3 = Report();
+                doc3["InspectionNumber"] = "1234567-CPP-3-PQE";
+                File.WriteAllText(ins3, doc3.ToString(Formatting.None), new UTF8Encoding(false));
+                var saver3 = new SurgicalSaveService();
+                var model3 = saver3.Load(ins3);
+                bool Save3() { saver3.Save(model3); return true; }
+                var unedited = Snapshot(model3);
+                unedited.Add(JobFilesService.ReferenceAttachment(file.Filename, PdfAttachmentService.ReadPdf(fivePager), DateTime.Now));
+                bool referenced = Transact(model3, unedited, Save3);
+                var ctx = new SubmitContext
+                {
+                    Model = model3, Saver = saver3, SourcePath = ins3, RawUserType = "Inspector",
+                    Profile = new CompleteProfile(inspections, InspectUserKind.Inspector, "Pat Q Example", "inspector@example.com", "000-000-0000", "TX"),
+                    SaveWithSweeps = () => { saver3.Save(model3); return true; }, Validate = () => new CompletionResult(),
+                    LocalRoot = Path.Combine(root, "AppData"), Log = new QuietLog(), Sleep = _ => { }
+                };
+                var submitted = await SubmitService.SubmitAsync(ctx);
+                string outboxCopy = Path.Combine(inspections, "Outbox", "1234567-CPP-3-PQE.ins");
+                Check("A-016-12", referenced && submitted.Stage == SubmitStage.Done && File.Exists(outboxCopy) &&
+                                  ((JArray?)Read(outboxCopy)["Attachments"] ?? new JArray()).Count == 0 && Hash(fivePager) == fiveHash,
+                    $"a reference-only (unedited) copy is dropped at Submit: the Outbox file has no attachment ({submitted.Stage})");
+            }
+
+            // ---------- A-016-13 The buttons always open the PDF; a newer Dropbox file is still asked about (review 2026-10-20) ----------
+            {
+                string source = File.ReadAllText(Path.Combine("..", "..", "MainWindow.JobFiles.cs"));
+                int shared = source.IndexOf("private void OpenSharedJobPdf", StringComparison.Ordinal);
+                int open = source.IndexOf("private bool OpenJobFile", StringComparison.Ordinal);
+                string sharedBody = shared < 0 || open < shared ? "" : source.Substring(shared, open - shared);
+                Check("A-016-13", sharedBody.Contains("try { opened = OpenJobFile(") && sharedBody.Contains("catch (IOException") &&
+                                  sharedBody.Contains("if (!opened)") && sharedBody.Contains("DocsViewerWindow.OpenReadOnlyCopy(fullPath);") &&
+                                  source.Contains("if (plan.Action == JobFileOpenAction.AskMarkedUp && FindPdfMonitor(index)?.HasLaunched == true) break;") &&
+                                  !source.Contains("default:\r\n                {\r\n                    index = plan.Index!.Value;\r\n                    if (FindPdfMonitor(index)?.HasLaunched == true) break;"),
+                    "a PDF that cannot be attached (unsafe name, unreadable, over 100 MiB, embedding declined, save failed) still opens as a read-only copy; only O3 is skipped for an open copy, O4 (newer Dropbox file) is always asked (source check)");
+            }
 
             Check("C3", Hash(plan) == planHash, "after every step the shared job file is byte-for-byte unchanged");
         }

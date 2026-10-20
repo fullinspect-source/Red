@@ -81,6 +81,66 @@ namespace InspectionEditor.Services
         public static bool HasAll(string? root = null) =>
             Enum.GetValues<OfflineCache>().All(cache => File.Exists(PathOf(cache, root)));
 
+        public static List<OfflineCache> StaleCaches(DateTime now, string? root = null) =>
+            Enum.GetValues<OfflineCache>().Where(cache => IsStale(cache, now, root)).ToList();
+
+        // Whether Windows reports any usable network connection. Only a hint: the download itself is the real test.
+        public static bool LooksOnline()
+        {
+            try { return System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable(); }
+            catch (Exception) { return true; }
+        }
+
+        // An explicit Strand sign-out in this run keeps the saved login from being used for downloads until the next
+        // sign-in or launch (C2: the jobs list went with the session).
+        private static int _savedLoginRefused;
+        public static void RefuseSavedLoginForThisRun() => Volatile.Write(ref _savedLoginRefused, 1);
+        public static void AllowSavedLogin() => Volatile.Write(ref _savedLoginRefused, 0);
+        public static bool SavedLoginRefused => Volatile.Read(ref _savedLoginRefused) == 1;
+
+        /// <summary>
+        /// R2 and F-021 E2 (owner tablet test 2026-10-20): the website session a download (and the Add wizard) uses. The
+        /// signed-in Strand session when there is one; otherwise a session of its own on RED's saved login (else INSPECT's,
+        /// in the silent sign-in's order), so no ORDERS sign-in is needed first, as INSPECT uses its saved login. Null when
+        /// no complete login is known.
+        /// </summary>
+        public static StrandWebsiteSession? SessionForDownload(StrandWebsiteSession signedIn, Func<StrandCredentials?>? savedLogin = null)
+        {
+            if (signedIn.HasCredentials)
+                return signedIn;
+            if (SavedLoginRefused)
+                return null;
+            var login = (savedLogin ?? SavedLogin)();
+            if (login is not { IsComplete: true })
+                return null;
+            string username = login.Username, password = login.Password;
+            lock (SavedLoginLock)
+            {
+                // One session per saved login, so its cookie and connections are reused by the next download or Add.
+                if (_savedLoginSession == null || _savedLoginSession.Username != username || _savedLoginPassword != password)
+                {
+                    _savedLoginSession = new StrandWebsiteSession(StrandWebsiteSession.ConfiguredBase, () => (username, password));
+                    _savedLoginPassword = password;
+                }
+                return _savedLoginSession;
+            }
+        }
+
+        private static readonly object SavedLoginLock = new();
+        private static StrandWebsiteSession? _savedLoginSession;
+        private static string? _savedLoginPassword;
+
+        // RED's saved login; INSPECT's when RED has none, or for the same account (as TrySilentStrandSignInAsync).
+        private static StrandCredentials? SavedLogin()
+        {
+            var saved = StrandCredentialService.LoadSaved();
+            if (saved is { IsComplete: true })
+                return saved;
+            var inspect = StrandCredentialService.ImportFromInspect();
+            return inspect is { IsComplete: true } && (saved == null || string.Equals(inspect.Username, saved.Username, StringComparison.OrdinalIgnoreCase))
+                ? inspect : null;
+        }
+
         /// <summary>
         /// R2/R3: fetches the given caches in parallel on the website session and saves the good answers. Returns what was
         /// saved and what failed. An answer that is not a JSON array (a login page, an error page) is not saved.
@@ -110,6 +170,7 @@ namespace InspectionEditor.Services
                 var run = new RefreshRun(StrandScheduleService.SessionGeneration);
                 var results = await Task.WhenAll(list.Select(async cache => (cache, ok: await FetchOneAsync(session, cache, root, redLog, run, token))));
                 foreach (var (cache, ok) in results) (ok ? saved : failed).Add(cache);
+                redLog($"Offline data download: {saved.Count} of {list.Count} saved"); // counts only (V3)
                 return new OfflineRefreshResult(saved, failed);
             }
             finally
@@ -206,14 +267,20 @@ namespace InspectionEditor.Services
         {
             clock ??= () => DateTime.Now;
             delay ??= Task.Delay;
-            if (!session.HasCredentials) return;
+            // A saved-login session (SessionForDownload) stops once the user has signed out in this run, and once any sign-in
+            // or sign-out has happened since it started (the retry must never save the previous account's jobs list; the
+            // sign-in starts its own refresh).
+            int generation = StrandScheduleService.SessionGeneration;
+            bool Allowed() => session.HasCredentials && (ReferenceEquals(session, StrandWebsiteSession.Default) ||
+                                                         !SavedLoginRefused && StrandScheduleService.SessionGeneration == generation);
+            if (!Allowed()) return;
             List<OfflineCache> Stale() => Enum.GetValues<OfflineCache>().Where(cache => IsStale(cache, clock(), root)).ToList();
             var stale = Stale();
             if (stale.Count == 0) return;
             await RefreshAsync(session, stale, root, redLog);
             await delay(RetryDelay);
             stale = Stale();
-            if (stale.Count > 0 && session.HasCredentials) // signed out meanwhile: no retry
+            if (stale.Count > 0 && Allowed()) // signed out meanwhile: no retry
                 await RefreshAsync(session, stale, root, redLog);
         }
         // R4: the result text of a forced download.

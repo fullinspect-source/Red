@@ -20,14 +20,15 @@ namespace InspectionEditor
     // Processed columns, a live folder watcher (renames included), Move to My List, and the Outbox "Sync" button for
     // kind NonDropBox only (L8). Review is F-018.
     // Owner 2026-10-19: the views are side tabs (My List, Outbox, Archive, Review); Move to Archive and Move to Review
-    // are gone ("never needed"); Remove, Move to My List and Approve act on the rows ticked in the list.
+    // are gone ("never needed"); Remove and Move to My List act on the rows ticked in the list. Owner 2026-10-20: no
+    // Approve (F-018): Review is the owner's holding folder for their own automation.
     public partial class InspectionPickerWindow
     {
         private FolderView _folderView = FolderView.MyList;
         private WrapPanel? _folderViewBar;
         private readonly Dictionary<FolderView, Button> _folderViewButtons = new(); // the side tabs
         private readonly HashSet<string> _checkedPaths = new(StringComparer.OrdinalIgnoreCase);
-        private Button? _moveToMyListButton, _syncButton, _approveButton, _removeButton, _addServiceButton;
+        private Button? _moveToMyListButton, _syncButton, _removeButton, _addServiceButton;
         private AddServiceWindow? _addWindow;
         private bool _addPressedWhileDownloading;
         private TextBlock? _folderViewNote;
@@ -76,7 +77,6 @@ namespace InspectionEditor
                 _folderViewButtons[view] = FolderTabButton(view);
             _moveToMyListButton = CommandButton("Move to My List", () => ShowMoveDialog(InspectFolder.MyList));
             _syncButton = CommandButton("Sync", async () => await RunSyncAsync());
-            _approveButton = CommandButton("Approve…", async () => await ShowApproveDialogAsync());           // F-018 A4
             _addServiceButton = CommandButton("Add…", OnAddServiceClick); // F-021 E1: My List only
             // Owner 2026-10-19: Add is green.
             _addServiceButton.Background = new SolidColorBrush(Color.FromRgb(63, 163, 77));
@@ -84,7 +84,6 @@ namespace InspectionEditor
             _addServiceButton.Foreground = Brushes.White;
             _addServiceButton.FontWeight = FontWeights.SemiBold;
             _folderViewBar.Children.Add(_addServiceButton);
-            _folderViewBar.Children.Add(_approveButton);
             _folderViewBar.Children.Add(_moveToMyListButton);
             _folderViewBar.Children.Add(_syncButton);
             _removeButton = CommandButton("Remove…", ShowRemoveDialog); // F-019 D1, every view
@@ -120,7 +119,7 @@ namespace InspectionEditor
                 ApplyColumnSettings();
                 string myList = InspectFolders.PathOf(root, InspectFolder.MyList);
                 if (_isLoading)
-                    _pendingFolderViewLoad = myList; // e.g. the reload after an Approve is still running
+                    _pendingFolderViewLoad = myList; // e.g. the reload after a Remove is still running
                 LoadInspections(myList);
                 if (MyListPanel.Visibility == Visibility.Visible)
                     SetActiveTab(MyListTabButton);
@@ -145,7 +144,6 @@ namespace InspectionEditor
             if (_activeTab != null)
                 SetActiveTab(_activeTab); // re-colour the Outbox tab
             _moveToMyListButton!.Visibility = _folderView == FolderView.MyList ? Visibility.Collapsed : Visibility.Visible;
-            _approveButton!.Visibility = reviewer && _folderView == FolderView.Review ? Visibility.Visible : Visibility.Collapsed;
             _addServiceButton!.Visibility = _folderView == FolderView.MyList ? Visibility.Visible : Visibility.Collapsed;
             var kind = InspectUserType.Classify(InspectorProfileService.Load()?.UserType);
             _syncButton!.Visibility = _folderView == FolderView.Outbox && kind == InspectUserKind.NonDropBox ? Visibility.Visible : Visibility.Collapsed;
@@ -335,43 +333,91 @@ namespace InspectionEditor
             UpdateFolderViewBar();
         }
 
-        // F-021 E1-E3: one Add window at a time; the three offline caches present and from today; the profile guard.
+        // F-021 E1-E3: one Add window at a time; the three offline caches present and from today (downloaded now when
+        // they are not and RED can reach Strand, owner 2026-10-20); the profile guard.
         private void OnAddServiceClick()
         {
             if (_addWindow != null) { _addWindow.Activate(); return; }
             var profile = ProfileGuard.Require(this, "Add");
             if (profile == null)
                 return;
-            if (!AddServiceService.CachesReady(DateTime.Now))
+            DateTime now = DateTime.Now;
+            bool ready = AddServiceService.CachesReady(now), downloading = OfflineCacheService.IsDownloading;
+            var session = ready || downloading ? null : OfflineCacheService.SessionForDownload(StrandWebsiteSession.Default);
+            switch (AddServiceService.Gate(ready, downloading, OfflineCacheService.LooksOnline(), session != null))
             {
-                if (OfflineCacheService.IsDownloading)
-                {
-                    if (!_addPressedWhileDownloading)
-                    {
-                        _addPressedWhileDownloading = true; // one flag for any number of presses
-                        OfflineCacheService.DownloadFinished += OnOfflineDownloadFinishedForAdd;
-                    }
-                    MessageBox.Show(this, AddServiceService.ReceivingText, AddServiceService.ReceivingCaption, MessageBoxButton.OK, MessageBoxImage.Information);
+                case AddGate.Open:
+                    OpenAddWindow(profile);
                     return;
-                }
-                DiagnosticLogService.Info("Add refused: the offline data is missing or not from today.");
-                MessageBox.Show(this, AddServiceService.MissingText, AddServiceService.MissingCaption, MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                case AddGate.Wait:
+                    WaitForOfflineDataThenAdd();
+                    return;
+                case AddGate.Download:
+                    DiagnosticLogService.Info("Add: the offline data is missing or not from today; downloading it now.");
+                    WaitForOfflineDataThenAdd(); // listens before the download starts, so its end is never missed
+                    OfflineCacheService.RefreshAsync(session!, OfflineCacheService.StaleCaches(now)).ContinueWith(task =>
+                    {
+                        if (task.IsFaulted)
+                            DiagnosticLogService.Info($"Add: the offline data download failed: {task.Exception!.GetBaseException().GetType().Name}");
+                        OnOfflineDownloadFinishedForAdd(); // also when nothing was left to fetch (no DownloadFinished then)
+                    }, TaskScheduler.Default);
+                    return;
+                default:
+                    DiagnosticLogService.Info(session == null
+                        ? "Add refused: the offline data is missing or not from today, and no Strand login is saved to download it."
+                        : "Add refused: the offline data is missing or not from today, and Windows reports no network.");
+                    MessageBox.Show(this, AddServiceService.MissingText, AddServiceService.MissingCaption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
             }
-            OpenAddWindow(profile);
         }
 
-        // E2: when the download ends, open the wizard only if the caches are now fresh and no Add window is open.
+        private Window? _offlineWaitWindow;
+
+        // E2: "Receiving offline work requirements from Strand, please wait..." until the download ends; the press is
+        // remembered (one flag for any number of presses). The window only informs: OK or closing it hides it, and the
+        // wizard still opens when the download ends (as INSPECT's message box over its wait form).
+        private void WaitForOfflineDataThenAdd()
+        {
+            if (!_addPressedWhileDownloading)
+            {
+                _addPressedWhileDownloading = true;
+                OfflineCacheService.DownloadFinished += OnOfflineDownloadFinishedForAdd;
+                // A download that ended between the gate's check and this subscription raised its event unheard: check
+                // once more on the dispatcher (the handler does nothing while a download is still running).
+                if (!OfflineCacheService.IsDownloading)
+                    OnOfflineDownloadFinishedForAdd();
+            }
+            if (_offlineWaitWindow != null) { _offlineWaitWindow.Activate(); return; }
+            var ok = new Button { Content = "OK", Padding = new Thickness(18, 4, 18, 4), HorizontalAlignment = HorizontalAlignment.Right, IsDefault = true, IsCancel = true };
+            var body = new StackPanel { Margin = new Thickness(18) };
+            body.Children.Add(new TextBlock { Text = AddServiceService.ReceivingText, TextWrapping = TextWrapping.Wrap, FontSize = 14, Margin = new Thickness(0, 0, 0, 12) });
+            body.Children.Add(new ProgressBar { IsIndeterminate = true, Height = 8, Margin = new Thickness(0, 0, 0, 14) });
+            body.Children.Add(ok);
+            var window = new Window
+            {
+                Title = AddServiceService.ReceivingCaption, Owner = this, Content = body, Width = 440, SizeToContent = SizeToContent.Height,
+                ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false
+            };
+            ok.Click += (_, _) => window.Close();
+            window.Closed += (_, _) => { if (ReferenceEquals(_offlineWaitWindow, window)) _offlineWaitWindow = null; };
+            _offlineWaitWindow = window;
+            window.Show();
+        }
+
+        // E2: when the download ends, open the wizard only if the caches are now fresh and no Add window is open;
+        // otherwise the Missing message.
         private void OnOfflineDownloadFinishedForAdd() => Dispatcher.BeginInvoke(new Action(() =>
         {
             if (OfflineCacheService.IsDownloading || !_addPressedWhileDownloading)
                 return;
             OfflineCacheService.DownloadFinished -= OnOfflineDownloadFinishedForAdd;
             _addPressedWhileDownloading = false;
-            if (_addWindow != null)
+            _offlineWaitWindow?.Close();
+            if (_pickerClosed || _addWindow != null)
                 return;
             if (!AddServiceService.CachesReady(DateTime.Now))
             {
+                DiagnosticLogService.Info("Add refused: the offline data could not be downloaded.");
                 MessageBox.Show(this, AddServiceService.MissingText, AddServiceService.MissingCaption, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -381,7 +427,11 @@ namespace InspectionEditor
 
         private void OpenAddWindow(CompleteProfile profile)
         {
-            var window = new AddServiceWindow(profile, InspectorProfileService.Load()?.UserType, StrandWebsiteSession.Default, IsOpenInRed) { Owner = this };
+            // The wizard's job search, forms, reinspection fetch, superintendents and job-files request use the same login as
+            // the offline download, as INSPECT uses its saved login for them: the Strand session, else RED's saved login.
+            // Without one they fall back to the offline lists as before.
+            var session = OfflineCacheService.SessionForDownload(StrandWebsiteSession.Default) ?? StrandWebsiteSession.Default;
+            var window = new AddServiceWindow(profile, InspectorProfileService.Load()?.UserType, session, IsOpenInRed) { Owner = this };
             if (!window.CachesUsable)
             {
                 // R5: a cache that cannot be read counts as missing.
@@ -446,58 +496,7 @@ namespace InspectionEditor
             UpdateFolderViewBar();
         }
 
-        // F-018 A4: Approve from the Review list, in list order; the first failure stops the run.
-        private async Task ShowApproveDialogAsync()
-        {
-            string? root = InspectorProfileService.Load()?.InspectionsFolder;
-            if (string.IsNullOrWhiteSpace(root) || _folderView != FolderView.Review)
-                return;
-            if (!ReviewAccess.Allowed(root))
-            {
-                MessageBox.Show(this, ReviewAccess.ApprovePermissionRefused, "Approve", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            if (StrandSyncService.IsRunning)
-            {
-                MessageBox.Show(this, "Wait for the Sync to finish, then approve.", "Approve", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            // W3: only the Review folder of the Inspections folder, never a folder picked with Browse.
-            if (string.IsNullOrWhiteSpace(_currentFolderPath) ||
-                !string.Equals(Path.GetFullPath(_currentFolderPath).TrimEnd('\\'), Path.GetFullPath(ReviewAccess.ReviewFolder(root)).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show(this, "Approve works only on the Review folder of your Inspections folder. Open the Review view again to approve.", "Approve", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            var chosen = TickedRows("approve");
-            if (chosen == null)
-                return;
-            var profile = ProfileGuard.Require(this, "Approve");
-            if (profile == null)
-                return;
-            if (!SubmitState.IsLiveVerified("Approve") && MessageBox.Show(this,
-                    "This is the first live Approve on this device. The back office has never received an approval flag (F-018 §7 V3). Is the owner present?",
-                    "First live Approve", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
-            var openPaths = Application.Current.Windows.OfType<MainWindow>().Where(w => w.HasOpenInspection).Select(w => w.OpenInspectionFilePath).ToList();
-            _approveButton!.IsEnabled = false;
-            ApproveRunResult run;
-            try
-            {
-                run = await ReviewAccess.ApproveFilesAsync(chosen.Select(r => r.FilePath).ToList(), profile,
-                    InspectorProfileService.Load()?.UserType, path => openPaths.Any(p => PathEquals(p, path)));
-            }
-            finally { _approveButton.IsEnabled = true; }
-            MessageBox.Show(this, run.Summary, "Approve", MessageBoxButton.OK, run.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
-            if (run.Approved > 0 && !SubmitState.IsLiveVerified("Approve") && MessageBox.Show(this,
-                    "Owner: mark the first live Approve on this device as checked (processed by Strand as expected)?\n\nNo asks again next time.",
-                    "First live Approve", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                SubmitState.MarkLiveVerified("Approve");
-            RefreshCurrentMyListFolder();
-            UpdateFolderViewBar();
-        }
-
-        // Owner 2026-10-19: Remove, Move to My List and Approve take the rows ticked in the list (only rows the search
+        // Owner 2026-10-19: Remove and Move to My List take the rows ticked in the list (only rows the search
         // shows), in file-name order as the old pick list had them. Nothing ticked: a hint in the status line, no popup.
         // Only rows of the folder the list now holds count: during a tab switch's load, or after a failed load, the old
         // folder's rows can still be on screen.

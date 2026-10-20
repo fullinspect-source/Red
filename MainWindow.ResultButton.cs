@@ -24,6 +24,7 @@ namespace InspectionEditor
             if (!HeaderSectionsAvailable)
             {
                 ResultButton.Visibility = Visibility.Collapsed;
+                UpdateSignButton();
                 UpdateResultButtonPlacement();
                 return;
             }
@@ -40,6 +41,7 @@ namespace InspectionEditor
             ResultButton.ToolTip = _readOnlyMode ? $"{display.Text}: the result of this read-only report" : $"{display.Text}: tap to set or change the result";
             AutomationProperties.SetName(ResultButton, display.Text);
             ResultButton.Visibility = Visibility.Visible;
+            UpdateSignButton();
             UpdateResultButtonPlacement();
         }
 
@@ -51,8 +53,11 @@ namespace InspectionEditor
                 Dispatcher.BeginInvoke(new Action(UpdateResultButtonPlacement), DispatcherPriority.Loaded);
         }
 
-        // The button sits in the header row beside "Insp Items" when the whole label fits there; in a narrow left panel
-        // (classic mode's 350 px column) it moves to its own line just under the row instead of being cut off.
+        // The button (with Sign beside it, owner 2026-10-20) sits in the header row beside "Insp Items" when both fit
+        // there; in a narrow left panel (classic mode's 350 px column) they move together to their own line just under the
+        // row instead of being cut off.
+        private StackPanel? _narrowResultRow;
+
         private void UpdateResultButtonPlacement()
         {
             if (!_resultPlacementHooked)
@@ -64,13 +69,14 @@ namespace InspectionEditor
                     part.SizeChanged += ChecklistHeaderDock_SizeChanged;
             }
             double available = ChecklistHeaderDock.ActualWidth;
+            bool onNarrowLine = _narrowResultRow != null && ResultButton.Parent == _narrowResultRow;
             bool narrow = false;
             if (ResultButton.Visibility == Visibility.Visible && available > 0)
             {
                 double used = 0;
                 foreach (UIElement child in ChecklistHeaderDock.Children)
                 {
-                    if (child == ResultButton || child == ChangedFieldsNotice || child == MegaStatsButton ||
+                    if (child == ResultButton || child == SignButton || child == ChangedFieldsNotice || child == MegaStatsButton ||
                         child == DesignExtractionButton || child.Visibility == Visibility.Collapsed)
                         continue;
                     child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -78,23 +84,35 @@ namespace InspectionEditor
                 }
                 ResultButton.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 // DesiredSize includes the margin, which is 0 on the narrow line and 14 in the row.
-                used += ResultButton.DesiredSize.Width + (ResultButton.Parent == ResultButtonNarrowHost ? 14 : 0);
+                used += ResultButton.DesiredSize.Width + (onNarrowLine ? 14 : 0);
+                if (SignButton.Visibility == Visibility.Visible)
+                {
+                    SignButton.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    used += SignButton.DesiredSize.Width; // its 8 px margin is the same in both places
+                }
                 narrow = used > available;
             }
 
-            if (narrow && ResultButton.Parent != ResultButtonNarrowHost)
+            if (narrow && !onNarrowLine)
             {
                 ChecklistHeaderDock.Children.Remove(ResultButton);
+                ChecklistHeaderDock.Children.Remove(SignButton);
                 ResultButton.Margin = new Thickness(0);
-                ResultButtonNarrowHost.Child = ResultButton;
+                _narrowResultRow ??= new StackPanel { Orientation = Orientation.Horizontal };
+                _narrowResultRow.Children.Add(ResultButton);
+                _narrowResultRow.Children.Add(SignButton);
+                ResultButtonNarrowHost.Child = _narrowResultRow;
             }
-            else if (!narrow && ResultButton.Parent == ResultButtonNarrowHost)
+            else if (!narrow && onNarrowLine)
             {
+                _narrowResultRow!.Children.Clear();
                 ResultButtonNarrowHost.Child = null;
                 ResultButton.Margin = new Thickness(14, 0, 0, 0);
-                ChecklistHeaderDock.Children.Insert(ChecklistHeaderDock.Children.IndexOf(TopTextSizeDownButton) + 1, ResultButton);
+                int index = ChecklistHeaderDock.Children.IndexOf(TopTextSizeDownButton) + 1;
+                ChecklistHeaderDock.Children.Insert(index, ResultButton);
+                ChecklistHeaderDock.Children.Insert(index + 1, SignButton);
             }
-            ResultButtonNarrowHost.Visibility = ResultButton.Parent == ResultButtonNarrowHost && ResultButton.Visibility == Visibility.Visible
+            ResultButtonNarrowHost.Visibility = _narrowResultRow != null && ResultButton.Parent == _narrowResultRow && ResultButton.Visibility == Visibility.Visible
                 ? Visibility.Visible : Visibility.Collapsed;
         }
 

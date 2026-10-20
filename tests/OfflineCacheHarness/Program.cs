@@ -226,6 +226,70 @@ static class Harness
                             redLog.Contains("Offline jobs not saved: the Strand session changed during the download"),
                     "an answer that arrives after a sign-out or account change is not saved");
             }
+
+            // ---------- A-020-08 The sign-in event already carries the login (owner tablet test 2026-10-20) ----------
+            {
+                // RED 2.3.3 raised SessionChanged before it stored the password, so the refresh at the first sign-in found no
+                // login and never ran. The API base points at the loopback mock for this check only.
+                var apiBase = typeof(StrandScheduleService).GetField("_apiBase", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+                var sessionCredentials = typeof(StrandScheduleService).GetProperty("SessionCredentials", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+                object? savedBase = apiBase.GetValue(null);
+                apiBase.SetValue(null, mock.Base);
+                mock.Handler = path => path.StartsWith("/api/Auth") ? (200, "{\"AccessToken\":\"mock-token\",\"User\":{\"UserName\":\"mockuser\",\"DisplayName\":\"Mock User\"}}")
+                    : path.StartsWith("/Inspect/User/permissions") ? (200, "[]") : (404, "");
+                bool sawLogin = false, sawWebsiteLogin = false;
+                Action onChanged = () =>
+                {
+                    var (user, password) = ((string, string))sessionCredentials.GetValue(null)!;
+                    sawLogin = user == "mockuser" && password == "mock-password";
+                    sawWebsiteLogin = StrandWebsiteSession.Default.HasCredentials;
+                };
+                StrandScheduleService.SessionChanged += onChanged;
+                try { await StrandScheduleService.SignInAsync("mockuser", "mock-password"); }
+                finally
+                {
+                    StrandScheduleService.SessionChanged -= onChanged;
+                    StrandScheduleService.SignOut();
+                    apiBase.SetValue(null, savedBase);
+                }
+                Check("A-020-08", sawLogin && sawWebsiteLogin, "when SessionChanged fires at sign-in, the username and password are already there (the refresh can run)");
+            }
+
+            // ---------- A-020-09 The download session without an ORDERS sign-in ----------
+            {
+                var notSignedIn = new StrandWebsiteSession(() => mock.Base, () => (null, null));
+                var saved = new StrandCredentials { Username = "saved@example.com", Password = "mock-saved", Source = "RED" };
+                var fromSaved = OfflineCacheService.SessionForDownload(notSignedIn, () => saved);
+                Check("A-020-09", ReferenceEquals(OfflineCacheService.SessionForDownload(session, () => null), session),
+                    "signed in: the signed-in session is used");
+                Check("A-020-09", fromSaved != null && fromSaved.HasCredentials && fromSaved.Username == "saved@example.com" &&
+                                  OfflineCacheService.SessionForDownload(notSignedIn, () => null) == null &&
+                                  OfflineCacheService.SessionForDownload(notSignedIn, () => new StrandCredentials { Username = "saved@example.com" }) == null,
+                    "not signed in: a session of its own on the saved login; none when no complete login is saved");
+                OfflineCacheService.RefuseSavedLoginForThisRun();
+                bool refused = OfflineCacheService.SessionForDownload(notSignedIn, () => saved) == null &&
+                               ReferenceEquals(OfflineCacheService.SessionForDownload(session, () => saved), session);
+                OfflineCacheService.AllowSavedLogin();
+                Check("A-020-09", refused && OfflineCacheService.SessionForDownload(notSignedIn, () => saved) != null,
+                    "after an explicit sign-out in this run the saved login is not used (a signed-in session still is); the next sign-in allows it again");
+            }
+
+            // ---------- A-020-10 A launch refresh on the saved login stops after a sign-out ----------
+            {
+                string launch = Path.Combine(root, "launch");
+                var savedLoginSession = StrandWebsiteSession.ForLoopbackMock(mock.Base, () => ("saved@example.com", "mock-saved")); // not the signed-in Default
+                mock.Handler = path => path.Contains("Forms") ? (200, Forms) : path.Contains("Templates") ? (200, Templates) : (200, Jobs);
+                int before = mock.Requests.Count(r => r.Contains("GetOfflineList") || r.Contains("GetList"));
+                OfflineCacheService.RefuseSavedLoginForThisRun();
+                await OfflineCacheService.AutoRefreshAsync(savedLoginSession, () => DateTime.Now, launch, NoDelay, redLog.Add);
+                int afterRefused = mock.Requests.Count(r => r.Contains("GetOfflineList") || r.Contains("GetList"));
+                bool nothingSaved = !OfflineCacheService.HasAll(launch);
+                OfflineCacheService.AllowSavedLogin();
+                await OfflineCacheService.AutoRefreshAsync(savedLoginSession, () => DateTime.Now, launch, NoDelay, redLog.Add);
+                Check("A-020-10", afterRefused == before && nothingSaved &&
+                                  OfflineCacheService.StaleCaches(DateTime.Now, launch).Count == 0 && redLog.Contains("Offline data download: 3 of 3 saved"),
+                    "refused after a sign-out: no request at all; allowed: the three stale caches are downloaded at once (one RED line with counts)");
+            }
         }
         catch (Exception ex)
         {

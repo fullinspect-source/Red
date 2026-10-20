@@ -20,13 +20,14 @@ namespace InspectionEditor.Services
 
     /// <summary>
     /// F-019 §2 (INSPECT 2026 JobFoldersDeleter): once per launch, in the background after the lists load. A folder
-    /// Jobs\J is orphaned unless a live .ins name starts with J. Live = My List, Outbox, Review and (RED default, owner
-    /// Q-26) Archive. At most 20 per run, links refused at any depth, every line in INSPECT's exact text.
+    /// Jobs\J is orphaned unless a live .ins name starts with J. Live = My List, Outbox and Review, as INSPECT (owner
+    /// 2026-10-20: "no need to save job folders when purged for completed or deleted ins"; Archive does not count, which
+    /// reverses the old Q-26 default). At most 20 per run, links refused at any depth, every line in INSPECT's exact text.
     /// </summary>
     public static class JobFolderPurgeService
     {
         public const int MaxFoldersPerRun = 20;
-        private static readonly InspectFolder[] LiveFolders = { InspectFolder.MyList, InspectFolder.Outbox, InspectFolder.Review, InspectFolder.Archive };
+        public static readonly IReadOnlyList<InspectFolder> LiveFolders = new[] { InspectFolder.MyList, InspectFolder.Outbox, InspectFolder.Review };
 
         // dryRun (V3): lists the candidates only; deletes nothing and writes no line.
         public static JobPurgeResult Run(string inspectionsFolder, InspectLogWriter log, bool dryRun = false, HousekeepingSettings? settings = null)

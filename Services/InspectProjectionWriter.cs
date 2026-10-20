@@ -23,8 +23,8 @@ namespace InspectionEditor.Services
     }
 
     /// <summary>
-    /// F-002 Mode B: the bytes INSPECT2026 itself would write for an inspection (SPEC §4 B1-B7). Used by Submit and
-    /// Approve; never for the ordinary save. Key lists and model defaults follow SAE.Inspect.Models.* and
+    /// F-002 Mode B: the bytes INSPECT2026 itself would write for an inspection (SPEC §4 B1-B7). Used by Submit; never
+    /// for the ordinary save. Key lists and model defaults follow SAE.Inspect.Models.* and
     /// SAE.Inspect.Shared.{Picture,Attachment} in Inspect2026.dll 2026.1012.2.0 (field types read with REA).
     /// </summary>
     public static class InspectProjectionWriter

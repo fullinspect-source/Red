@@ -81,6 +81,7 @@ namespace InspectionEditor
             if (StrandScheduleService.IsSignedIn)
             {
                 EndStrandSession("Signed out of Strand.");
+                OfflineCacheService.RefuseSavedLoginForThisRun(); // F-020 R2a: an explicit sign-out; no download on the saved login until the next sign-in
                 _ordersSignedOutManually = true;
                 return;
             }

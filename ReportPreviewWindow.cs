@@ -84,13 +84,7 @@ namespace InspectionEditor
             var root = new DockPanel();
             DockPanel.SetDock(bar, Dock.Top);
             root.Children.Add(bar);
-            root.Children.Add(new ScrollViewer
-            {
-                Content = _pages,
-                Background = new SolidColorBrush(Color.FromRgb(96, 96, 96)),
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-            });
+            root.Children.Add(Pages = TouchScroller(_pages));
             Content = root;
             Loaded += async (_, _) => await RenderAsync();
             Closed += (_, _) =>
@@ -114,6 +108,30 @@ namespace InspectionEditor
         }
 
         private static Button Tool(string text) => new() { Content = text, Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(6, 0, 0, 0) };
+
+        public ScrollViewer Pages { get; }
+
+        // Owner tablet test 2026-10-20: the pages scroll with a finger swipe (not only with the scroll bar), keep gliding
+        // after a flick (inertia), and the window does not bounce at the first or last page. Press-and-hold and flick
+        // gestures are off here, so a slow swipe is never taken for a right-click and a fast one never for a back/forward
+        // command.
+        public static ScrollViewer TouchScroller(UIElement content)
+        {
+            var scroller = new ScrollViewer
+            {
+                Content = content,
+                Background = new SolidColorBrush(Color.FromRgb(96, 96, 96)),
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                PanningMode = PanningMode.VerticalFirst,
+                PanningDeceleration = 0.001, // DIP per ms², WPF's default glide
+                PanningRatio = 1
+            };
+            System.Windows.Input.Stylus.SetIsPressAndHoldEnabled(scroller, false);
+            System.Windows.Input.Stylus.SetIsFlicksEnabled(scroller, false);
+            scroller.ManipulationBoundaryFeedback += (_, e) => e.Handled = true;
+            return scroller;
+        }
 
         private ReportOptions CurrentOptions => new(_defectsOnly.IsChecked == true, _pictures.IsChecked == true, _attachments.IsChecked == true);
 

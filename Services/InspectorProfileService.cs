@@ -48,7 +48,7 @@ namespace InspectionEditor.Services
         public override string ToString() => $"{Label}: {Old} -> {New}";
     }
 
-    // A profile that passed the F-003 O9 guard: what Submit, Approve and Add need to file and stamp an inspection (O6).
+    // A profile that passed the F-003 O9 guard: what Submit and Add need to file and stamp an inspection (O6).
     public sealed record CompleteProfile(string Folder, InspectUserKind Kind, string InspectorName, string Username, string Phone, string DefaultState);
 
     public static class InspectorProfileService
@@ -321,7 +321,7 @@ namespace InspectionEditor.Services
 
         public static bool IsCompleteNow() => IsComplete(Load(), StrandCredentialService.LoadSaved());
 
-        // The O9 profile guard. Submit (F-013), Approve (F-018) and every Add (F-001, F-021, F-025) call it, through
+        // The O9 profile guard. Submit (F-013) and every Add (F-001, F-021, F-025) call it, through
         // ProfileGuard.Require, before they act. Null means: refuse with InspectUserType.ProfileIncompleteMessage and open
         // Settings. It checks O9's three items only (owner, 2026-10-18): a Strand username with @, a two-word
         // InspectorName and a non-blank UserType. The start-up lock keeps its six (MissingItems); callers check the

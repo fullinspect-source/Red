@@ -39,16 +39,8 @@ namespace InspectionEditor
                 if (TryFindResource("QuietButtonStyle") is Style purgeStyle) purgeDryRun.Style = purgeStyle;
                 purgeDryRun.Click += (_, _) => ShowPurgeDryRun();
                 int index = panel.Children.IndexOf(ArchiveRetentionRefusalText) + 1;
-                if (!settings.LiveCleanupVerified)
-                {
-                    // App.ArchiveCleanupAllowed: launch deletions wait for the owner's supervised check.
-                    panel.Children.Insert(index, new TextBlock
-                    {
-                        Text = "Archive cleanup starts after the owner's first supervised check. Until then RED deletes nothing at start.",
-                        TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 4, 0, 0),
-                        Foreground = System.Windows.Media.Brushes.DimGray
-                    });
-                }
+                // Owner 2026-10-20: the Archive cleanup and the job-folder purge both run at start (each behind its switch
+                // above); there is no supervised-check note any more.
                 // F-020 R2/R4: forced Download Offline Data.
                 var offline = new Button { Content = "Download Offline Data", Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 4, 10, 4) };
                 if (TryFindResource("QuietButtonStyle") is Style offlineStyle) offline.Style = offlineStyle;
@@ -116,7 +108,7 @@ namespace InspectionEditor
                 ? "The purge would decline: the live inspections could not be established, or there are none."
                 : result.Orphaned == 0
                     ? $"{result.Present} job folder(s) present, none orphaned. Nothing would be removed."
-                    : $"{result.Orphaned} of {result.Present} job folder(s) have no inspection in My List, Outbox, Review or Archive. " +
+                    : $"{result.Orphaned} of {result.Present} job folder(s) have no inspection in My List, Outbox or Review. " +
                       $"The next start would remove {result.Taken}: {string.Join(", ", result.Candidates)}. Nothing was changed.";
             MessageBox.Show(this, text, "Job folder purge check", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -134,7 +126,7 @@ namespace InspectionEditor
                     ? "There is no Archive folder."
                     : result.Declined
                         ? "The Archive folder could not be read."
-                        : $"Archive retention {result.Days} days: {result.Total} file(s) last changed on or before {result.Cutoff:M/d/yyyy h:mm:ss tt}. " +
+                        : $"Archive retention {result.Days} days, and RED keeps one day more: {result.Total} file(s) last changed on or before {result.Cutoff:M/d/yyyy}. " +
                           $"The next start would remove {result.Taken}. Nothing was changed.";
             MessageBox.Show(this, text, "Archive cleanup check", MessageBoxButton.OK, MessageBoxImage.Information);
         }

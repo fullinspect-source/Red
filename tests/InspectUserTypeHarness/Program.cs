@@ -350,12 +350,13 @@ try
     Check(days == 8 && InspectLiveSettings.ArchiveRetentionLine(days, DateTime.Today).StartsWith("Archive retention: 8 days (from INSPECT's settings).") &&
           InspectLiveSettings.ArchiveRetentionRefusal(days) == null,
         "A-003-01: Settings line \"Archive retention: 8 days (from INSPECT's settings).\", read live");
-    // F-015 N4 in full (owner, 2026-10-18), with A-015's today 2026-10-17 and cutoff date 10/9/2026.
+    // F-015 N4 in full (owner, 2026-10-18; one day more than INSPECT, owner 2026-10-20), with A-015's today 2026-10-17
+    // and cutoff date 10/8/2026.
     var a015Today = new DateTime(2026, 10, 17, 21, 25, 56);
     Check(InspectLiveSettings.ArchiveRetentionLine(8, a015Today) ==
-          "Archive retention: 8 days (from INSPECT's settings). At each start RED deletes archived inspections last changed on or before " +
-          "10/9/2026, as INSPECT does. They are removed from every device that shares this Dropbox folder.",
-        "N4: the full Settings text with the cutoff date today - N");
+          "Archive retention: 8 days (from INSPECT's settings). RED keeps one day more than INSPECT: at each start it deletes archived inspections " +
+          "last changed on or before 10/8/2026. They are removed from every device that shares this Dropbox folder.",
+        "N4: the full Settings text with the cutoff date today - (N + 1)");
     Check(InspectLiveSettings.ArchiveRetentionLine(0, a015Today) == "Archive retention: 0 days (from INSPECT's settings)." &&
           InspectLiveSettings.ArchiveRetentionLine(-5, a015Today) == "Archive retention: -5 days (from INSPECT's settings).",
         "N2/N4: with 0 or fewer days RED does not clean, so no deletion sentence");

@@ -255,9 +255,8 @@ static class Harness
 
         // ---------- W2/W3 messages ----------
         Check("W2", InspectionValidator.SubmitRefused == "Cannot submit inspection. You need to fix one or more problems with the inspection." &&
-                    InspectionValidator.ApproveRefused == "Cannot approve inspection. You need to fix one or more problems with the inspection." &&
                     InspectionValidator.PrintRefused == "Cannot print inspection. You need to fix one or more problems with the inspection.",
-            "Submit, Approve and Print refusal texts");
+            "Submit and Print refusal texts (no Approve, owner 2026-10-20)");
 
         Console.WriteLine();
         Console.WriteLine($"F-012 harness: {_passed} passed, {_failed} failed");

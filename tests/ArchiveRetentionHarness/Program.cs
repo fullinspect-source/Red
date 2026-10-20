@@ -67,11 +67,11 @@ static class Harness
         // ---------- A-015-02 Date rule ----------
         using (var box = new Box())
         {
-            string a = box.File_("a.ins", new DateTime(2026, 10, 9, 23, 59, 0));
-            string b = box.File_("b.ins", new DateTime(2026, 10, 10, 0, 1, 0));
+            string a = box.File_("a.ins", new DateTime(2026, 10, 8, 23, 59, 0));
+            string b = box.File_("b.ins", new DateTime(2026, 10, 9, 0, 1, 0));
             string c = box.File_("c.ins", new DateTime(2026, 10, 1, 8, 0, 0));
             box.Run();
-            Check("A-015-02", !File.Exists(a) && File.Exists(b) && !File.Exists(c), "10/9 23:59 and 10/1 deleted; 10/10 00:01 kept (calendar date rule)");
+            Check("A-015-02", !File.Exists(a) && File.Exists(b) && !File.Exists(c), "N = 8, RED keeps 9 days: 10/8 23:59 and 10/1 deleted; 10/9 00:01 kept (calendar date rule)");
         }
 
         // ---------- A-015-03 Top level only ----------
@@ -95,7 +95,7 @@ static class Harness
             string folder = box.Archive;
             Check("A-015-04", first.Removed == 200 && remaining.Count == 580 && remaining[0] == "0200.ins",
                 "the 200 oldest are deleted, no question asked (A-015-13)");
-            Check("A-015-04", Regex.IsMatch(log, @"^2026-10-17 21:25:56\.\d{4} \| Info \| " + Regex.Escape($"Archive cleanup: 780 file(s) in {folder} older than 10/9/2026 9:25:56 PM; removing 200 this run, 580 left for the next launch") + "\r$", RegexOptions.Multiline) &&
+            Check("A-015-04", Regex.IsMatch(log, @"^2026-10-17 21:25:56\.\d{4} \| Info \| " + Regex.Escape($"Archive cleanup: 780 file(s) in {folder} older than 10/8/2026 9:25:56 PM; removing 200 this run, 580 left for the next launch") + "\r$", RegexOptions.Multiline) &&
                               Regex.IsMatch(log, @"\| Info \| " + Regex.Escape("Archive cleanup: removed 200 file(s), 0 failed, 580 left for the next launch") + "\r$", RegexOptions.Multiline),
                 "INSPECT's two lines, character for character");
             byte[] raw = File.ReadAllBytes(box.Log.FileFor(Now));
@@ -156,7 +156,7 @@ static class Harness
             for (int i = 0; i < 5; i++) box.File_($"{i}.ins", new DateTime(2026, 10, 1).AddHours(i));
             box.File_("new.ins", new DateTime(2026, 10, 15));
             var result = box.Run(dryRun: true);
-            Check("A-015-11", result.Total == 5 && result.Cutoff == Now.AddDays(-8) && Directory.GetFiles(box.Archive).Length == 6 &&
+            Check("A-015-11", result.Total == 5 && result.Cutoff == Now.AddDays(-9) && Directory.GetFiles(box.Archive).Length == 6 &&
                               !File.Exists(box.Log.FileFor(Now)) && box.RedOnly.Count == 0,
                 "the dry run counts 5 candidates and the cutoff; nothing deleted, no log line");
         }
@@ -166,8 +166,8 @@ static class Harness
         {
             string old = box.File_("old.ins", new DateTime(2025, 9, 1));
             box.Run();
-            Check("A-015-12", !File.Exists(old) && box.LogText.Contains("older than 9/12/2025 9:25:56 PM; removing 1 this run"),
-                "400 days: the 9/1/2025 file goes; the line reads \"older than 9/12/2025 9:25:56 PM\"");
+            Check("A-015-12", !File.Exists(old) && box.LogText.Contains("older than 9/11/2025 9:25:56 PM; removing 1 this run"),
+                "400 days (RED keeps 401): the 9/1/2025 file goes; the line reads \"older than 9/11/2025 9:25:56 PM\"");
         }
 
         // ---------- A-015-15 / A-015-17 N read live, fallbacks ----------
@@ -177,7 +177,7 @@ static class Harness
             Check("A-015-15", InspectLiveSettings.ReadArchiveRetention(box.IF) == 8, "N = 8 at this launch");
             File.WriteAllText(config, "{\"ArchiveRetention\":40}");
             var result = box.Run(dryRun: true);
-            Check("A-015-15", result.Days == 40 && result.Cutoff == new DateTime(2026, 9, 7, 21, 25, 56), "after INSPECT's value changes to 40: cutoff 9/7/2026 9:25:56 PM");
+            Check("A-015-15", result.Days == 40 && result.Cutoff == new DateTime(2026, 9, 6, 21, 25, 56), "after INSPECT's value changes to 40: cutoff 9/6/2026 9:25:56 PM (40 + 1 days)");
             File.WriteAllText(config, "{\"Other\":1}");
             Check("A-015-17", InspectLiveSettings.ReadArchiveRetention(box.IF) == 40, "(a) no key: 40");
             File.WriteAllText(config, "{not json");
@@ -207,7 +207,7 @@ static class Harness
         {
             box.File_("new.ins", new DateTime(2026, 10, 10));
             box.Run();
-            Check("A-015-19", box.LogText.Contains($"| Info | Archive cleanup: nothing in {box.Archive} older than 10/9/2026 9:25:56 PM") &&
+            Check("A-015-19", box.LogText.Contains($"| Info | Archive cleanup: nothing in {box.Archive} older than 10/8/2026 9:25:56 PM") &&
                               Directory.GetFiles(box.Archive).Length == 1, "(b) nothing older than the cutoff");
         }
 
@@ -239,10 +239,58 @@ static class Harness
                 "while the file is held, the entry waits in RED's queue; the next write appends it first, then its own; INSPECT's line untouched");
         }
 
+        // ---------- A-015-21 / A-015-22 Owner 2026-10-20: RED keeps one day more than INSPECT (setting 5) ----------
+        foreach (var at in new[] { new DateTime(2026, 10, 20, 0, 0, 30), new DateTime(2026, 10, 20, 10, 0, 0), new DateTime(2026, 10, 20, 23, 59, 30) })
+        {
+            using var box = new Box(retention: 5);
+            // Counting today (10/20) as day 1: 10/16 is the 5th day, 10/15 the 6th, 10/14 the 7th, 10/13 the 8th.
+            string day5 = box.File_("day5.ins", new DateTime(2026, 10, 16, 0, 0, 0));
+            string day6early = box.File_("day6-early.ins", new DateTime(2026, 10, 15, 0, 0, 1));
+            string day6late = box.File_("day6-late.ins", new DateTime(2026, 10, 15, 23, 59, 59));
+            string day7late = box.File_("day7-late.ins", new DateTime(2026, 10, 14, 23, 59, 59));
+            string day7early = box.File_("day7-early.ins", new DateTime(2026, 10, 14, 0, 0, 1));
+            string day8 = box.File_("day8.ins", new DateTime(2026, 10, 13, 12, 0, 0));
+            var result = ArchiveRetentionService.Run(box.IF, new InspectLogWriter(box.Logs, box.Queue, () => at), at, redOnlyLog: box.RedOnly.Add, settings: new HousekeepingSettings());
+            Check("A-015-21", File.Exists(day5) && File.Exists(day6early) && File.Exists(day6late) && !File.Exists(day7late) && !File.Exists(day7early) && !File.Exists(day8) &&
+                              result.Days == 5 && result.Removed == 3 && result.Cutoff.Date == new DateTime(2026, 10, 14),
+                $"setting 5 at {at:HH:mm:ss} on 10/20: 5- and 6-day-old files (10/16, 10/15) kept; from day 7 (10/14 and older) deleted");
+        }
+        {
+            var at = new DateTime(2026, 10, 20, 10, 0, 0);
+            Check("A-015-22", ArchiveRetentionService.ExtraDays == 1 && ArchiveRetentionService.CutoffFor(at, 5) == new DateTime(2026, 10, 14, 10, 0, 0) &&
+                              InspectLiveSettings.ArchiveRetentionLine(5, at) == "Archive retention: 5 days (from INSPECT's settings). RED keeps one day more than INSPECT: " +
+                              "at each start it deletes archived inspections last changed on or before 10/14/2026. They are removed from every device that shares this Dropbox folder.",
+                "the cutoff is INSPECT's rule with one day more (10/14/2026 10:00:00 AM); Settings names 10/14/2026");
+            using var box = new Box(retention: 5);
+            box.File_("day7.ins", new DateTime(2026, 10, 14, 9, 0, 0));
+            var log = new InspectLogWriter(box.Logs, box.Queue, () => at);
+            ArchiveRetentionService.Run(box.IF, log, at, redOnlyLog: box.RedOnly.Add, settings: new HousekeepingSettings());
+            string text = File.Exists(log.FileFor(at)) ? File.ReadAllText(log.FileFor(at)) : "";
+            Check("A-015-22", text.Contains($"Archive cleanup: 1 file(s) in {box.Archive} older than 10/14/2026 10:00:00 AM; removing 1 this run, 0 left for the next launch"),
+                "INSPECT's log line names the shifted cutoff");
+        }
+
+        // ---------- A-015-23 / A-019-22 Gates (owner 2026-10-20): Archive cleanup and job-folder purge run; the log prune waits ----------
+        {
+            var fresh = new HousekeepingSettings();
+            Check("A-015-23", HousekeepingGates.ArchiveCleanup(devBuild: false, devHousekeeping: false) &&
+                              !HousekeepingGates.ArchiveCleanup(devBuild: true, devHousekeeping: false) &&
+                              HousekeepingGates.ArchiveCleanup(devBuild: true, devHousekeeping: true),
+                "installed RED cleans the Archive with no supervised check; a dev build only with RED_DEV_HOUSEKEEPING=1");
+            Check("A-019-22", HousekeepingGates.JobFolderPurge(devBuild: false, devHousekeeping: false) &&
+                              !HousekeepingGates.JobFolderPurge(devBuild: true, devHousekeeping: false) &&
+                              HousekeepingGates.JobFolderPurge(devBuild: true, devHousekeeping: true) && fresh.PurgeJobFolders,
+                "installed RED purges job folders with no supervised check (its own switch, on by default); a dev build only with RED_DEV_HOUSEKEEPING=1");
+            Check("A-019-22", !HousekeepingGates.DropboxLogPrune(fresh, devHousekeeping: false) &&
+                              HousekeepingGates.DropboxLogPrune(new HousekeepingSettings { LiveCleanupVerified = true }, devHousekeeping: false) &&
+                              HousekeepingGates.DropboxLogPrune(fresh, devHousekeeping: true),
+                "the Dropbox log prune (no owner decision) still waits for LiveCleanupVerified");
+        }
+
         // ---------- Live-risk gate and settings safety ----------
         using (var box = new Box())
         {
-            Check("GATE", !new HousekeepingSettings().LiveCleanupVerified, "launch deletions wait for the owner: LiveCleanupVerified is off by default");
+            Check("GATE", !new HousekeepingSettings().LiveCleanupVerified, "the Dropbox log prune waits for the owner: LiveCleanupVerified is off by default");
             File.WriteAllText(Path.Combine(box.Root, "housekeeping.json"), "{ not json");
             var broken = HousekeepingSettings.Load(box.Root);
             Check("GATE", broken.ReadFailed && !broken.CleanArchive && !broken.PurgeJobFolders && !broken.LiveCleanupVerified,

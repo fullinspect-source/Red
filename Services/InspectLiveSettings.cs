@@ -21,15 +21,25 @@ namespace InspectionEditor.Services
         public const int DefaultDropboxLogRetention = 10;
         public static int ReadDropboxLogRetention(string? inspectionsFolder) =>
             ReadInt(inspectionsFolder, "DropboxLogRetention", DefaultDropboxLogRetention);
-        // F-015 N4, shown in full before the cleanup exists (owner, 2026-10-18). The cutoff date is today - N. With 0 or
-        // fewer days (N2: RED does not clean) or a cutoff before year 1, only the first sentence is shown.
+        // F-015 (owner, 2026-10-20): RED keeps one day more than INSPECT. Its cutoff is INSPECT's for ArchiveRetention + 1:
+        // now - (N + 1) days, and files last changed on or before that calendar date go. Before year 1: no cutoff.
+        public const int ArchiveExtraDays = 1;
+
+        public static DateTime ArchiveCutoff(DateTime now, int days)
+        {
+            try { return now.AddDays(-((long)days + ArchiveExtraDays)); }
+            catch (ArgumentOutOfRangeException) { return DateTime.MinValue; }
+        }
+
+        // F-015 N4. The cutoff date is today - (N + 1). With 0 or fewer days (N2: RED does not clean) or a cutoff before
+        // year 1, only the first sentence is shown.
         public static string ArchiveRetentionLine(int days, DateTime today)
         {
             string line = $"Archive retention: {days} days (from INSPECT's settings).";
-            if (days <= 0 || days > (today.Date - DateTime.MinValue).Days)
+            if (days <= 0 || (long)days + ArchiveExtraDays > (today.Date - DateTime.MinValue).Days)
                 return line;
-            string cutoff = today.Date.AddDays(-days).ToString("M/d/yyyy", CultureInfo.InvariantCulture);
-            return line + $" At each start RED deletes archived inspections last changed on or before {cutoff}, as INSPECT does." +
+            string cutoff = ArchiveCutoff(today.Date, days).ToString("M/d/yyyy", CultureInfo.InvariantCulture);
+            return line + $" RED keeps one day more than INSPECT: at each start it deletes archived inspections last changed on or before {cutoff}." +
                    " They are removed from every device that shares this Dropbox folder.";
         }
 

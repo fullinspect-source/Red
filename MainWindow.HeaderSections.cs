@@ -490,7 +490,8 @@ namespace InspectionEditor
             return node;
         }
 
-        private void OpenHeaderSectionWindow(bool top)
+        // focusKey: a header field to scroll to once the window shows (the problem list's Go to, the Sign button).
+        private void OpenHeaderSectionWindow(bool top, string? focusKey = null)
         {
             if (!HeaderSectionsAvailable)
                 return;
@@ -504,8 +505,14 @@ namespace InspectionEditor
                 Width = 640,
                 Height = top ? 760 : 460,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Content = new ScrollViewer { Content = new Border { Padding = new Thickness(14), Child = body }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }
+                Content = new ScrollViewer { Content = new Border { Padding = new Thickness(14), Child = body }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, PanningMode = PanningMode.VerticalFirst }
             };
+            if (focusKey != null)
+                window.Loaded += (_, _) =>
+                {
+                    if (_headerMarkerBlocks.TryGetValue(focusKey, out var marker))
+                        (marker.Parent as FrameworkElement ?? marker).BringIntoView();
+                };
             window.ShowDialog();
             ClearHeaderSectionState();
             PopulateTreeView(SearchFilterBox.Text);

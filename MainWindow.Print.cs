@@ -18,7 +18,9 @@ namespace InspectionEditor
                 return;
             _printButton = new Button { Content = "🖨 Print", IsEnabled = false, ToolTip = "Preview, print, save or e-mail this report" };
             _printButton.Click += (_, _) => PrintCurrentReport();
-            int index = _submitButton != null ? panel.Children.IndexOf(_submitButton) + 1 : panel.Children.IndexOf(SaveFileButton) + 1;
+            // Open, Save, Submit (+ its hint), Check, Print, History.
+            UIElement? after = (UIElement?)_completionCheckButton ?? (UIElement?)_submitHint ?? _submitButton;
+            int index = after != null ? panel.Children.IndexOf(after) + 1 : panel.Children.IndexOf(SaveFileButton) + 1;
             panel.Children.Insert(index, _printButton);
         }
 

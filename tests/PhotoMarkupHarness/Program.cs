@@ -1,5 +1,5 @@
 // F-023 markup editor, import, camera roll and "never reprocess" checks (program/features/F-023-photo-parity/ACCEPTANCE.md
-// A-023-01..07, A-023-15). The editor runs on an STA thread without being shown; synthetic images only.
+// A-023-01..07, A-023-15, A-023-16b). The editor runs on an STA thread without being shown; synthetic images only.
 //   dotnet run -p:Platform=x64
 using System.IO;
 using System.Text;
@@ -53,6 +53,15 @@ static class Harness
     {
         int i = (y * image.W + x) * 4;
         return (image.Bgra[i + 2], image.Bgra[i + 1], image.Bgra[i]);
+    }
+
+    // The APPn marker bytes before the first scan (0xE0 JFIF, 0xE1 EXIF/XMP, 0xE2 ICC, 0xED IPTC).
+    private static List<byte> AppMarkers(byte[] jpeg)
+    {
+        var markers = new List<byte>();
+        for (int i = 2; i + 3 < jpeg.Length && jpeg[i] == 0xFF && jpeg[i + 1] != 0xDA; i += 2 + ((jpeg[i + 2] << 8) | jpeg[i + 3]))
+            if (jpeg[i + 1] >= 0xE0 && jpeg[i + 1] <= 0xEF) markers.Add(jpeg[i + 1]);
+        return markers;
     }
 
     private static IEnumerable<Point> Line(double x1, double y1, double x2, double y2, int steps = 30) =>
@@ -234,6 +243,22 @@ static class Harness
             cancelled.Close();
             Check("A-023-15", images.Count == 2 && images[0] == oldRed && images[1] == inspect && (string?)after["Sections"]![0]!["Items"]![1]!["Comments"] == "unrelated edit" && untouched,
                 "open, unrelated edit and save leave both pictures' Image bytes unchanged; an editor opened and cancelled returns the same bytes");
+
+            // ---------- A-023-16b The photo editor keeps no metadata (owner Q-A 2026-10-20) ----------
+            var meta = new BitmapMetadata("jpg") { CameraManufacturer = "TestCam", DateTaken = "10/20/2026 09:15:00" };
+            var tagged = new JpegBitmapEncoder { QualityLevel = 90 };
+            tagged.Frames.Add(BitmapFrame.Create(BitmapFrame.Create(new MemoryStream(photo)), null, meta, null));
+            byte[] withExif;
+            using (var s = new MemoryStream()) { tagged.Save(s); withExif = s.ToArray(); }
+            var adjust = Editor(withExif);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            typeof(ImageEditorWindow).GetField("_gamma", flags)!.SetValue(adjust, 0.8f); // a brightness lift, as the gesture sets it
+            typeof(ImageEditorWindow).GetMethod("ApplyAdjustmentsPreview", flags)!.Invoke(adjust, null);
+            byte[] adjusted = (byte[])typeof(ImageEditorWindow).GetField("_currentImageBytes", flags)!.GetValue(adjust)!;
+            adjust.Close();
+            Check("A-023-16b", AppMarkers(withExif).Contains(0xE1) && !adjusted.AsSpan().SequenceEqual(withExif) &&
+                               !AppMarkers(adjusted).Any(m => m is 0xE1 or 0xE2 or 0xED),
+                $"a brightness-adjusted photo is saved with no APP1/APP2/APP13 segment (source markers {string.Join(",", AppMarkers(withExif).Select(m => m.ToString("X2")))}; output {string.Join(",", AppMarkers(adjusted).Select(m => m.ToString("X2")))})");
         }
         catch (Exception ex)
         {

@@ -106,15 +106,16 @@
 
         <!-- Top Menu Bar -->
         <Border Grid.Row="0" Background="#8B0000" Padding="8">
-            <Grid>
+            <Grid x:Name="TopBarGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: Buttons -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <!-- Left: Buttons. Owner tablet test 2026-10-20: a WrapPanel whose MaxWidth follows the visible window width
+                     (MainWindow.Submit.cs), so on a narrow screen the buttons wrap to a second line instead of being cut off. -->
+                <WrapPanel x:Name="EditorToolbar" Grid.Column="0" Orientation="Horizontal">
                     <Button x:Name="OpenFileButton" Content="📂 _Open INS" Click="OpenFileButton_Click" Background="#A52A2A" Foreground="White" BorderThickness="0" TabIndex="100"/>
                     <Button x:Name="SaveFileButton" Content="💾 _Save" Click="SaveFileButton_Click" Background="#228B22" Foreground="White" BorderThickness="0" IsEnabled="False" TabIndex="101"/>
 
@@ -124,7 +125,7 @@
                     <Button x:Name="SaveTemplateButton" Content="📤 Save _Template" Click="SaveTemplateButton_Click" Background="#A23B72" Foreground="White" BorderThickness="0" IsEnabled="False" ToolTip="Save current values as a template (Alt+T)" TabIndex="103"/>
 
                     <!-- Settings button removed - API key set via settings.txt -->
-                </StackPanel>
+                </WrapPanel>
 
                 <!-- Center: File info -->
                 <TextBlock x:Name="FileNameText" Grid.Column="1" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="13" FontWeight="Bold"
@@ -302,6 +303,42 @@
                                             </Trigger>
                                             <Trigger Property="IsPressed" Value="True">
                                                 <Setter TargetName="ResultChrome" Property="Opacity" Value="0.75"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <!-- Owner tablet test 2026-10-20: "Sign" beside the result button; a tap opens the End section at the
+                                 inspector signature (MainWindow.Signature.cs). It moves with the result button to the line below. -->
+                            <Button x:Name="SignButton"
+                                    DockPanel.Dock="Left"
+                                    Visibility="Collapsed"
+                                    Click="SignButton_Click"
+                                    MinHeight="44"
+                                    MinWidth="80"
+                                    Margin="8,0,0,0"
+                                    Padding="14,6"
+                                    FontSize="14"
+                                    FontWeight="Bold"
+                                    VerticalAlignment="Center"
+                                    IsTabStop="False"
+                                    AutomationProperties.AutomationId="SignButton">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="SignChrome"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="6"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="SignChrome" Property="Opacity" Value="0.88"/>
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="SignChrome" Property="Opacity" Value="0.75"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>

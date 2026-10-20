@@ -23,7 +23,6 @@ namespace InspectionEditor.Services
     public static class InspectionValidator
     {
         public const string SubmitRefused = "Cannot submit inspection. You need to fix one or more problems with the inspection.";
-        public const string ApproveRefused = "Cannot approve inspection. You need to fix one or more problems with the inspection.";
         public const string PrintRefused = "Cannot print inspection. You need to fix one or more problems with the inspection.";
         public const string FeeReasonText = "Must provide a reason for Other Fee.";
         public const string FeeRuleSkippedText = "Fee rule not checked on this device";

@@ -2386,7 +2386,7 @@ namespace InspectionEditor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditTooltip)));
         }
 
-        // Owner 2026-10-19: the row's tick box (Remove, Move to My List, Approve act on ticked rows).
+        // Owner 2026-10-19: the row's tick box (Remove and Move to My List act on ticked rows).
         private bool _isChecked;
         public bool IsChecked
         {

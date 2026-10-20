@@ -4,7 +4,7 @@ using InspectionEditor.Services;
 
 namespace InspectionEditor
 {
-    // F-003 O9: the one call Submit (F-013), Approve (F-018) and every Add (F-001, F-021, F-025) make before they act.
+    // F-003 O9: the one call Submit (F-013) and every Add (F-001, F-021, F-025) make before they act.
     // It returns the complete profile, or refuses with "Complete your inspector profile in RED Settings first." and opens
     // Settings. Editing is never blocked.
     internal static class ProfileGuard

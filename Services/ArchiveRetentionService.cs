@@ -27,8 +27,9 @@ namespace InspectionEditor.Services
     {
         public bool CleanArchive { get; set; } = true;
         public bool PurgeJobFolders { get; set; } = true;
-        // Live-risk gate (program release policy): launch deletions in the shared Archive and Jobs folders wait for the
-        // owner's supervised check (F-015 V2, F-019 V-checks). Only the owner sets this, in housekeeping.json.
+        // Live-risk gate (program release policy, owner Q-55): the Dropbox log prune waits for the owner's supervised check.
+        // Only the owner sets this, in housekeeping.json. Since 2026-10-20 the Archive cleanup and the job-folder purge no
+        // longer wait for it (owner decisions).
         public bool LiveCleanupVerified { get; set; }
         // A settings file that exists but cannot be read turns everything off for that launch: a user's "off" is never
         // silently replaced by the "on" defaults.
@@ -55,19 +56,41 @@ namespace InspectionEditor.Services
         }
     }
 
+    // Which launch deletions may run in this build (App.Housekeeping). Owner 2026-10-20: the Archive cleanup and the
+    // job-folder purge run in every installed RED, each behind its own switch; the Dropbox log prune (no owner decision)
+    // keeps waiting for the owner's supervised check. A dev build (Red2Dev) deletes from shared folders only with
+    // RED_DEV_HOUSEKEEPING=1.
+    public static class HousekeepingGates
+    {
+        public static bool ArchiveCleanup(bool devBuild, bool devHousekeeping) => !devBuild || devHousekeeping;
+
+        public static bool JobFolderPurge(bool devBuild, bool devHousekeeping) => !devBuild || devHousekeeping;
+
+        public static bool DropboxLogPrune(HousekeepingSettings settings, bool devHousekeeping) =>
+            devHousekeeping || (settings.LiveCleanupVerified && !settings.ReadFailed);
+    }
+
     // F-015 Archive retention (INSPECT 2026 ArchiveFilesDeleter): once per launch, before the Archive list is read.
     public static class ArchiveRetentionService
     {
         public const int MaxFilesPerRun = 200;
+        // Owner 2026-10-20: RED keeps one day more than INSPECT. It applies INSPECT's own rule as if the setting were N + 1,
+        // so with N = 5 on 10/20 it keeps files last changed on 10/15 or later (counting today as day 1: the 5- and 6-day-old
+        // files) and deletes those changed on 10/14 or earlier (from day 7). INSPECT, where it also runs, still deletes from
+        // day 6.
+        public const int ExtraDays = InspectLiveSettings.ArchiveExtraDays;
 
         public static string RefusedLine(int days) => $"Archive cleanup refused: Archive retention is {days} days; RED needs 1 or more.";
+
+        // Owner 2026-10-20: the cutoff for INSPECT's setting n, one day earlier than INSPECT's own (now - (n + 1) days).
+        public static DateTime CutoffFor(DateTime now, int days) => InspectLiveSettings.ArchiveCutoff(now, days);
 
         // dryRun (V1): computes the candidates and the cutoff only; deletes nothing and writes no log line.
         public static ArchiveCleanupResult Run(string inspectionsFolder, InspectLogWriter log, DateTime now, bool dryRun = false,
             Action<string>? redOnlyLog = null, int? days = null, HousekeepingSettings? settings = null)
         {
             int n = days ?? InspectLiveSettings.ReadArchiveRetention(inspectionsFolder); // N1, read live at each launch
-            var result = new ArchiveCleanupResult { Days = n, Cutoff = n > 0 ? SafeCutoff(now, n) : now };
+            var result = new ArchiveCleanupResult { Days = n, Cutoff = n > 0 ? CutoffFor(now, n) : now };
             redOnlyLog ??= DiagnosticLogService.Info;
 
             if (!dryRun && (settings ?? HousekeepingSettings.Load()).CleanArchive == false)
@@ -151,12 +174,6 @@ namespace InspectionEditor.Services
                 if (!dryRun) log.Error(ex.ToString()); // A11: the launch continues
                 return result;
             }
-        }
-
-        private static DateTime SafeCutoff(DateTime now, int days)
-        {
-            try { return now.AddDays(-days); }
-            catch (ArgumentOutOfRangeException) { return DateTime.MinValue; }
         }
     }
 }

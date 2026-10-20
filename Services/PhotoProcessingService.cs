@@ -58,13 +58,26 @@ namespace InspectionEditor.Services
                 // P4: R, G and B x1.25 on the 8-bit values, clamped; no sharpen step (P5).
                 ctx.Brightness(1.25f);
             });
-            // P6: JFIF density 72x72 dots per inch; the source EXIF stays (Orientation 1) until the owner answers Q-A.
+            // P6: JFIF density 72x72 dots per inch, and no other metadata (owner Q-A 2026-10-20: "strip metadata ... match
+            // INSPECT"): INSPECT's redraw keeps no EXIF (camera, time, GPS), XMP, IPTC or ICC. The pixels were oriented
+            // above (P2) before the tag goes, so the photo stays upright.
+            StripMetadata(image);
             image.Metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
             image.Metadata.HorizontalResolution = Dpi;
             image.Metadata.VerticalResolution = Dpi;
             using var output = new MemoryStream();
             image.Save(output, new JpegEncoder { Quality = JpegQuality }); // P7
             return output.ToArray();
+        }
+
+        // P6 (owner Q-A): the profiles that can carry camera, time, place or author data are dropped. Call only after
+        // AutoOrient, which needs the EXIF Orientation.
+        public static void StripMetadata(Image image)
+        {
+            image.Metadata.ExifProfile = null;
+            image.Metadata.XmpProfile = null;
+            image.Metadata.IptcProfile = null;
+            image.Metadata.IccProfile = null;
         }
     }
 }

@@ -110,6 +110,8 @@ internal static class Program
 
     private static bool HasApp1(byte[] jpeg) => Segments(jpeg).Any(s => s.Marker == 0xE1);
 
+    private static HashSet<int> Markers(byte[] jpeg) => Segments(jpeg).Select(s => s.Marker).ToHashSet();
+
     // Marker segments before the scan: (marker, offset of the 0xFF, segment length field).
     private static IEnumerable<(int Marker, int Offset, int Length)> Segments(byte[] jpeg)
     {
@@ -231,14 +233,41 @@ internal static class Program
                 Check(worst <= 3, $"largest difference {worst}");
                 Check(min >= 80 - 4 && max <= 160 + 4, $"range {min}..{max} (sharpening would overshoot 80..160)");
             });
-            Test("A-023-16 metadata: JFIF 72x72 dpi, EXIF Orientation absent or 1, EXIF Make TestCam kept (Q-A default)", () =>
+            Test("A-023-16 metadata (owner Q-A 2026-10-20, INSPECT's rule): JFIF 72x72 dpi, no APP1 (EXIF/XMP), no ICC, photo upright", () =>
             {
-                byte[] output = Process(Fixture(400, 300, orientation: 6, make: "TestCam"));
+                // Source: Orientation 6, camera Make, capture time and a GPS position, plus an ICC profile.
+                byte[] source;
+                using (var image = new Image<Rgba32>(400, 300, new Rgba32(80, 80, 80)))
+                {
+                    for (int y = 0; y < 40; y++) for (int x = 0; x < 40; x++) image[x, y] = new Rgba32(255, 0, 0);
+                    image.Metadata.ExifProfile = new ExifProfile();
+                    image.Metadata.ExifProfile.SetValue(ExifTag.Orientation, (ushort)6);
+                    image.Metadata.ExifProfile.SetValue(ExifTag.Make, "TestCam");
+                    image.Metadata.ExifProfile.SetValue(ExifTag.DateTimeOriginal, "2026:10:20 09:15:00");
+                    image.Metadata.ExifProfile.SetValue(ExifTag.GPSLatitudeRef, "N");
+                    image.Metadata.ExifProfile.SetValue(ExifTag.GPSLatitude, new[] { new Rational(30, 1), new Rational(15, 1), new Rational(0, 1) });
+                    // Windows' own sRGB profile (read only), when present, so the output can be checked for an ICC segment too.
+                    string icm = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "spool", "drivers", "color", "sRGB Color Space Profile.icm");
+                    if (File.Exists(icm))
+                        image.Metadata.IccProfile = new SixLabors.ImageSharp.Metadata.Profiles.Icc.IccProfile(File.ReadAllBytes(icm));
+                    using var s = new MemoryStream();
+                    image.Save(s, new JpegEncoder { Quality = 95 });
+                    source = Pad(s.ToArray(), false);
+                }
+                var sourceMarkers = Markers(source);
+                Check(sourceMarkers.Contains(0xE1), "fixture lacks APP1");
+                Console.WriteLine($"     (fixture ICC segment: {(sourceMarkers.Contains(0xE2) ? "yes" : "no")})");
+                byte[] output = Process(source);
+                var markers = Markers(output);
                 Check(Density(output) == (1, 72, 72), $"density {Density(output)}");
+                Check(!markers.Contains(0xE1), "an APP1 (EXIF/XMP) segment is still there");
+                Check(!markers.Contains(0xE2), "an APP2 (ICC) segment is still there");
+                Check(!markers.Contains(0xED), "an APP13 (IPTC) segment is still there");
                 using var decoded = Decode(output);
-                var profile = decoded.Metadata.ExifProfile;
-                Check(profile != null && profile.TryGetValue(ExifTag.Make, out var make) && make.Value == "TestCam", "EXIF Make lost");
-                if (profile!.TryGetValue(ExifTag.Orientation, out var tag)) Check(tag.Value == 1, $"orientation {tag.Value}");
+                Check(decoded.Metadata.ExifProfile == null && decoded.Metadata.IccProfile == null && decoded.Metadata.XmpProfile == null, "metadata decoded from the output");
+                Check(decoded.Width == 150 && decoded.Height == 200, $"oriented size {decoded.Width}x{decoded.Height}");
+                var p = decoded[140, 10];
+                Check(p.R >= 200 && p.G <= 40 && p.B <= 40, $"the red block is top-right (rotated before stripping): {p}");
             });
             Test("A-023-17 fallback without ImageSharp: 1984x1116, 72 dpi, centre (80,80,80) ±3 (no brightening), no EXIF", FallbackWithoutImageSharp);
             Test("A-023-17b WPF fallback applies EXIF orientation 6/8/3 before halving (red block top-right / bottom-left / bottom-right)", () =>

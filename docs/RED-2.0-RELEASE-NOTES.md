@@ -1,5 +1,27 @@
 # RED 2.0 Release Notes
 
+## 2.3.4 — Fixes from the tablet test: Add, Sign and Submit, swipe to scroll, marked-up plans
+
+- **Add on My List works on a fresh tablet.** When the offline lists are missing or old, Add now downloads them itself
+  ("Receiving offline work requirements from Strand, please wait..." / "Stay Connected To WiFi") and then opens. RED
+  also refreshes them at start and when you sign in. The "Please connect to WiFi..." message now shows only when there
+  is no connection or no saved login.
+- **Sign and Submit are easy to find.** A red **✍ Sign** button next to the result button takes you straight to the
+  signature box (it turns green when signed). **Submit** sits right after Save, and when it is greyed out a short note
+  says why ("Submit: only from My List", "Submit: save first"). The toolbar wraps onto a second line instead of
+  hiding buttons.
+- **Swipe to scroll.** The print preview scrolls with your finger, and a finger stroke on the signature box draws
+  instead of scrolling the page.
+- **Marked-up plans attach to the report, like INSPECT.** The plan button (Slab Eng, FD Plan and the others) and the
+  ◀ Trip button now open a copy. Pages you mark up and save are attached to the report and only those pages print;
+  a copy you did not mark up is not sent. The shared plan in Dropbox is never changed.
+- **Housekeeping runs by itself.** Archived reports are cleaned up at each start, keeping one day more than INSPECT's
+  setting (with 5 days: 5- and 6-day-old reports stay, 7 days and older go). Job folders of plans for reports no
+  longer in My List, Outbox or Review are removed, as INSPECT does.
+- **Photos no longer carry location, camera or time details,** as in INSPECT. They stay the right way up.
+- **No Approve.** Approve is gone, Review reports show no Submit, and RED never submits, moves or changes Review files
+  by itself.
+
 ## 2.3.3 — The report comes back when you close the camera; tidy backup photos
 
 - **Closing the camera brings your report back to the front.** Before, the report could stay hidden behind RED's list

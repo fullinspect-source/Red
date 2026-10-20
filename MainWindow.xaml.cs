@@ -3587,14 +3587,9 @@ namespace InspectionEditor
 
         private void PriorReportButton_Click(object sender, RoutedEventArgs e)
         {
+            // Owner Q-56: through the Job Files working copy, never the shared PDF itself (MainWindow.JobFiles.cs).
             if (PriorReportButton.Tag is string pdfPath && File.Exists(pdfPath))
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = pdfPath,
-                    UseShellExecute = true
-                });
-            }
+                OpenSharedJobPdf(pdfPath, "Prior report");
         }
 
         private void SeeDocsButton_Click(object sender, RoutedEventArgs e)
@@ -3717,15 +3712,12 @@ namespace InspectionEditor
         {
             if (string.IsNullOrEmpty(_currentFilePath)) return;
 
-            // Non-CPP types: open the pre-found plan PDF directly
+            // Owner Q-56: every PDF this button opens goes through the Job Files working copy (MainWindow.JobFiles.cs), so
+            // the shared plan in Jobs is never opened for editing; markups become an attachment with AnnotatedPages.
+            // Non-CPP types: the pre-found plan PDF.
             if (_planPdfPath != null)
             {
-                if (File.Exists(_planPdfPath))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        { FileName = _planPdfPath, UseShellExecute = true });
-                else
-                    MessageBox.Show($"Plan file not found:\n{_planPdfPath}", "File Not Found",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                OpenSharedJobPdf(_planPdfPath, "Plan");
                 return;
             }
 
@@ -3733,23 +3725,16 @@ namespace InspectionEditor
             // service here can trigger OCR/PDF parsing on the UI click path.
             if (!string.IsNullOrWhiteSpace(_currentSlabInfo?.PdfPath))
             {
-                if (File.Exists(_currentSlabInfo.PdfPath))
-                    SlabEngineeringService.OpenPdf(_currentSlabInfo.PdfPath);
-                else
-                    MessageBox.Show($"Slab engineering file not found:\n{_currentSlabInfo.PdfPath}", "File Not Found",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                OpenSharedJobPdf(_currentSlabInfo.PdfPath, "Slab Eng");
                 return;
             }
 
             // Fallback only: this can be slower because it discovers/parses the slab PDF.
-            try
-            {
-                SlabEngineeringService.OpenSlabEngineeringPdf(_currentFilePath);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message, "Slab Eng", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+            var info = SlabEngineeringService.GetInfoForInspection(_currentFilePath);
+            if (!string.IsNullOrWhiteSpace(info.PdfPath) && File.Exists(info.PdfPath))
+                OpenSharedJobPdf(info.PdfPath, "Slab Eng");
+            else
+                MessageBox.Show(info.StatusText ?? "Slab engineering PDF not found.", "Slab Eng", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void SlabEngButton_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
@@ -3768,17 +3753,7 @@ namespace InspectionEditor
                     Tag = option.FullPath,
                     FontWeight = option.FullPath == _currentSlabInfo.PdfPath ? FontWeights.Bold : FontWeights.Normal
                 };
-                item.Click += (s, _) =>
-                {
-                    try
-                    {
-                        SlabEngineeringService.OpenPdf(option.FullPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show(ex.Message, "Slab Eng", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                };
+                item.Click += (s, _) => OpenSharedJobPdf(option.FullPath, "Slab Eng"); // owner Q-56: working copy, as Job Files
                 menu.Items.Add(item);
             }
 

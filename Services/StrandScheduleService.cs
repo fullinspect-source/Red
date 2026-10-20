@@ -212,13 +212,15 @@ namespace InspectionEditor.Services
 
             var user = result?.SelectToken("User") ?? result?.SelectToken("user");
             _accessToken = token;
-            SessionGeneration++;
-            SessionChanged?.Invoke();
             _accountId = FirstString(user, "Account.Id", "account.id", "AccountId");
             Username = FirstString(user, "UserName", "userName", "Username") is { Length: > 0 } name ? name : username;
             DisplayName = FirstString(user, "DisplayName", "displayName") is { Length: > 0 } display ? display : Username;
             Phone = FirstString(user, "Phone", "phone");
             _sessionPassword = password;
+            // Raised only once the login is complete: F-020's refresh at the first sign-in reads SessionCredentials here
+            // (raised before them, it found no password and never ran; owner tablet test 2026-10-20).
+            SessionGeneration++;
+            SessionChanged?.Invoke();
             _permissions = await LoadPermissionsAsync(cancellationToken);
         }
 

@@ -48,6 +48,8 @@ namespace InspectionEditor.Services
 
     public sealed record AddDuplicate(string Path, string Number, string FolderCaption);
 
+    public enum AddGate { Open, Wait, Download, Missing }
+
     /// <summary>
     /// F-021 Add Service (behavior authority Inspect2022 2022.7.27.1, with the SPEC's RED deviations): job search, forms
     /// with on-disk history, page 3 rules, the template and reinspection builds, the duplicate check and the save as
@@ -87,6 +89,12 @@ namespace InspectionEditor.Services
         // E2: all three caches present and written today.
         public static bool CachesReady(DateTime now, string? root = null) =>
             Enum.GetValues<OfflineCache>().All(cache => !OfflineCacheService.IsStale(cache, now, root));
+
+        // E2 (owner tablet test 2026-10-20): fresh caches open the wizard; a running download is waited for; otherwise,
+        // online and with a Strand login, RED downloads the stale caches itself and then opens the wizard (INSPECT only
+        // refuses here); offline or with no login, the Missing message.
+        public static AddGate Gate(bool cachesReady, bool downloading, bool online, bool hasLogin) =>
+            cachesReady ? AddGate.Open : downloading ? AddGate.Wait : online && hasLogin ? AddGate.Download : AddGate.Missing;
 
         // ── Page 1 ──────────────────────────────────────────────────────────────────────────────────────────────────
 

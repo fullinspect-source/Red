@@ -10,7 +10,7 @@ using InspectionEditor.Services;
 namespace InspectionEditor
 {
     // F-012 completion check: runs silently after every save (W1) and on open, drives the BWT read-only lock (§4b), and
-    // gates Submit, Approve and Print (W2-W3) with INSPECT's messages plus RED's problem list (W4).
+    // gates Submit and Print (W2-W3) with INSPECT's messages plus RED's problem list (W4).
     public partial class MainWindow
     {
         private CompletionResult? _lastValidation;
@@ -25,7 +25,7 @@ namespace InspectionEditor
             return _lastValidation;
         }
 
-        // Called by F-013 Submit, F-018 Approve and F-022 Print. False (and the problem list) when invalid.
+        // Called by F-013 Submit and F-022 Print. False (and the problem list) when invalid.
         internal bool PassesCompletionGate(string refusedMessage, string title)
         {
             var result = RunCompletionCheck();
@@ -185,7 +185,7 @@ namespace InspectionEditor
                 }
                 else
                 {
-                    OpenHeaderSectionWindow(top: !end);
+                    OpenHeaderSectionWindow(top: !end, focusKey: problem.HeaderKey);
                 }
             }
         }

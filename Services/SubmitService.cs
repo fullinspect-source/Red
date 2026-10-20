@@ -89,7 +89,6 @@ namespace InspectionEditor.Services
         public ISubmitLog Log { get; init; } = DiagnosticSubmitLog.Instance;
         public IStrandWebsite? Website { get; init; }            // §3A, Preinspector only
         public Action<int>? Sleep { get; init; }                 // tests
-        public bool Approve { get; init; }                       // F-018 A1: a reviewer's Approve from Review
     }
 
     // F-013 Submit (mirrors Inspection::Submit). Every Submit except a Preinspector's is purely local file work.
@@ -115,14 +114,8 @@ namespace InspectionEditor.Services
         public static bool IsSafeReportName(string? number) =>
             !string.IsNullOrWhiteSpace(number) && number == number.Trim() && number.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 &&
             !number.Contains("..", StringComparison.Ordinal) && number.Length <= 200;
-        // F-018 A5/A1 step 8 (INSPECT's Approve texts have no "Cannot submit inspection." prefix).
-        public const string ApproveRefused = "Cannot approve inspection. You need to fix one or more problems with the inspection.";
-        public const string ApproveArchiveFailedPrefix = "Copy to Archive folder failed. ";
-        public const string ApproveOutboxFailedPrefix = "Move to Outbox folder failed. ";
-        public const string ApprovedMessage = "Approved and sent to Outbox. Strand usually picks it up within a few minutes.";
-        public const string ApprovedNonDropBoxMessage = "Approved and sent to Outbox. Press Sync in the Outbox to send it to Strand.";
-        // A5: F-013's text with "the Review copy" for "the My List copy".
-        public const string ApprovedSourceNotRemovedMessage = "Submitted, but the Review copy could not be removed. RED will retry.";
+        // F-018 (owner 2026-10-20): Review is the owner's holding folder; RED never submits, moves or rewrites a Review file.
+        public const string ReviewNotSubmittedMessage = "Review files are not submitted from RED.";
         public const string SubmitBackupsFolder = "SubmitBackups";
         public const string PendingDeletesFile = "submit-pending-deletes.json";
 
@@ -138,19 +131,20 @@ namespace InspectionEditor.Services
             string sourceFolder = Path.GetDirectoryName(src)!;
             string inspections = Path.GetDirectoryName(sourceFolder)!;
             var kind = ctx.Profile.Kind;
-            bool approve = ctx.Approve;
-            // F-018 A1 step 1: Approve sends every user type to the Outbox; it never uses the website upload.
-            bool preinspector = !approve && kind == InspectUserKind.Preinspector;
+            bool preinspector = kind == InspectUserKind.Preinspector;
+
+            // F-018 (owner 2026-10-20): never a Review file, before anything is logged, stamped or saved.
+            if (string.Equals(Path.GetFileName(sourceFolder), "Review", StringComparison.OrdinalIgnoreCase))
+                return Refused(ReviewNotSubmittedMessage);
 
             // P5: a Preinspector needs Strand credentials before anything is touched.
             if (preinspector && (ctx.Website == null || !ctx.Website.HasCredentials))
                 return new SubmitResult { Stage = SubmitStage.WebsiteSignInNeeded, Message = PreinspectorSignInMessage };
 
-            // 1-2: log and stamp the submitter. Approve stamps only after every step that can refuse (A1 steps 3, 6).
+            // 1-2: log and stamp the submitter.
             string number = HeaderRules.Text(saver.GetHeaderValue("InspectionNumber")) ?? "";
-            ctx.Log.Inspect(approve ? $"Approving Inspection - {number}" : $"Submitting inspection {number}");
-            if (!approve)
-                saver.SetHeaderValue("SubmittorUserName", new JValue(ctx.Profile.Username), allowAdd: true);
+            ctx.Log.Inspect($"Submitting inspection {number}");
+            saver.SetHeaderValue("SubmittorUserName", new JValue(ctx.Profile.Username), allowAdd: true);
 
             // 3: save before the completion check, as INSPECT (a refused submit still re-saves SubmittorUserName).
             try
@@ -166,7 +160,7 @@ namespace InspectionEditor.Services
             // 4: completion check.
             var problems = ctx.Validate?.Invoke() ?? InspectionValidator.Validate(model, saver.GetHeaderValue);
             if (!problems.IsValid)
-                return new SubmitResult { Stage = SubmitStage.Invalid, Message = approve ? ApproveRefused : InspectionValidator.SubmitRefused, Problems = problems };
+                return new SubmitResult { Stage = SubmitStage.Invalid, Message = InspectionValidator.SubmitRefused, Problems = problems };
 
             // 5: blank duplicate rows.
             RemoveBlankItems(model);
@@ -206,29 +200,11 @@ namespace InspectionEditor.Services
                 model.InspectionNumber = number;
             }
 
-            // RED safety: the number becomes a file name in Archive and Outbox; never a path. Checked before the approval
-            // stamp, so this refusal never leaves the flag behind.
-            string archiveFailed = approve ? ApproveArchiveFailedPrefix : ArchiveFailedPrefix;
-            string outboxFailed = approve ? ApproveOutboxFailedPrefix : OutboxFailedPrefix;
+            // RED safety: the number becomes a file name in Archive and Outbox; never a path.
+            string archiveFailed = ArchiveFailedPrefix;
+            string outboxFailed = OutboxFailedPrefix;
             if (!IsSafeReportName(number))
-                return new SubmitResult { Stage = SubmitStage.ArchiveFailed, Message = archiveFailed + "The inspection number cannot be used as a file name.", SourceRewritten = !approve };
-
-            // F-018 A1 step 6: stamp the approval on the model that step 10 projects. Until {SRC} is written the stamp can
-            // be taken back, so a refused approve never leaves the flag in the file or in memory.
-            JToken? priorSubmittor = null, priorApproval = null;
-            if (approve)
-            {
-                priorSubmittor = saver.GetHeaderValue("SubmittorUserName");
-                priorApproval = saver.GetHeaderValue("IsApproval");
-                saver.SetHeaderValue("SubmittorUserName", new JValue(ctx.Profile.Username), allowAdd: true);
-                saver.SetHeaderValue("IsApproval", new JValue(true), allowAdd: true);
-            }
-            void TakeBackApproval()
-            {
-                if (!approve) return;
-                saver.RestoreHeaderValue("SubmittorUserName", priorSubmittor);
-                saver.RestoreHeaderValue("IsApproval", priorApproval);
-            }
+                return new SubmitResult { Stage = SubmitStage.ArchiveFailed, Message = archiveFailed + "The inspection number cannot be used as a file name.", SourceRewritten = true };
 
             // 10-11: Mode A save (recomputes ResultSortOrder, A5), project to INSPECT's dialect, write {SRC} with the
             // external-change check, re-read and compare.
@@ -244,16 +220,7 @@ namespace InspectionEditor.Services
             }
             catch (InspectionChangedOnDiskException ex)
             {
-                TakeBackApproval();
                 return new SubmitResult { Stage = SubmitStage.ExternalChange, Message = ex.Message };
-            }
-            catch (Exception ex) when (approve && ex is not OutOfMemoryException)
-            {
-                // A1 step 7: the final write did not happen. Take the stamp back and save {SRC} without it, so neither the
-                // file nor the model keeps IsApproval or the reviewer's SubmittorUserName.
-                TakeBackApproval();
-                try { saver.Save(model); } catch (Exception saveAgain) { DiagnosticLogService.Log("Approve: the Review copy could not be saved back without the stamp", saveAgain); }
-                return new SubmitResult { Stage = SubmitStage.Refused, Message = "Cannot approve inspection. " + ex.Message };
             }
             if (!ReadBack(src).SequenceEqual(bytes))
                 return new SubmitResult { Stage = SubmitStage.ArchiveFailed, Message = archiveFailed + "The final report could not be verified.", SourceRewritten = true };
@@ -261,7 +228,6 @@ namespace InspectionEditor.Services
             string fileName = number + ".ins";
             // 12: Archive copy (create the folder; replace; local backup of the old copy; atomic; verified).
             string archivePath = Path.Combine(inspections, "Archive", fileName);
-            if (approve) ctx.Log.Inspect($"Moving Inspection to Archive - {number}"); // F-018 A1 step 2
             try
             {
                 archivePath = Path.Combine(InspectFolders.EnsureForWrite(inspections, InspectFolder.Archive), fileName);
@@ -278,11 +244,10 @@ namespace InspectionEditor.Services
 
             // 13: Outbox placement, atomic.
             string outboxPath = Path.Combine(inspections, "Outbox", fileName);
-            if (approve) ctx.Log.Inspect($"Moving Inspection to Outbox - {number}"); // F-018 A1 step 2
             try
             {
                 outboxPath = Path.Combine(InspectFolders.EnsureForWrite(inspections, InspectFolder.Outbox), fileName);
-                // Step 13: the cross-volume fallback stages in {IF}\MyList, never in the shared Review folder (F-018).
+                // Step 13: the cross-volume fallback stages in {IF}\MyList.
                 string fallbackFolder = Directory.Exists(InspectFolders.PathOf(inspections, InspectFolder.MyList)) ? InspectFolders.PathOf(inspections, InspectFolder.MyList) : sourceFolder;
                 PlaceAtomically(outboxPath, bytes, Path.Combine(localRoot, "outbox-staging"), fallbackFolder, fileName);
             }
@@ -292,7 +257,7 @@ namespace InspectionEditor.Services
             }
             ctx.Log.Inspect($"Copied inspection {number} to {outboxPath}");
 
-            // 14: remove {SRC} (unless it is the Outbox file itself, which cannot happen from My List or Review).
+            // 14: remove {SRC} (unless it is the Outbox file itself, which cannot happen from My List).
             bool removed = RemoveSource(src, bytes, localRoot, ctx.Sleep);
             if (removed) ctx.Log.Inspect($"Removed inspection {number} from {src}");
 
@@ -304,13 +269,11 @@ namespace InspectionEditor.Services
             MoveBackupSidecars(sourceFolder, Path.GetFileName(src), Path.Combine(localRoot, SubmitBackupsFolder));
 
             // 17.
-            string done = approve
-                ? kind == InspectUserKind.NonDropBox ? ApprovedNonDropBoxMessage : ApprovedMessage
-                : kind == InspectUserKind.NonDropBox ? SentToOutboxNonDropBoxMessage : SentToOutboxMessage;
+            string done = kind == InspectUserKind.NonDropBox ? SentToOutboxNonDropBoxMessage : SentToOutboxMessage;
             return new SubmitResult
             {
                 Stage = removed ? SubmitStage.Done : SubmitStage.SourceNotRemoved,
-                Message = removed ? done : approve ? ApprovedSourceNotRemovedMessage : SourceNotRemovedMessage,
+                Message = removed ? done : SourceNotRemovedMessage,
                 ArchivePath = archivePath,
                 OutboxPath = outboxPath,
                 SourceRewritten = true
@@ -609,13 +572,16 @@ namespace InspectionEditor.Services
                 try
                 {
                     if (!File.Exists(entry.Path)) continue;
+                    // F-018 (owner 2026-10-20): a Review copy left by an older RED's Approve is never deleted; the entry goes.
+                    if (string.Equals(Path.GetFileName(Path.GetDirectoryName(entry.Path)), "Review", StringComparison.OrdinalIgnoreCase))
+                    {
+                        DiagnosticLogService.Info("Submit: a pending delete of a Review file was dropped; RED never deletes Review files.");
+                        continue;
+                    }
                     string hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(entry.Path)));
                     if (!string.Equals(hash, entry.Sha256, StringComparison.OrdinalIgnoreCase))
                     {
-                        string message = string.Format(CultureInfo.InvariantCulture, ChangedAfterSubmitMessage, Path.GetFileNameWithoutExtension(entry.Path));
-                if (string.Equals(Path.GetFileName(Path.GetDirectoryName(entry.Path)), "Review", StringComparison.OrdinalIgnoreCase))
-                    message = message.Replace("The My List copy", "The Review copy"); // F-018 A5
-                messages.Add(message);
+                        messages.Add(string.Format(CultureInfo.InvariantCulture, ChangedAfterSubmitMessage, Path.GetFileNameWithoutExtension(entry.Path)));
                         continue; // never delete on the name alone
                     }
                     File.Delete(entry.Path);

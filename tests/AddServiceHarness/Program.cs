@@ -176,6 +176,43 @@ static class Harness
             try { Directory.Delete(root, true); } catch { }
         }
 
+        // ---------- A-021-28 / A-021-29 / A-021-30 Add downloads the offline data itself (owner tablet test 2026-10-20) ----------
+        {
+            Check("A-021-28", AddServiceService.Gate(cachesReady: true, downloading: false, online: false, hasLogin: false) == AddGate.Open &&
+                              AddServiceService.Gate(false, downloading: true, online: true, hasLogin: true) == AddGate.Wait &&
+                              AddServiceService.Gate(false, false, online: true, hasLogin: true) == AddGate.Download &&
+                              AddServiceService.Gate(false, false, online: false, hasLogin: true) == AddGate.Missing &&
+                              AddServiceService.Gate(false, false, online: true, hasLogin: false) == AddGate.Missing,
+                "fresh: open; a download running: wait; stale, online and a login: download now; offline or no login: the Missing message");
+
+            string root = Path.Combine(Path.GetTempPath(), "red-f021-e2-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(OfflineCacheService.Folder(root));
+            File.WriteAllText(OfflineCacheService.PathOf(OfflineCache.Forms, root), Forms.ToString());
+            File.SetLastWriteTime(OfflineCacheService.PathOf(OfflineCache.Forms, root), DateTime.Now.AddDays(-3)); // stale; Jobs and Templates missing
+            var stale = OfflineCacheService.StaleCaches(DateTime.Now, root);
+            mock.Handler = (_, path) => path.Contains("/Inspect/Forms/GetOfflineList") ? (200, Forms.ToString())
+                : path.Contains("/Inspect/Templates/GetList") ? (200, Templates.ToString())
+                : path.Contains("/Inspect/Jobs/GetOfflineList") ? (200, cachedJobs.ToString()) : (404, "");
+            int finished = 0;
+            Action onFinished = () => finished++;
+            OfflineCacheService.DownloadFinished += onFinished;
+            var download = OfflineCacheService.RefreshAsync(session, stale, root, redLog.Add);
+            bool runningAtOnce = OfflineCacheService.IsDownloading; // the Add button listens before it starts the download
+            var result = await download;
+            OfflineCacheService.DownloadFinished -= onFinished;
+            Check("A-021-29", stale.Count == 3 && runningAtOnce && finished == 1 && !OfflineCacheService.IsDownloading &&
+                              result.Saved.Count == 3 && AddServiceService.CachesReady(DateTime.Now, root),
+                "stale Forms and missing Jobs/Templates: one download of all three; it counts as running from the start, ends with one DownloadFinished, and the wizard's gate is then open");
+
+            File.SetLastWriteTime(OfflineCacheService.PathOf(OfflineCache.Templates, root), DateTime.Now.AddDays(-1));
+            mock.Offline = true;
+            var failed = await OfflineCacheService.RefreshAsync(session, OfflineCacheService.StaleCaches(DateTime.Now, root), root, redLog.Add);
+            mock.Offline = false;
+            Check("A-021-30", failed.Failed.SequenceEqual(new[] { OfflineCache.Templates }) && !AddServiceService.CachesReady(DateTime.Now, root),
+                "no connection: the download fails, the gate stays closed and Add shows the Missing message");
+            try { Directory.Delete(root, true); } catch { }
+        }
+
         // ---------- A-021-07 / 08 / 09 Search ----------
         {
             mock.Offline = true;

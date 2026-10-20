@@ -335,7 +335,7 @@
                               PreviewMouseLeftButtonUp="InspectionListView_PreviewMouseLeftButtonUp">
                         <ListView.View>
                             <GridView>
-                                <!-- Owner 2026-10-19: tick rows; Remove, Move to My List and Approve act on the ticked rows.
+                                <!-- Owner 2026-10-19: tick rows; Remove and Move to My List act on the ticked rows.
                                      Always first and not a configurable column (ApplyColumnSettings re-adds it). -->
                                 <GridViewColumn x:Name="CheckColumn" Width="52">
                                     <GridViewColumn.Header>

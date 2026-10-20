@@ -174,6 +174,8 @@ namespace InspectionEditor
                         ctx.GaussianSharpen(_sharpness);
                 });
 
+                // F-023 P6 (owner Q-A 2026-10-20): an edited photo keeps no EXIF/XMP/IPTC/ICC either, as INSPECT's redraw.
+                InspectionEditor.Services.PhotoProcessingService.StripMetadata(image);
                 using var ms = new MemoryStream();
                 image.SaveAsJpeg(ms);
                 _currentImageBytes = ms.ToArray();

@@ -84,6 +84,28 @@ namespace InspectionEditor.Services
             return result;
         }
 
+        // Owner Q-56 (2026-10-20): the editor's plan/slab and prior-report buttons open shared job PDFs the Job Files way.
+        // Any existing .pdf below {IF}\Jobs is a job file (its job folder gives the version, its Engineering subfolder the
+        // type); anything else is not (null), and the caller opens a read-only copy instead.
+        public static JobFile? JobFileFor(string? fullPath, string? inspectionsFolder, IEnumerable<object>? attachments)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath) || string.IsNullOrWhiteSpace(inspectionsFolder)) return null;
+            string path, jobs;
+            try
+            {
+                path = Path.GetFullPath(fullPath);
+                jobs = Path.GetFullPath(Path.Combine(inspectionsFolder, "Jobs")).TrimEnd('\\') + "\\";
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return null; }
+            if (!path.StartsWith(jobs, StringComparison.OrdinalIgnoreCase) || !path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+                return null;
+            var info = new FileInfo(path);
+            string below = path.Substring(jobs.Length);
+            string job7 = below.Split('\\')[0];
+            string type = below.Contains("\\Engineering\\", StringComparison.OrdinalIgnoreCase) ? "Engineering" : "Inspection";
+            return new JobFile(path, info.Name, type, info.CreationTime, info.LastWriteTime, Version(job7, info.Name), AttachedNames(attachments).Contains(info.Name));
+        }
+
         // J2: the digits after "R" per INSPECT's regex {job7}R(\d+).+, else "0".
         public static string Version(string job7, string fileName)
         {
