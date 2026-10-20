@@ -408,7 +408,7 @@ static class Harness
         // ---------- Review fix: Back and Next reuse the pages; the Job column shows the job number ----------
         {
             string? failure = null;
-            string jobPath = "";
+            string jobPath = "", formNamePath = "";
             var ui = new Thread(() =>
             {
                 try
@@ -420,6 +420,8 @@ static class Harness
                     var jobs = (System.Windows.Controls.ListView)typeof(InspectionEditor.AddServiceWindow).GetField("_jobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(window)!;
                     var column = ((System.Windows.Controls.GridView)jobs.View).Columns.Last();
                     jobPath = ((System.Windows.Data.Binding)column.DisplayMemberBinding).Path.Path;
+                    var formsList = (System.Windows.Controls.ListView)typeof(InspectionEditor.AddServiceWindow).GetField("_formsList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(window)!;
+                    formNamePath = ((System.Windows.Data.Binding)((System.Windows.Controls.GridView)formsList.View).Columns[0].DisplayMemberBinding).Path.Path;
                     window.Close();
                 }
                 catch (Exception ex) { failure = (ex.InnerException ?? ex).GetType().Name + ": " + (ex.InnerException ?? ex).Message; }
@@ -429,6 +431,52 @@ static class Harness
             ui.Join();
             Check("W1", failure == null && jobPath == "JobNumber",
                 $"pages 1 and 3 shown again after Back and Next without an error; the Job column binds the job number ({failure ?? jobPath})");
+            Check("DUP-4", failure == null && formNamePath == nameof(AddFormRow.DisplayName),
+                $"page 2's Name column shows the labelled name ({failure ?? formNamePath})");
+        }
+
+        // ---------- Owner fix list 2026-10-19: forms with the same name (HERS Energy Rough, FormId 96 and 299) ----------
+        {
+            var sameName = new JArray(
+                new JObject { ["ServiceId"] = 306, ["FormId"] = 96, ["Name"] = "HERS Energy Rough", ["Abbreviation"] = "HER", ["Attempt"] = 1 },
+                new JObject { ["ServiceId"] = 305, ["FormId"] = 95, ["Name"] = "HERS Energy Final", ["Abbreviation"] = "HEF", ["Attempt"] = 1 },
+                new JObject { ["ServiceId"] = 306, ["FormId"] = 299, ["Name"] = "HERS Energy Rough ", ["Abbreviation"] = "HER", ["Attempt"] = 1 });
+            var rows = AddServiceService.FormsFromJson(sameName);
+            Check("DUP-1", rows.Count == 3 &&
+                           rows.Select(r => r.DisplayName).SequenceEqual(new[] { "HERS Energy Rough  (form 96)", "HERS Energy Final", "HERS Energy Rough  (form 299)" }) &&
+                           rows[0].Name == "HERS Energy Rough" && rows[2].Name == "HERS Energy Rough ",
+                "same-named forms (trailing space ignored) show their form number; none is hidden; Name, which the new file gets, is unchanged");
+            Check("DUP-2", AddServiceService.FormsFromJson(Forms).All(r => r.DisplayName == r.Name), "a name that occurs once is shown unchanged");
+            var chooser = FormChoiceLabels.Labels(new List<(string, int)> { ("HER - HERS Energy Rough", 96), ("HER - HERS Energy Rough", 299), ("HET - HERS Energy Testing", 263) });
+            Check("DUP-3", chooser.SequenceEqual(new[] { "HER - HERS Energy Rough  (form 96)", "HER - HERS Energy Rough  (form 299)", "HET - HERS Energy Testing" }),
+                "the labels for ORDERS' Choose Form list");
+
+            // The real ORDERS Choose Form window (internal): its radio buttons show the labels and keep each form's id.
+            string? chooserFailure = null;
+            var shown = new List<(string Text, int Id)>();
+            int chosen = -2;
+            var chooserUi = new Thread(() =>
+            {
+                try
+                {
+                    var forms = new List<StrandFormOption> { new() { Id = 96, Name = "HER - HERS Energy Rough" }, new() { Id = 299, Name = "HER - HERS Energy Rough" } };
+                    var type = typeof(AddServiceService).Assembly.GetType("InspectionEditor.OrderFormChooserWindow")!;
+                    var window = (System.Windows.Window)Activator.CreateInstance(type, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
+                        null, new object[] { forms, "HER - HERS Energy Rough" }, null)!;
+                    var radios = ((List<System.Windows.Controls.RadioButton>)type.GetField("_options", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(window)!);
+                    foreach (var radio in radios) shown.Add(((string)radio.Content, (int)radio.Tag));
+                    radios[1].IsChecked = true;
+                    chosen = (int)type.GetProperty("ChosenFormId")!.GetValue(window)!;
+                    window.Close();
+                }
+                catch (Exception ex) { chooserFailure = (ex.InnerException ?? ex).GetType().Name + ": " + (ex.InnerException ?? ex).Message; }
+            });
+            chooserUi.SetApartmentState(ApartmentState.STA);
+            chooserUi.Start();
+            chooserUi.Join();
+            Check("DUP-5", chooserFailure == null && chosen == 299 &&
+                           shown.SequenceEqual(new[] { ("HER - HERS Energy Rough  (form 96)", 96), ("HER - HERS Energy Rough  (form 299)", 299) }),
+                $"OrderFormChooserWindow shows the labels and returns the picked form's id ({chooserFailure ?? "ok"})");
         }
 
         Console.WriteLine();

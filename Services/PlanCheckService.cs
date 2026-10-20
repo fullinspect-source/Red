@@ -100,7 +100,7 @@ namespace InspectionEditor.Services
                         finding.X = Math.Clamp((match.BoundingBox.Left + match.BoundingBox.Right) / 2.0 / width, 0.02, 0.98);
                         finding.Y = Math.Clamp(1.0 - ((match.BoundingBox.Bottom + match.BoundingBox.Top) / 2.0 / height), 0.02, 0.98);
                         finding.IsSuggested = true;
-                        finding.SuggestionText = $"Suggested from plan text “{match.Text}” on page {page.Number}. Verify and reposition if needed.";
+                        finding.SuggestionText = $"Suggested from plan text “{match.Text}” on page {page.Number}.";
                     }
                 }
             }

@@ -4,6 +4,62 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-20 — RED 2.3.1 — owner fix list: My List tabs, result button, no "please confirm" popups
+
+- **Base:** 2.3.0 (`6a06e32`). Built in `Dropbox\P\PL` from the owner's marked-up list (`Dropbox\Red for windows fixes
+  to do.pdf`, items 1-14); report `Dropbox/ios-port/program/fixes-2026-10-19/README.md`, popup table `POPUPS.md`.
+  Two review rounds plus a final targeted review; every confirmed finding fixed. Released by owner decision.
+  - Ported as a three-way merge per file (base = PL before the fixes, ours = 2.3.0, theirs = PL now), line endings
+    normalised for the merge and written back as each file had them. No conflicts. `MainWindow.xaml.cs` keeps this tree's
+    release-only lines.
+- **Files changed:**
+  - New (8): `MainWindow.ValueFlash.cs`, `MainWindow.ResultButton.cs`, `Services/ValueFlash.cs`,
+    `Services/TickedRowsService.cs`, `Services/FormChoiceLabels.cs`, `Services/ResultLabel.cs`,
+    `tests/ValueFlashHarness/{Program.cs,ValueFlashHarness.csproj}`.
+  - Modified (23): `InspectionPickerWindow.xaml(.cs)`, `.FolderViews.cs`, `.InspectorProfile.cs`, `MainWindow.xaml(.cs)`,
+    `MainWindow.HeaderSections.cs`, `ResultPickerWindow.xaml.cs`, `OrdersDialogs.cs`, `AddServiceWindow.cs`,
+    `BuyerWalkScheduleWindow.cs`, `PlanCheckWindow.xaml`, `Services/{AddServiceService,EnergyComplianceService,
+    PlanCheckService}.cs`; tests FolderViewsHarness, AddServiceHarness, HeaderSectionsHarness,
+    EnergySemanticHarness/Production.Generated.cs, `ocr_unit_scope_test.py`, `ocr_window_rating_test.py`,
+    `het_transfer_wiring_test.py`, `template_first_open_harness.cs.txt`.
+  - Also: the version (2.3.1) in the csproj and the four release-metadata tests, these release notes and this handoff.
+- **Behavior:**
+  - My List: the folder views are side tabs (My List, ORDERS, BUYER WALK, Outbox, Archive, Review) with counts; the
+    active tab is a white folder tab; Review shows only with F-018 access; the heading and the in-panel view buttons,
+    Move to Archive and Move to Review are gone; Add is green; "Reset size" vs Refresh.
+  - Row tick boxes (and tick-all); Remove, Move to My List (F-014 FolderMoveService) and Approve act on the ticked rows
+    of the listed folder. The Remove question and the overwrite question stay.
+  - Same-named forms show "(form N)" in ORDERS' Choose Form and the Add wizard (HERS Energy Rough 96/299). Nothing is
+    hidden: INSPECT has no rule (owner question Q-57).
+  - Popups: 17 content-confirmation popups removed or reworded (POPUPS.md lists all 326 sites). Values RED changes for
+    the inspector flash red 5 times (`Services/ValueFlash.cs`); a change with nothing on screen is named for 8 s in
+    the left header. Window ratings fill the other window type's field when blank or in sync. Deletes, overwrites,
+    Submit, Approve, cleanup, first-live gates and errors still ask.
+  - Editor result button (F-007): top of the left panel; NO RESULT / FAIL (PO required|reinspection|next inspection)
+    / the StatusList name; opens the result picker (Cancel instead of Skip) and saves through the existing F-002 path;
+    read-only reports show it without the picker; moves to its own line in a narrow classic panel.
+  - Live-risk safeguards unchanged (Q-55 housekeeping gate, first-live Submit/Approve, Buyer Walk §18).
+- **Verification:**
+  - Debug build `--no-incremental`: 0 errors, 29 warnings (unchanged).
+  - The 33 harnesses, all exit 0: ItemGroupGrid 53, InkItem 21, HeaderSections 47 (+7 result button), Cpr 12,
+    BuyerWalkFamily 20, SciForms 11, InspectorSignature 17, CompletionCheck 48, Submit 54, FolderViews 24 (+6 ticks),
+    ArchiveRetention 27, JobFiles 26, PdfAnnotation 11, Approve 28, Housekeeping 23, OfflineCache 18, AddService 40
+    (+5 form labels), InsRoundTrip 71, ItemControls 78, SaveLoss 22, FailedSaveRecovery 17, LastEdit 74,
+    ChecklistVisibility 7, OrientationPdf 345, InspectUserType, FeeToken, Report 35, PhotoProcessing 16, PhotoMarkup 10,
+    CommentLibrary 6, BuyerWalk 40, History 4, and the new ValueFlash 9.
+  - Also pass: EnergySemantic (292), HetMeasured (48), CommentSnippet 53, AppUpdate 34, UpdateUi 19,
+    EquipmentAirflow, FramingDesignParser.
+  - Harness traffic went to a dead proxy (127.0.0.1:9); the harnesses' own loopback mocks were exempt.
+  - Python 35/45: the same 10 environment failures as 2.2.1 and 2.3.0. The rewritten `ocr_window_rating_test` passes
+    its 39 checks from a scratch-folder copy (its `~/.hermes` folder is missing on this PC).
+  - Every fix was driven or rendered in an isolated Red2Dev build (own app-data folder, sandbox Inspections, dead
+    proxy); see the owner report. Tick boxes were clicked with raised events; taps in the strip beside them and touch were not driven (the PC was locked).
+  - Corpus round trip not run: the save code is unchanged (SurgicalSaveService, TrySaveCurrentInspection and
+    MainWindow_Closing untouched); the new writes use the existing save paths.
+  - Packaged smoke start skipped: a non-dev Red.exe uses the real `%LOCALAPPDATA%\RED` profile and the real
+    Inspections folder, which this release must not touch.
+- **Deployment:** pending.
+
 ### 2026-10-19 — RED 2.3.0 — F-005 to F-026 in one combined release
 
 - **Base:** 2.2.3 (`d7d2af7`). F-005 to F-026 were built in the Dropbox copy (`Dropbox\P\PL`) by the Windows feature

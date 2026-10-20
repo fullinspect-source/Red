@@ -16,15 +16,18 @@ namespace InspectionEditor
 {
     public enum FolderView { MyList, Outbox, Archive, Review }
 
-    // F-014 Outbox and Archive views in the home window: view buttons with counts, header-only rows with Status and
-    // Processed columns, a live folder watcher (renames included), Move to My List / Move to Archive, and the Outbox
-    // "Sync" button for kind NonDropBox only (L8). Review is F-018.
+    // F-014 Outbox and Archive views in the home window: side tabs with counts, header-only rows with Status and
+    // Processed columns, a live folder watcher (renames included), Move to My List, and the Outbox "Sync" button for
+    // kind NonDropBox only (L8). Review is F-018.
+    // Owner 2026-10-19: the views are side tabs (My List, Outbox, Archive, Review); Move to Archive and Move to Review
+    // are gone ("never needed"); Remove, Move to My List and Approve act on the rows ticked in the list.
     public partial class InspectionPickerWindow
     {
         private FolderView _folderView = FolderView.MyList;
         private WrapPanel? _folderViewBar;
-        private readonly Dictionary<FolderView, Button> _folderViewButtons = new();
-        private Button? _moveToMyListButton, _moveToArchiveButton, _syncButton, _moveToReviewButton, _approveButton, _removeButton, _addServiceButton;
+        private readonly Dictionary<FolderView, Button> _folderViewButtons = new(); // the side tabs
+        private readonly HashSet<string> _checkedPaths = new(StringComparer.OrdinalIgnoreCase);
+        private Button? _moveToMyListButton, _syncButton, _approveButton, _removeButton, _addServiceButton;
         private AddServiceWindow? _addWindow;
         private bool _addPressedWhileDownloading;
         private TextBlock? _folderViewNote;
@@ -70,25 +73,19 @@ namespace InspectionEditor
                 return;
             _folderViewBar = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
             foreach (var view in new[] { FolderView.MyList, FolderView.Outbox, FolderView.Archive, FolderView.Review })
-            {
-                var button = new Button { Content = Caption(view), Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(0, 0, 6, 0), Tag = view };
-                if (TryFindResource("QuietButtonStyle") is Style style) button.Style = style;
-                button.Click += (_, _) => ShowFolderView(view);
-                _folderViewButtons[view] = button;
-                _folderViewBar.Children.Add(button);
-            }
-            _moveToMyListButton = CommandButton("Move to My List…", () => ShowMoveDialog(InspectFolder.MyList));
-            _moveToArchiveButton = CommandButton("Move to Archive…", () => ShowMoveDialog(InspectFolder.Archive));
+                _folderViewButtons[view] = FolderTabButton(view);
+            _moveToMyListButton = CommandButton("Move to My List", () => ShowMoveDialog(InspectFolder.MyList));
             _syncButton = CommandButton("Sync", async () => await RunSyncAsync());
-            _moveToReviewButton = CommandButton("Move to Review…", () => ShowMoveDialog(InspectFolder.Review)); // F-018 M1
             _approveButton = CommandButton("Approve…", async () => await ShowApproveDialogAsync());           // F-018 A4
             _addServiceButton = CommandButton("Add…", OnAddServiceClick); // F-021 E1: My List only
-            _folderViewBar.Children.Add(new Border { Width = 14 });
+            // Owner 2026-10-19: Add is green.
+            _addServiceButton.Background = new SolidColorBrush(Color.FromRgb(63, 163, 77));
+            _addServiceButton.BorderBrush = new SolidColorBrush(Color.FromRgb(46, 125, 50));
+            _addServiceButton.Foreground = Brushes.White;
+            _addServiceButton.FontWeight = FontWeights.SemiBold;
             _folderViewBar.Children.Add(_addServiceButton);
             _folderViewBar.Children.Add(_approveButton);
             _folderViewBar.Children.Add(_moveToMyListButton);
-            _folderViewBar.Children.Add(_moveToArchiveButton);
-            _folderViewBar.Children.Add(_moveToReviewButton);
             _folderViewBar.Children.Add(_syncButton);
             _removeButton = CommandButton("Remove…", ShowRemoveDialog); // F-019 D1, every view
             _folderViewBar.Children.Add(_removeButton);
@@ -119,10 +116,18 @@ namespace InspectionEditor
             if (!reviewer && _folderView == FolderView.Review && root != null)
             {
                 _folderView = FolderView.MyList; // the Review folder emptied or the setting changed
-                LoadInspections(InspectFolders.PathOf(root, InspectFolder.MyList));
+                ClearTicks();
+                ApplyColumnSettings();
+                string myList = InspectFolders.PathOf(root, InspectFolder.MyList);
+                if (_isLoading)
+                    _pendingFolderViewLoad = myList; // e.g. the reload after an Approve is still running
+                LoadInspections(myList);
+                if (MyListPanel.Visibility == Visibility.Visible)
+                    SetActiveTab(MyListTabButton);
             }
             foreach (var (view, button) in _folderViewButtons)
             {
+                // F-018 W2: the Review tab only for reviewers (setting Always, or Auto with files in Review).
                 button.Visibility = view != FolderView.Review || reviewer ? Visibility.Visible : Visibility.Collapsed;
                 int count = 0;
                 try
@@ -132,16 +137,14 @@ namespace InspectionEditor
                         count = Directory.EnumerateFiles(folder, "*.ins", SearchOption.TopDirectoryOnly).Count();
                 }
                 catch (Exception) { }
-                string indicator = view == FolderView.Outbox ? (count > 0 ? " ●" : " ○") : "";
+                string indicator = view == FolderView.Outbox && count > 0 ? " ●" : "";
                 button.Content = $"{Caption(view)} ({count}){indicator}";
-                button.FontWeight = view == _folderView ? FontWeights.Bold : FontWeights.Normal;
-                button.Foreground = view == FolderView.Outbox && count > 0
-                    ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
-                    : new SolidColorBrush(Color.FromRgb(31, 41, 51));
+                if (view == FolderView.Outbox)
+                    _outboxHasFiles = count > 0;
             }
+            if (_activeTab != null)
+                SetActiveTab(_activeTab); // re-colour the Outbox tab
             _moveToMyListButton!.Visibility = _folderView == FolderView.MyList ? Visibility.Collapsed : Visibility.Visible;
-            _moveToArchiveButton!.Visibility = _folderView == FolderView.Archive ? Visibility.Collapsed : Visibility.Visible;
-            _moveToReviewButton!.Visibility = reviewer && _folderView != FolderView.Review ? Visibility.Visible : Visibility.Collapsed;
             _approveButton!.Visibility = reviewer && _folderView == FolderView.Review ? Visibility.Visible : Visibility.Collapsed;
             _addServiceButton!.Visibility = _folderView == FolderView.MyList ? Visibility.Visible : Visibility.Collapsed;
             var kind = InspectUserType.Classify(InspectorProfileService.Load()?.UserType);
@@ -172,14 +175,31 @@ namespace InspectionEditor
             string? root = InspectionsRoot();
             if (root == null)
                 return;
+            if (view != _folderView)
+                ClearTicks(); // ticks belong to one folder
             _folderView = view;
-            if (FolderPathText.Parent is Panel header && header.Children.OfType<TextBlock>().FirstOrDefault() is { } title && !ReferenceEquals(title, FolderPathText))
-                title.Text = Caption(view);
             ApplyColumnSettings();
             string folder = InspectFolders.PathOf(root, ToInspectFolder(view));
+            if (_isLoading)
+                _pendingFolderViewLoad = folder; // a tab picked while another folder still loads: load it next
             LoadInspections(folder);
             StartFolderWatcher(folder);
             UpdateFolderViewBar();
+        }
+
+        private string? _pendingFolderViewLoad;
+
+        // Called when a load ends: the folder of a tab picked during that load is loaded now (unless a profile repoint
+        // has started its own load), so the list never shows one folder under another folder's tab.
+        private void RunPendingFolderViewLoad()
+        {
+            string? folder = _pendingFolderViewLoad;
+            _pendingFolderViewLoad = null;
+            if (folder != null && !_isLoading && !PathEquals(folder, _currentFolderPath))
+            {
+                LoadInspections(folder);
+                UpdateFolderViewBar(); // the watcher follows the listed folder; the counts refresh
+            }
         }
 
         // Rows for the list: My List keeps RED's full parse; Outbox and Archive read the header only (L3).
@@ -254,10 +274,11 @@ namespace InspectionEditor
         private void FolderWatchDebounce_Tick(object? sender, EventArgs e)
         {
             _folderWatchDebounce?.Stop();
-            if (!IsLoaded || MyListPanel.Visibility != Visibility.Visible)
+            if (!IsLoaded)
                 return;
-            RefreshCurrentMyListFolder();
-            UpdateFolderViewBar();
+            if (MyListPanel.Visibility == Visibility.Visible)
+                RefreshCurrentMyListFolder();
+            UpdateFolderViewBar(); // the tab counts show on every tab
         }
 
         // M1-M5: pick rows, move them one by one, report "{n} of {m} inspections were moved."
@@ -288,7 +309,7 @@ namespace InspectionEditor
                 return;
             }
             string destCaption = destination == InspectFolder.MyList ? "My List" : destination.ToString();
-            var chosen = PickRows($"Move to {destCaption}", $"Move to {destCaption}", "There is nothing to move in this view.");
+            var chosen = TickedRows($"move to {destCaption}");
             if (chosen == null)
                 return;
 
@@ -400,7 +421,7 @@ namespace InspectionEditor
                 MessageBox.Show(this, $"Remove works only on the {Caption(_folderView)} folder of your Inspections folder.", "Remove", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            var chosen = PickRows("Remove from device", "Remove", "There is nothing to remove in this view.");
+            var chosen = TickedRows("remove");
             if (chosen == null)
                 return;
             if (MessageBox.Show(this, RemoveFromDeviceService.Question(chosen.Count), "Remove", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
@@ -448,7 +469,7 @@ namespace InspectionEditor
                 MessageBox.Show(this, "Approve works only on the Review folder of your Inspections folder. Open the Review view again to approve.", "Approve", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            var chosen = PickRows("Approve", "Approve", "There is nothing to approve in this view.");
+            var chosen = TickedRows("approve");
             if (chosen == null)
                 return;
             var profile = ProfileGuard.Require(this, "Approve");
@@ -476,51 +497,80 @@ namespace InspectionEditor
             UpdateFolderViewBar();
         }
 
-        // The pick list shared by Move and Approve: list order, Select All / Unselect All. Null when nothing was chosen.
-        private List<InspectionFileInfo>? PickRows(string title, string action, string emptyText)
+        // Owner 2026-10-19: Remove, Move to My List and Approve take the rows ticked in the list (only rows the search
+        // shows), in file-name order as the old pick list had them. Nothing ticked: a hint in the status line, no popup.
+        // Only rows of the folder the list now holds count: during a tab switch's load, or after a failed load, the old
+        // folder's rows can still be on screen.
+        private List<InspectionFileInfo>? TickedRows(string verb)
         {
-            var rows = _allInspections.ToList();
-            if (rows.Count == 0)
+            if (_isLoading)
             {
-                MessageBox.Show(this, emptyText, title, MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText.Text = TickedRowsService.StillLoading;
                 return null;
             }
-            var checks = new List<(CheckBox Box, InspectionFileInfo Row)>();
-            var list = new StackPanel();
-            foreach (var row in rows.OrderBy(r => r.FileName, StringComparer.OrdinalIgnoreCase))
+            var chosen = TickedRowsService.Chosen(
+                ShownRows().Where(r => TickedRowsService.Counts(r.FilePath, _checkedPaths, _currentFolderPath)),
+                r => r.IsChecked, r => r.FileName);
+            if (chosen.Count > 0)
+                return chosen;
+            StatusText.Text = TickedRowsService.NothingTicked(verb);
+            return null;
+        }
+
+        private static bool SameFolder(string? a, string? b) => TickedRowsService.SameFolder(a, b);
+
+        private void ClearTicks()
+        {
+            _checkedPaths.Clear();
+            foreach (var row in ShownRows())
+                row.IsChecked = false;
+            UpdateCheckAllBox();
+        }
+
+        private IEnumerable<InspectionFileInfo> ShownRows() =>
+            InspectionListView.ItemsSource as IEnumerable<InspectionFileInfo> ?? Enumerable.Empty<InspectionFileInfo>();
+
+        // Tick-all ticks what the user can see: in a categorized list, rows inside a collapsed group are left alone.
+        private IEnumerable<InspectionFileInfo> VisibleRows() =>
+            _categoryMode == "None"
+                ? ShownRows()
+                : ShownRows().Where(r => InspectionListView.ItemContainerGenerator.ContainerFromItem(r) is ListViewItem { IsVisible: true });
+
+        private void RowCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: InspectionFileInfo row })
+                TickedRowsService.Set(_checkedPaths, row.FilePath, row.IsChecked);
+            UpdateCheckAllBox();
+        }
+
+        private void CheckAllRowsBox_Click(object sender, RoutedEventArgs e)
+        {
+            bool tick = CheckAllRowsBox.IsChecked == true;
+            foreach (var row in tick ? VisibleRows() : ShownRows())
             {
-                var box = new CheckBox { Content = $"{row.FileName}   {row.Address}", Margin = new Thickness(0, 2, 0, 2) };
-                checks.Add((box, row));
-                list.Children.Add(box);
+                row.IsChecked = tick;
+                TickedRowsService.Set(_checkedPaths, row.FilePath, tick);
             }
-            var window = new Window
-            {
-                Title = title,
-                Owner = this,
-                Width = 560,
-                Height = 520,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-            var move = new Button { Content = action, Padding = new Thickness(14, 4, 14, 4), Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
-            var cancel = new Button { Content = "Cancel", Padding = new Thickness(14, 4, 14, 4), IsCancel = true };
-            var selectAll = new Button { Content = "Select All", Padding = new Thickness(10, 4, 10, 4), Margin = new Thickness(0, 0, 8, 0) };
-            var unselectAll = new Button { Content = "Unselect All", Padding = new Thickness(10, 4, 10, 4) };
-            selectAll.Click += (_, _) => checks.ForEach(c => c.Box.IsChecked = true);
-            unselectAll.Click += (_, _) => checks.ForEach(c => c.Box.IsChecked = false);
-            bool go = false;
-            move.Click += (_, _) => { go = true; window.Close(); };
-            var top = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-            top.Children.Add(selectAll); top.Children.Add(unselectAll);
-            var bottom = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
-            bottom.Children.Add(move); bottom.Children.Add(cancel);
-            var dock = new DockPanel { Margin = new Thickness(12) };
-            DockPanel.SetDock(top, Dock.Top); DockPanel.SetDock(bottom, Dock.Bottom);
-            dock.Children.Add(top); dock.Children.Add(bottom);
-            dock.Children.Add(new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-            window.Content = dock;
-            window.ShowDialog();
-            var chosen = checks.Where(c => c.Box.IsChecked == true).Select(c => c.Row).ToList();
-            return go && chosen.Count > 0 ? chosen : null;
+            UpdateCheckAllBox();
+        }
+
+        // After a reload: keep the ticks of files still listed, drop the rest.
+        private void RestoreRowChecks()
+        {
+            TickedRowsService.Prune(_checkedPaths, _allInspections.Select(r => r.FilePath));
+            foreach (var row in _allInspections)
+                row.IsChecked = _checkedPaths.Contains(row.FilePath);
+        }
+
+        // Ticked when every row the user can see is ticked (rows in a collapsed category group do not count), so the
+        // box can always untick what it ticked.
+        private void CategoryGroupExpander_Toggled(object sender, RoutedEventArgs e) =>
+            Dispatcher.BeginInvoke(new Action(UpdateCheckAllBox), System.Windows.Threading.DispatcherPriority.Loaded);
+
+        private void UpdateCheckAllBox()
+        {
+            var visible = VisibleRows().ToList();
+            CheckAllRowsBox.IsChecked = visible.Count > 0 && visible.All(r => r.IsChecked);
         }
 
         // L8 / F-013 §3B: the Outbox Sync button, kind NonDropBox only.

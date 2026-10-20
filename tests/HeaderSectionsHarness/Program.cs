@@ -230,6 +230,58 @@ static class Harness
             try { Directory.Delete(root, true); } catch { }
         }
 
+        // ---------- Owner fix list 2026-10-19 item 14: the editor's result button label ----------
+        {
+            var statuses = HeaderRules.StatusList(new JArray(
+                new JObject { ["Id"] = 0, ["Name"] = "Ordered" }, new JObject { ["Id"] = 1, ["Name"] = "Scheduled" },
+                new JObject { ["Id"] = 2, ["Name"] = "Passed" }, new JObject { ["Id"] = 3, ["Name"] = "Failed" },
+                new JObject { ["Id"] = 5, ["Name"] = "Correct & Proceed" }, new JObject { ["Id"] = 7, ["Name"] = "Complete" },
+                new JObject { ["Id"] = 9, ["Name"] = "Not Ready" }, new JObject { ["Id"] = 24, ["Name"] = "Engineer Review" }));
+            string L(int status, int next) => ResultLabel.For(status, next, statuses).Text;
+            Check("RES-1", L(0, 0) == "NO RESULT" && L(1, 2) == "NO RESULT" && !ResultLabel.For(0, 0, statuses).HasResult &&
+                           ResultLabel.For(1, 0, statuses).Background == ResultLabel.Neutral && ResultLabel.For(0, 0, null).Text == "NO RESULT",
+                "StatusId 0 (Ordered), 1 (Scheduled) or nothing set: NO RESULT, neutral, whatever the next action");
+            Check("RES-2", L(3, 2) == "FAIL (PO required)" && L(3, 3) == "FAIL (reinspection)" && L(3, 1) == "FAIL (next inspection)" &&
+                           L(3, 0) == "FAIL" && L(3, 7) == "FAIL",
+                "Failed: FAIL plus the E2 next action in brackets (2 PO required, 3 reinspection, 1 next inspection); none or unknown: FAIL");
+            Check("RES-3", ResultLabel.For(3, 1, statuses).Background == ResultLabel.Purple && ResultLabel.For(3, 2, statuses).Background == ResultLabel.Red &&
+                           ResultLabel.For(3, 0, statuses).Background == ResultLabel.Red,
+                "fail colours follow the result picker: next phase purple, PO / reinspection red");
+            Check("RES-4", L(2, 0) == "PASSED" && L(5, 0) == "CORRECT & PROCEED" && L(7, 0) == "COMPLETE" && L(24, 0) == "ENGINEER REVIEW" &&
+                           L(9, 0) == "NOT READY" && L(2, 2) == "PASSED",
+                "other statuses: the file's own StatusList name in capitals; a next action does not change them");
+            Check("RES-5", ResultLabel.For(2, 0, statuses).Background == ResultLabel.Green && ResultLabel.For(7, 0, statuses).Background == ResultLabel.Green &&
+                           ResultLabel.For(5, 0, statuses).Background == ResultLabel.Orange && ResultLabel.For(24, 0, statuses).Background == ResultLabel.Blue &&
+                           ResultLabel.For(9, 0, statuses).Background == ResultLabel.Slate && ResultLabel.For(2, 0, statuses).HasResult,
+                "colours: pass family green, Correct & Proceed orange, engineer review blue, others slate");
+            Check("RES-6", L(15, 0) == "STATUS 15" && ResultLabel.For(2, 0, new List<StatusOption>()).Text == "STATUS 2",
+                "a status missing from the file's list is named by its number, never guessed");
+            // The real picker in both modes: from the button, Cancel and no Skip; while closing, Skip and Keep Open as before.
+            string? failure = null;
+            string fromButton = "", whileClosing = "";
+            var ui = new Thread(() =>
+            {
+                try
+                {
+                    var ids = new List<int> { 0, 1, 2, 3, 5 };
+                    var changeOnly = new ResultPickerWindow("HER", 10, 1, null, false, ids, changeOnly: true);
+                    var closing = new ResultPickerWindow("HER", 10, 1, null, false, ids);
+                    string Describe(ResultPickerWindow w) =>
+                        $"{((System.Windows.Controls.Button)w.FindName("SkipButton")).Visibility}/{((System.Windows.Controls.Button)w.FindName("KeepOpenButton")).Content}";
+                    fromButton = Describe(changeOnly);
+                    whileClosing = Describe(closing);
+                    changeOnly.Close();
+                    closing.Close();
+                }
+                catch (Exception ex) { failure = (ex.InnerException ?? ex).Message; }
+            });
+            ui.SetApartmentState(ApartmentState.STA);
+            ui.Start();
+            ui.Join();
+            Check("RES-7", failure == null && fromButton == "Collapsed/Cancel" && whileClosing == "Visible/↩ Keep Open",
+                $"from the button the picker offers Cancel and no Skip; while closing it keeps Skip and Keep Open ({failure ?? fromButton + " | " + whileClosing})");
+        }
+
         Console.WriteLine();
         Console.WriteLine($"F-007 harness: {_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;

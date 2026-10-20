@@ -333,10 +333,10 @@ namespace InspectionEditor
                 value = parsed;
             }
             if (value == _sheet.Scheduled) { Refresh(); return; }
-            var warnings = _sheet.SetScheduled(value);
+            // Owner 2026-10-19: no "Your schedule date is before the Ready / after the Closing date." popups; the date
+            // stands as typed (SetScheduled still returns the warnings for the harness).
+            _sheet.SetScheduled(value);
             Refresh();
-            foreach (string warning in warnings)
-                MessageBox.Show(this, warning, "", MessageBoxButton.OK, MessageBoxImage.Warning); // no title, warning style
         }
 
         // E3 then B3 (§9.6). False when it did not save (its alert shown); the sheet keeps the edits.

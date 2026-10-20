@@ -635,7 +635,9 @@ namespace InspectionEditor
             return count;
         }
 
-        private bool ShowResultPicker(bool closeAfterPicker)
+        // changeOnly: opened from the result button (item 14), not while closing; the picker then offers Cancel instead of
+        // "Skip" and "Keep Open".
+        private bool ShowResultPicker(bool closeAfterPicker, bool changeOnly = false)
         {
             string code = _currentInspectionCode ?? _currentInspection?.InspectionCode ?? "";
             int answered = CountAnsweredItems();
@@ -668,7 +670,7 @@ namespace InspectionEditor
             }
 
             // F-007 E5: offer only the statuses in the file's own StatusList.
-            var picker = new ResultPickerWindow(code, answered, failed, config, expirationStageDone, CurrentStatusListIds())
+            var picker = new ResultPickerWindow(code, answered, failed, config, expirationStageDone, CurrentStatusListIds(), changeOnly)
             {
                 Owner = this
             };
@@ -2758,7 +2760,8 @@ namespace InspectionEditor
 
             var template = _userDataService.GetTemplate(_currentInspectionCode);
             bool isSCI = (_currentInspectionCode ?? "").Equals("SCI", StringComparison.OrdinalIgnoreCase);
-            
+            var before = ItemValueSnapshot();
+
             foreach (var section in _currentInspection.Sections)
             {
                 // Skip Administrative section - these are report-specific header fields
@@ -2767,18 +2770,31 @@ namespace InspectionEditor
 
                 foreach (var item in section.Items)
                 {
-                    if (template.TryGetValue(item.Number ?? "", out var defaultValue))
-                    {
-                        if (!string.IsNullOrEmpty(defaultValue))
-                            item.Value = defaultValue;
-                    }
+                    // F-004 C1/C2: only a value the item's control can store, as TemplateService does.
+                    if (template.TryGetValue(item.Number ?? "", out var defaultValue) && !string.IsNullOrEmpty(defaultValue) &&
+                        ItemControls.TryValueForControl(item, defaultValue, out string stored))
+                        item.Value = stored;
                 }
             }
 
             MarkUnsaved();
             RefreshAfterTemplateChange();
+            FlashValuesChangedSince(before);
             // Removed success popup - user already knows they clicked Apply Template
         }
+
+        // Owner 2026-10-19: the values a template changed flash red 5 times.
+        private Dictionary<Item, string> ItemValueSnapshot()
+        {
+            var snapshot = new Dictionary<Item, string>(ReferenceEqualityComparer.Instance);
+            foreach (var item in (_currentInspection?.Sections ?? new List<Section>()).SelectMany(s => s.Items))
+                snapshot[item] = item.Value?.ToString() ?? "";
+            return snapshot;
+        }
+
+        private void FlashValuesChangedSince(Dictionary<Item, string> before) =>
+            FlashChangedValues(before.Where(kv => !string.Equals(kv.Key.Value?.ToString() ?? "", kv.Value, StringComparison.Ordinal))
+                .Select(kv => kv.Key).ToArray());
 
         #region FormId-Based Templates
 
@@ -2792,13 +2808,14 @@ namespace InspectionEditor
             var templates = _templateService.GetTemplatesForForm(_currentInspection.FormId);
             if (templates.Count > 0)
             {
-                PromptApplyTemplate(templates);
+                PromptApplyTemplate(templates, askFirst: true);
             }
             else if (_userDataService?.HasTemplate(_currentInspectionCode ?? "") == true)
             {
+                // An offer on opening a blank report (a choice, kept). Owner 2026-10-19: no "values may be replaced" reminder.
                 var result = MessageBox.Show(
                     $"A saved template exists for {_currentInspectionCode} inspections.\n\n" +
-                    "Apply default values? Existing eligible values may be replaced.",
+                    "Apply default values?",
                     "Apply Template?", MessageBoxButton.YesNo, MessageBoxImage.Question,
                     MessageBoxResult.No);
                 if (result == MessageBoxResult.Yes)
@@ -2860,7 +2877,9 @@ namespace InspectionEditor
                 LoadItemEditor(_editorLoadedItem);
         }
 
-        private void PromptApplyTemplate(List<InspectionTemplate> templates)
+        // askFirst: the offer when a blank report opens (a choice). The Apply Template button applies at once (owner
+        // 2026-10-19: no question after the user asked for it); the values that change flash red 5 times.
+        private void PromptApplyTemplate(List<InspectionTemplate> templates, bool askFirst)
         {
             if (_currentInspection == null) return;
 
@@ -2868,19 +2887,21 @@ namespace InspectionEditor
             {
                 // Single template - simple yes/no
                 var template = templates[0];
-                var result = MessageBox.Show(
+                bool apply = !askFirst || MessageBox.Show(
                     $"A saved template exists for this form type:\n\n\"{template.Name}\"\n\n" +
-                    "Apply default values? Existing eligible values may be replaced.",
+                    "Apply default values?",
                     "Apply Template?",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question,
-                    MessageBoxResult.No);
+                    MessageBoxResult.No) == MessageBoxResult.Yes;
 
-                if (result == MessageBoxResult.Yes)
+                if (apply)
                 {
+                    var before = ItemValueSnapshot();
                     int count = _templateService.ApplyTemplate(template, _currentInspection, _currentInspectionCode);
                     MarkUnsaved();
                     RefreshAfterTemplateChange();
+                    FlashValuesChangedSince(before);
                     // Removed success popup - user already clicked Yes to apply
                 }
             }
@@ -2904,7 +2925,7 @@ namespace InspectionEditor
                 var stack = new StackPanel { Margin = new Thickness(15) };
                 stack.Children.Add(new TextBlock 
                 { 
-                    Text = "Multiple templates exist for this form type.\nSelect one to apply. Existing eligible values may be replaced.",
+                    Text = "Multiple templates exist for this form type.\nSelect one to apply.",
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 0, 0, 10) 
                 });
@@ -2931,33 +2952,50 @@ namespace InspectionEditor
                 if (selectionWindow.ShowDialog() == true && combo.SelectedIndex > 0)
                 {
                     var selectedTemplate = templates[combo.SelectedIndex - 1];
+                    var before = ItemValueSnapshot();
                     int count = _templateService.ApplyTemplate(selectedTemplate, _currentInspection, _currentInspectionCode);
                     MarkUnsaved();
                     RefreshAfterTemplateChange();
+                    FlashValuesChangedSince(before);
                     // Removed success popup - user already selected and applied template
                 }
             }
         }
 
+        private bool _templateApplyPending;
+
         private void ApplyTemplateButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentInspection == null) return;
+            if (_currentInspection == null || _templateApplyPending) return;
+            var report = _currentInspection;
+            _templateApplyPending = true;
             AutoApplyCurrentItem();
-
-            var templates = _templateService.GetTemplatesForForm(_currentInspection.FormId);
-            if (templates.Count == 0)
+            // That save may have stopped on a changed-on-disk file and queued a Reload or Close (Background priority).
+            // With no question in between any more, let it run first and apply only to this same report.
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (_userDataService != null && _userDataService.HasTemplate(_currentInspectionCode ?? ""))
+                try
                 {
-                    ApplyInspectionTemplate();
-                    return;
+                    if (_isLoadingFile || _readOnlyMode || !ReferenceEquals(_currentInspection, report))
+                        return;
+
+                    var templates = _templateService.GetTemplatesForForm(report.FormId);
+                    if (templates.Count == 0)
+                    {
+                        if (_userDataService != null && _userDataService.HasTemplate(_currentInspectionCode ?? ""))
+                        {
+                            ApplyInspectionTemplate();
+                            return;
+                        }
+
+                        MessageBox.Show("No templates saved for this form type.", "No Templates", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+
+                    PromptApplyTemplate(templates, askFirst: false);
                 }
-
-                MessageBox.Show("No templates saved for this form type.", "No Templates", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            PromptApplyTemplate(templates);
+                finally { _templateApplyPending = false; }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void SaveTemplateButton_Click(object sender, RoutedEventArgs e)
@@ -5813,16 +5851,17 @@ namespace InspectionEditor
                     MessageBox.Show("HET or calculation inputs changed. Review the refreshed value and click again.", "Local HET transfer", MessageBoxButton.OK, MessageBoxImage.Warning);
                     PopulateTreeView(SearchFilterBox.Text); return;
                 }
-                string oldValue = item.Value?.ToString() ?? "";
-                if (MessageBox.Show($"Source: {fresh.Source}\n{fresh.Detail}\n\nReplace current value '{oldValue}' with '{fresh.Value}'?",
-                    "Confirm measured HET transfer", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-                var confirmed = HetMeasuredTransferService.Resolve(_currentFilePath, _currentInspection, item);
-                if (confirmed != fresh || (item.Value?.ToString() ?? "") != oldValue || _readOnlyMode || !EditorEditService.Owns(_currentInspection, item))
+                // Owner 2026-10-19 (fix list p3): no "Confirm measured HET transfer" question. The chip's value is copied
+                // at once and the field flashes red 5 times; the two refusals above still stop a stale or unusable chip.
+                // F-004 C1: only a value the field can store; a copy is never a tap that clears the same value.
+                if (!ItemControls.TryValueForControl(item, fresh.Value!, out string stored))
                 {
-                    MessageBox.Show("Source or target changed during confirmation. Nothing copied. Review and retry.", "Local HET transfer");
-                    PopulateTreeView(SearchFilterBox.Text); return;
+                    MessageBox.Show($"This field cannot store the HET value '{fresh.Value}'. Nothing copied.", "Local HET transfer", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
-                SetInlineItemValue(item, fresh.Value!);
+                if (!string.Equals(item.Value?.ToString() ?? "", stored, StringComparison.Ordinal))
+                    SetInlineItemValue(item, stored, toggle: false);
+                FlashChangedValues(item);
             };
             return button;
         }
@@ -9704,13 +9743,14 @@ namespace InspectionEditor
             e.Handled = true;
         }
 
-        private void SetInlineItemValue(Item item, string value)
+        // toggle: a tap on the chosen value clears it. A copy RED makes (the HET chip) passes false.
+        private void SetInlineItemValue(Item item, string value, bool toggle = true)
         {
             LoadItemEditor(item);
             SelectItemInTreeView(item);
             string currentValue = item.Value?.ToString() ?? "";
             var control = ItemControls.For(item);
-            if (value.Equals(currentValue, StringComparison.OrdinalIgnoreCase))
+            if (toggle && value.Equals(currentValue, StringComparison.OrdinalIgnoreCase))
             {
                 // F-004: a selected checkbox or NI toggle clears to null (RTC B26, B32); list choices keep RED's "".
                 item.Value = control.IsCheckboxes || value.Equals("NI", StringComparison.OrdinalIgnoreCase) ? null : "";
@@ -9980,6 +10020,7 @@ namespace InspectionEditor
             // Invalidate navigation queued for any previously rendered filter/search.
             _checklistFilterGeneration++;
             SectionsTreeView.Items.Clear();
+            UpdateResultButton(); // item 14: on open, after edits, read-only changes and close
             if (_currentInspection?.Sections == null) return;
 
             bool hasFilter = !string.IsNullOrWhiteSpace(filter);
@@ -13631,11 +13672,17 @@ namespace InspectionEditor
             if (IsCompositeWindowRatingItem(anchor))
             {
                 string? completeRating = CompositeWindowRating(pairs, anchor);
-                anchorValue = completeRating ?? transcription;
+                string anchorBefore = anchor.Value?.ToString() ?? "";
+                // F-004 C1: only a value the control can store.
+                if (!ItemControls.TryValueForControl(anchor, completeRating ?? transcription, out string compositeStored))
+                    return anchorBefore;
+                anchorValue = compositeStored;
                 anchor.Value = anchorValue;
                 MarkUnsaved();
                 if (completeRating != null)
-                    OfferWindowRatingShare(anchor, completeRating);
+                    ShareWindowRating(anchor, anchorValue, anchorBefore);
+                else
+                    FlashChangedValues(anchor);
                 return anchorValue;
             }
 
@@ -13652,7 +13699,10 @@ namespace InspectionEditor
             MarkUnsaved();
 
             if (pairs.Count < 2)
+            {
+                FlashChangedValues(anchor); // owner 2026-10-19: changed values flash red
                 return anchorValue;
+            }
 
             // Use the inspection's actual persisted order, not the filtered/visible list.
             // Required partner fields still need values when a filter or collapsed section hides them.
@@ -13660,9 +13710,13 @@ namespace InspectionEditor
             var items = ownerSection?.Items?.ToList() ?? new List<Item>();
             int idx = items.IndexOf(anchor);
             if (idx < 0)
+            {
+                FlashChangedValues(anchor);
                 return anchorValue;
+            }
 
             var autoFilled = new List<string>();
+            var filledItems = new List<Item> { anchor };
             var consumedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             for (int offset = 1; offset <= 2 && idx + offset < items.Count; offset++)
@@ -13680,6 +13734,7 @@ namespace InspectionEditor
                         candidate.Value = candidateStored;
                         consumedKeys.Add(key);
                         autoFilled.Add(candidate.DisplayLabel ?? candidate.Name ?? "next item");
+                        filledItems.Add(candidate);
                         break;
                     }
                 }
@@ -13699,6 +13754,7 @@ namespace InspectionEditor
                 SuggestionsStack.Children.Add(note);
             }
 
+            FlashChangedValues(filledItems.ToArray());
             return anchorValue;
         }
 
@@ -13730,39 +13786,44 @@ namespace InspectionEditor
             return operable == fixedWindow ? "" : operable ? "operable" : "fixed";
         }
 
-        private void OfferWindowRatingShare(Item anchor, string rating)
+        // Owner 2026-10-19 (fix list p3): no "Confirm window ratings for both types" question. The one field of the
+        // other window type (same section and unit) gets the same rating at once, and both changed fields flash red 5
+        // times; the inspector corrects it if the other windows differ. The other field keeps a rating of its own:
+        // it is filled only when blank or still equal to this field's previous value (the two were in sync), and an
+        // NI there (no such windows) stays. With no single partner nothing else changes (never guess which repeated
+        // field was meant).
+        private void ShareWindowRating(Item anchor, string rating, string anchorBefore)
         {
             var inspection = _currentInspection;
             var section = inspection?.Sections?.FirstOrDefault(s => s.Items.Contains(anchor));
             string kind = WindowRatingKind(anchor);
             int unit = TranscriptionUnit(anchor);
-            if (section == null || kind.Length == 0 || unit < 1) return;
-            string partnerKind = kind == "operable" ? "fixed" : "operable";
-            var partners = section.Items.Where(item => item != anchor && IsCompositeWindowRatingItem(item)
-                && WindowRatingKind(item) == partnerKind && TranscriptionUnit(item) == unit).ToList();
-            if (partners.Count != 1) return; // Never guess which repeated field the inspector intended.
-            var partner = partners[0];
-            string oldValue = partner.Value?.ToString() ?? "";
-            if (string.Equals(oldValue, rating, StringComparison.Ordinal)) return;
-            string label = (string.IsNullOrWhiteSpace(partner.DisplayLabel) ? partner.Name : partner.DisplayLabel) ?? "window ratings";
-            string shownOld = string.IsNullOrWhiteSpace(oldValue) ? "(blank)" : oldValue;
-            var choice = MessageBox.Show(
-                $"The selected {kind}-window field now contains:\n{rating}\n\n" +
-                $"This sticker does not prove the {partnerKind} windows have the same ratings. " +
-                "Choose Yes only if you have confirmed both window types use these ratings.\n\n" +
-                $"Other field: {label}\nCurrent value: {shownOld}\nProposed value: {rating}\n\n" +
-                "Yes: replace the other field with the proposed value.\nNo: keep the other field unchanged.",
-                "Confirm window ratings for both types", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
-            // A modal dialog can pump events. Recheck the exact owner and previewed value.
-            if (choice != MessageBoxResult.Yes || _readOnlyMode || _currentInspection != inspection ||
-                !EditorEditService.Owns(inspection, anchor) || !EditorEditService.Owns(inspection, partner) ||
-                !section.Items.Contains(anchor) || !section.Items.Contains(partner) ||
-                !IsCompositeWindowRatingItem(partner) || WindowRatingKind(partner) != partnerKind ||
-                TranscriptionUnit(anchor) != unit || TranscriptionUnit(partner) != unit ||
-                !string.Equals(partner.Value?.ToString() ?? "", oldValue, StringComparison.Ordinal) ||
-                !string.Equals(anchor.Value?.ToString(), rating, StringComparison.Ordinal)) return;
-            partner.Value = rating;
+            Item? partner = null;
+            if (section != null && kind.Length > 0 && unit >= 1)
+            {
+                string partnerKind = kind == "operable" ? "fixed" : "operable";
+                var partners = section.Items.Where(item => item != anchor && IsCompositeWindowRatingItem(item)
+                    && WindowRatingKind(item) == partnerKind && TranscriptionUnit(item) == unit).ToList();
+                if (partners.Count == 1)
+                    partner = partners[0];
+            }
+            string oldValue = partner?.Value?.ToString() ?? "";
+            bool partnerOwnValue = !string.IsNullOrWhiteSpace(oldValue) &&
+                !string.Equals(oldValue, anchorBefore, StringComparison.Ordinal);
+            string partnerStored = rating;
+            bool keepPartner = partner == null || _readOnlyMode || !EditorEditService.Owns(inspection, partner) ||
+                string.Equals(oldValue, rating, StringComparison.Ordinal) || partnerOwnValue ||
+                string.Equals(oldValue.Trim(), "NI", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(oldValue.Trim(), "NA", StringComparison.OrdinalIgnoreCase) ||
+                !ItemControls.TryValueForControl(partner!, rating, out partnerStored); // F-004 C1: only a value its control stores
+            if (keepPartner)
+            {
+                FlashChangedValues(anchor);
+                return;
+            }
+            partner!.Value = partnerStored;
             MarkUnsaved();
+            FlashChangedValues(anchor, partner); // a partner a filter hides is named in the header note instead
         }
 
         private static int TranscriptionUnit(Item item)
@@ -14619,6 +14680,7 @@ namespace InspectionEditor
                 
                 // Clear the UI
                 SectionsTreeView.Items.Clear();
+                UpdateResultButton(); // item 14: no report, no result button
                 EditorPanel.Visibility = Visibility.Collapsed;
                 SelectItemPanel.Visibility = Visibility.Collapsed;
                 WelcomePanel.Visibility = Visibility.Visible;
@@ -15277,6 +15339,7 @@ namespace InspectionEditor
             _statsMode = StatsMode.Global;
 
             SectionsTreeView.Items.Clear();
+            UpdateResultButton(); // item 14: no report, no result button
             EditorPanel.Visibility = Visibility.Collapsed;
             SelectItemPanel.Visibility = Visibility.Collapsed;
             WelcomePanel.Visibility = Visibility.Visible;

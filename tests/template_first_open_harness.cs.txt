@@ -16,6 +16,12 @@ class Probe {
  TemplateService _templateService = new(); UserDataService? _userDataService = new();
  int Dirty,Refresh;
  void MarkUnsaved(){Dirty++;} void RefreshAfterTemplateChange(){Refresh++;} void AutoApplyCurrentItem(){}
+ // The button defers its apply behind any queued Reload/Close; here it runs at once.
+ bool _isLoadingFile,_readOnlyMode,_templateApplyPending; ImmediateDispatcher Dispatcher=new();
+ class ImmediateDispatcher {public void BeginInvoke(Action a,System.Windows.Threading.DispatcherPriority p)=>a();}
+ // Owner 2026-10-19: values a template changed flash red 5 times (UI only here: count the flashed items).
+ int Flashed; Dictionary<Item,string> ItemValueSnapshot()=>(_currentInspection?.Sections??new()).SelectMany(s=>s.Items).ToDictionary(x=>x,x=>x.Value?.ToString()??"");
+ void FlashValuesChangedSince(Dictionary<Item,string> before){Flashed+=before.Count(kv=>(kv.Key.Value?.ToString()??"")!=kv.Value);}
  static int Checks;
  static void Check(bool ok,string name){Checks++;if(!ok)throw new Exception("FAIL: "+name);Console.WriteLine("PASS: "+name);}
  static Item I(string n,string control="PassFail",object? value=null,int id=2)=>new(){Name=n,Number="2.1",ItemId=id,ControlName=control,Value=value};
@@ -46,15 +52,17 @@ class Probe {
   p=Fresh(Template());i=Blank();i.InspectionCode="SCI";p.Load(i);Check(MessageBox.Calls==0,"SCI section1 real content no header exemption");
   p=Fresh(Template());i=Blank();i.Sections[0].Name="Foundation";i.Sections[0].Items=new(){I("Concrete thickness","Lookup","4",8)};p.Load(i);Check(MessageBox.Calls==0,"section number1 alone is not administrative");
   p=Fresh(Template());i=Blank();i.Sections[0].Items[0].Value="   ";i.Sections[1].Items[0].Value=" \t";p.Load(i);Check(MessageBox.Calls==1,"whitespace blank is eligible");
-  p=Fresh(Template());i=Blank();i.Sections[1].Items[0].Value="0.40";p._currentInspection=i;p._currentInspectionCode="IER";before=JsonConvert.SerializeObject(i);p.ApplyTemplateButton_Click(p,new());Check(MessageBox.Calls==1&&JsonConvert.SerializeObject(i)==before,"manual Apply remains offered on filled report No preserves all fields");
+  // Owner fix list 2026-10-19: the Apply Template button applies at once (no question after the user asked) and the changed value flashes.
+  p=Fresh(Template());i=Blank();i.Sections[1].Items[0].Value="0.40";p._currentInspection=i;p._currentInspectionCode="IER";p.ApplyTemplateButton_Click(p,new());Check(MessageBox.Calls==0&&(string?)i.Sections[1].Items[1].Value=="Pass"&&(string?)i.Sections[1].Items[0].Value=="0.40"&&p.Dirty==1&&p.Flashed==1,"manual Apply on a filled report applies without a question, keeps other values and flashes the changed one");
   p=Fresh(Template(),Template(265,"Other"));i=Blank();before=JsonConvert.SerializeObject(i);p.Load(i);Check(Window.Calls==1&&JsonConvert.SerializeObject(i)==before,"multiple template cancel does not mutate");p.Load(i);Check(Window.Calls==2,"multiple template cancel can offer again");Window.Answer=true;Window.Index=1;p.Load(i);Check(p.Dirty==1,"multiple template explicit selection applies");
   p=Fresh(Template(),Template(265,"Other"));Window.Answer=true;Window.Index=0;i=Blank();before=JsonConvert.SerializeObject(i);p.Load(i);Check(p.Dirty==0&&JsonConvert.SerializeObject(i)==before,"do not apply selection does not mutate");
-  p=Fresh(Template());i=Blank();p._currentInspection=i;p._currentInspectionCode="IER";MessageBox.Answer=MessageBoxResult.Yes;p.ApplyTemplateButton_Click(p,new());Check((string?)i.Sections[1].Items[1].Value=="Pass","explicit manual button applies template");calls=MessageBox.Calls;p.Load(i);Check(MessageBox.Calls==calls,"manual application after-state cannot diagnose earlier load gate");
+  p=Fresh(Template());i=Blank();p._currentInspection=i;p._currentInspectionCode="IER";p.ApplyTemplateButton_Click(p,new());Check((string?)i.Sections[1].Items[1].Value=="Pass"&&MessageBox.Calls==0,"explicit manual button applies template");calls=MessageBox.Calls;p.Load(i);Check(MessageBox.Calls==calls,"manual application after-state cannot diagnose earlier load gate");
   p=Fresh(Template());i=Blank();i.Sections[0].Items.Add(I("Plans on site","YesNo","Yes",4));
   var file=Path.Combine(AppIdentity.LocalAppDataPath,"100-IER-1-TF.ins");File.WriteAllText(file,JsonConvert.SerializeObject(i));var bytes=File.ReadAllBytes(file);var loader=new LoadProbe();
   p.Load(loader.Load(file));p.Load(loader.Load(file));Check(MessageBox.Calls==2,"actual SurgicalSaveService.Load repeated disk reads reach offer despite admin defaults");Check(File.ReadAllBytes(file).SequenceEqual(bytes),"actual load and declined offer do not write INS");
-  Check(MessageBox.Default==MessageBoxResult.No&&MessageBox.Text.Contains("may be replaced"),"form prompt safe No default and overwrite disclosure");
-  p=Fresh(Template(999));p._userDataService!.Available=true;p.Load(Blank());Check(MessageBox.Default==MessageBoxResult.No&&MessageBox.Text.Contains("may be replaced"),"legacy prompt safe No default and overwrite disclosure");
+  // Owner fix list 2026-10-19: the blank-report offer keeps its safe No default but carries no "may be replaced" reminder.
+  Check(MessageBox.Default==MessageBoxResult.No&&!MessageBox.Text.Contains("may be replaced"),"form offer safe No default, no reminder sentence");
+  p=Fresh(Template(999));p._userDataService!.Available=true;p.Load(Blank());Check(MessageBox.Default==MessageBoxResult.No&&!MessageBox.Text.Contains("may be replaced"),"legacy offer safe No default, no reminder sentence");
   Console.WriteLine($"{Checks} production C# template checks passed");
  } finally {Directory.Delete(AppIdentity.LocalAppDataPath,true);}
  }
@@ -70,6 +78,7 @@ namespace System.Windows {
  class Thickness {public Thickness(int a){}public Thickness(int a,int b,int c,int d){}}
  class Window {public string? Title;public int Width,Height;public object? Owner,Content;public WindowStartupLocation WindowStartupLocation;public ResizeMode ResizeMode;public bool? DialogResult;public static int Calls,Index;public static bool? Answer;public static void Reset(){Calls=0;Index=0;Answer=null;}public bool? ShowDialog(){Calls++;Controls.ComboBox.Last!.SelectedIndex=Index;return Answer;}public void Close(){}}
 }
+namespace System.Windows.Threading { enum DispatcherPriority {Background} }
 namespace System.Windows.Controls {
  enum Orientation {Horizontal}
  class StackPanel {public Thickness? Margin;public List<object> Children=new();public Orientation Orientation;public HorizontalAlignment HorizontalAlignment;}

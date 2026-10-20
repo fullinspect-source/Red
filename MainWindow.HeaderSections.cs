@@ -456,6 +456,7 @@ namespace InspectionEditor
             }
             UpdateHeaderSummary(top: true);
             UpdateHeaderSummary(top: false);
+            UpdateResultButton(); // item 14: also after the End section's Status / Next Action combos
         }
 
         private void ClearHeaderSectionState()

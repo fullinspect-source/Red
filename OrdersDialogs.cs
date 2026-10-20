@@ -114,9 +114,11 @@ namespace InspectionEditor
         {
             Body.Children.Add(Label("Please choose a form for the service below to continue."));
             Body.Children.Add(new TextBlock { Text = $"Service: {serviceName}", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 6) });
-            foreach (var form in forms)
+            // Owner 2026-10-19: forms with the same name show their form number (FormChoiceLabels).
+            var labels = FormChoiceLabels.Labels(forms.Select(f => (f.Name, f.Id)).ToList());
+            foreach (var (form, label) in forms.Zip(labels))
             {
-                var option = new RadioButton { Content = form.Name, Tag = form.Id, Margin = new Thickness(0, 6, 0, 0) };
+                var option = new RadioButton { Content = label, Tag = form.Id, Margin = new Thickness(0, 6, 0, 0) };
                 _options.Add(option);
                 Body.Children.Add(option);
             }

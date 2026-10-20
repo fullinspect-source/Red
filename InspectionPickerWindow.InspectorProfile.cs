@@ -44,13 +44,13 @@ namespace InspectionEditor
             if (wasLocked && !_profileLocked)
                 RepointMyListToProfile();
 
-            MyListTabButton.IsEnabled = !_profileLocked;
-            OrdersTabButton.IsEnabled = !_profileLocked;
-            BuyerWalkTabButton.IsEnabled = !_profileLocked; // F-025: Add to My List needs the profile too
             object? tip = _profileLocked ? InspectorProfileService.MissingProfileMessage : null;
-            MyListTabButton.ToolTip = tip;
-            OrdersTabButton.ToolTip = tip;
-            BuyerWalkTabButton.ToolTip = tip;
+            // F-025: Add to My List needs the profile too. The Outbox, Archive and Review tabs show the My List panel.
+            foreach (var tab in new[] { MyListTabButton, OrdersTabButton, BuyerWalkTabButton, OutboxTabButton, ArchiveTabButton, ReviewTabButton })
+            {
+                tab.IsEnabled = !_profileLocked;
+                tab.ToolTip = tip;
+            }
 
             if (_profileLocked)
             {
@@ -233,7 +233,17 @@ namespace InspectionEditor
             }
             if (!string.IsNullOrWhiteSpace(_currentFolderPath) && InspectorProfileService.IsInside(_currentFolderPath, folder))
                 return;
+            // Owner 2026-10-19 (folder tabs): the new folder's My List shows under the My List tab.
+            if (_folderView != FolderView.MyList)
+            {
+                _folderView = FolderView.MyList;
+                ClearTicks();
+                ApplyColumnSettings();
+                if (MyListPanel.Visibility == Visibility.Visible)
+                    SetActiveTab(MyListTabButton);
+            }
             LoadInspections(Path.Combine(folder, "MyList")); // sets the folder at once, so SaveSettings remembers it
+            UpdateFolderViewBar(); // My List commands, the new root's tab counts and the watcher
             SaveSettings();
         }
 

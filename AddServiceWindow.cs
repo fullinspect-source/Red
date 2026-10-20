@@ -143,7 +143,7 @@ namespace InspectionEditor
             _skip.Unchecked += (_, _) => _skipWarning.Visibility = Visibility.Collapsed;
 
             var formsView = new GridView();
-            foreach (var (h, p, w) in new[] { ("Name", nameof(AddFormRow.Name), 250.0), ("Last Report", nameof(AddFormRow.LastReport), 150.0), ("Last Date", nameof(AddFormRow.LastDate), 110.0), ("Last Status", nameof(AddFormRow.LastStatus), 90.0), ("Next Action", nameof(AddFormRow.NextAction), 100.0) })
+            foreach (var (h, p, w) in new[] { ("Name", nameof(AddFormRow.DisplayName), 250.0), ("Last Report", nameof(AddFormRow.LastReport), 150.0), ("Last Date", nameof(AddFormRow.LastDate), 110.0), ("Last Status", nameof(AddFormRow.LastStatus), 90.0), ("Next Action", nameof(AddFormRow.NextAction), 100.0) })
                 formsView.Columns.Add(Column(h, p, w));
             _formsList.View = formsView;
             _formsList.PreviewMouseLeftButtonUp += (_, _) => { if (_formsList.SelectedItem != null && !Quiet()) LeavePage2(); };
@@ -162,7 +162,8 @@ namespace InspectionEditor
             _attempt.PreviewTextInput += (_, e) => e.Handled = !e.Text.All(char.IsDigit); // whole numbers only
         }
 
-        // D2/D3: editing the date box ticks Other and may warn.
+        // D2: editing the date box ticks Other. Owner 2026-10-19: no D3 "You have scheduled this inspection N day(s) in
+        // the future/past." popup; the inspector is responsible for the date (AddServiceService.DateWarning stays).
         private void DateEdited()
         {
             if (_updatingDate) return;
@@ -170,8 +171,6 @@ namespace InspectionEditor
             if (!DateTime.TryParse(_dateBox.Text, CultureInfo.GetCultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out var picked)) return;
             _dateValue = picked;
             _otherDate.IsChecked = true;
-            string? warning = AddServiceService.DateWarning(picked, DateTime.Now);
-            if (warning != null) MessageBox.Show(this, warning, "", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private UIElement Page1()

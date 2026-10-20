@@ -19,6 +19,8 @@ namespace InspectionEditor.Services
         public int ServiceId { get; init; }
         public int FormId { get; init; }
         public string Name { get; init; } = "";
+        // Owner 2026-10-19: the list shows "{Name}  (form {FormId})" when two forms share a name (FormChoiceLabels).
+        public string DisplayName { get; set; } = "";
         public int Attempt { get; set; } = 1;
         public string? LastWorkOrderId { get; set; }
         public string LastReport { get; set; } = "";
@@ -126,8 +128,9 @@ namespace InspectionEditor.Services
 
         // ── Page 2 ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-        public static List<AddFormRow> FormsFromJson(JArray? forms) =>
-            (forms ?? new JArray()).OfType<JObject>().Select(f => new AddFormRow
+        public static List<AddFormRow> FormsFromJson(JArray? forms)
+        {
+            var rows = (forms ?? new JArray()).OfType<JObject>().Select(f => new AddFormRow
             {
                 ServiceId = I(f["ServiceId"]),
                 FormId = I(f["FormId"]),
@@ -139,6 +142,11 @@ namespace InspectionEditor.Services
                 LastStatus = S(f["LastStatus"]),
                 NextAction = S(f["NextAction"])
             }).ToList();
+            var labels = FormChoiceLabels.Labels(rows.Select(r => (r.Name, r.FormId)).ToList());
+            for (int i = 0; i < rows.Count; i++)
+                rows[i].DisplayName = labels[i];
+            return rows;
+        }
 
         // MADD 2.4.24-25: Skip → every cached form; else Forms/Read for job7, falling back to the cache when it yields no data.
         public static async Task<List<AddFormRow>> FormsAsync(StrandWebsiteSession? session, string? job7, JArray? cachedForms, CancellationToken token = default)

@@ -209,7 +209,10 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <DockPanel Grid.Row="0" Margin="10,8" LastChildFill="True">
+                        <!-- Owner 2026-10-19 (item 14): the header row, plus a line under it that holds the result button
+                             only when the row is too narrow for it (classic mode's narrow column). -->
+                        <StackPanel Grid.Row="0">
+                        <DockPanel x:Name="ChecklistHeaderDock" Margin="10,8" LastChildFill="True" SizeChanged="ChecklistHeaderDock_SizeChanged">
                             <TextBlock Text="Insp Items" Style="{StaticResource HeaderStyle}" DockPanel.Dock="Left"/>
                             <TextBlock x:Name="InspectionTotalCounter" FontSize="13" Foreground="#787878"
                                        VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed"
@@ -268,6 +271,53 @@
                                     Margin="6,0,0,0"
                                     ToolTip="Make checklist text smaller"
                                     IsTabStop="False"/>
+                            <!-- Owner 2026-10-19 (item 14): the report's result, always shown. Declared after the right-docked A-/A+/Classic/Trip so they keep their room in a narrow panel; the text trims; a tap opens the result picker
+                                 (not in read-only reports). Text and colours: Services\ResultLabel.cs, MainWindow.ResultButton.cs. -->
+                            <Button x:Name="ResultButton"
+                                    DockPanel.Dock="Left"
+                                    Visibility="Collapsed"
+                                    Click="ResultButton_Click"
+                                    MinHeight="44"
+                                    MinWidth="90"
+                                    Margin="14,0,0,0"
+                                    Padding="14,6"
+                                    FontSize="14"
+                                    FontWeight="Bold"
+                                    VerticalAlignment="Center"
+                                    IsTabStop="False"
+                                    AutomationProperties.AutomationId="ResultButton">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="ResultChrome"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="6"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ResultChrome" Property="Opacity" Value="0.88"/>
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="ResultChrome" Property="Opacity" Value="0.75"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <!-- Owner 2026-10-19: names a value RED changed that has nothing on screen to flash (filtered or
+                                 collapsed); hides itself after 8 seconds (MainWindow.ValueFlash.cs). Not a popup. -->
+                            <TextBlock x:Name="ChangedFieldsNotice"
+                                       DockPanel.Dock="Left"
+                                       Visibility="Collapsed"
+                                       Foreground="#15803D"
+                                       FontStyle="Italic"
+                                       FontSize="13"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
                             <Border x:Name="MegaStatsButton"
                                     Visibility="Collapsed"
                                     Background="#1E40AF" CornerRadius="4"
@@ -292,6 +342,8 @@
                                            Foreground="White" FontSize="12" FontWeight="SemiBold"/>
                             </Border>
                         </DockPanel>
+                        <Border x:Name="ResultButtonNarrowHost" Margin="10,0,10,6" HorizontalAlignment="Left" Visibility="Collapsed"/>
+                        </StackPanel>
 
                         <!-- MegaStats overlay — spans all 3 rows of the inner Grid -->
                         <Grid x:Name="MegaStatsOverlay"

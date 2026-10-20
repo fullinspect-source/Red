@@ -141,6 +141,57 @@ static class Harness
             Check("A-014-11", move2.Outcome == MoveOutcome.Moved &&
                               Directory.GetFiles(outbox).All(f => f.EndsWith(".ins")) && Directory.GetFiles(archive).All(f => f.EndsWith(".ins")),
                 "after the moves Outbox and Archive hold only *.ins files");
+
+            // ---------- Owner fix list 2026-10-19: row tick boxes (Remove, Move to My List, Approve) ----------
+            var rows = new[] { (Name: "C.ins", Ticked: true), (Name: "A.ins", Ticked: true), (Name: "B.ins", Ticked: false) };
+            Check("TICK-1", TickedRowsService.Chosen(rows, r => r.Ticked, r => r.Name).Select(r => r.Name).SequenceEqual(new[] { "A.ins", "C.ins" }),
+                "only the ticked rows are chosen, in file-name order");
+            Check("TICK-2", TickedRowsService.Chosen(rows, _ => false, r => r.Name).Count == 0 &&
+                            TickedRowsService.NothingTicked("remove") == "Tick the boxes at the left of the rows to remove, then press the button again.",
+                "nothing ticked: no rows, and a status-line hint instead of a popup");
+            var ticked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            TickedRowsService.Set(ticked, @"C:\x\A.ins", true);
+            TickedRowsService.Set(ticked, @"C:\x\B.ins", true);
+            TickedRowsService.Set(ticked, @"C:\x\B.ins", false);
+            TickedRowsService.Set(ticked, @"C:\x\C.ins", true);
+            TickedRowsService.Prune(ticked, new[] { @"c:\X\a.ins", @"C:\x\D.ins" });
+            Check("TICK-3", ticked.SetEquals(new[] { @"C:\x\A.ins" }),
+                "an untick drops the row; a reload keeps the ticks of files still listed (any case) and drops files that are gone");
+
+            // Move to My List from the Archive tab: the ticked rows only, with F-014's overwrite question.
+            string t1 = Path.Combine(archive, "3000001-CPP-1-PQE.ins"), t2 = Path.Combine(archive, "3000002-CPP-1-PQE.ins"), t3 = Path.Combine(archive, "3000003-CPP-1-PQE.ins");
+            foreach (var t in new[] { t1, t2, t3 })
+                File.WriteAllText(t, Doc(Path.GetFileNameWithoutExtension(t), "2026-10-13T15:10:29.123-05:00", 31));
+            string mine = Path.Combine(myList, "3000002-CPP-1-PQE.ins");
+            File.WriteAllText(mine, "{\"InspectionNumber\":\"3000002-CPP-1-PQE\",\"mine\":true}");
+            var archiveRows = new[] { (Path: t1, Ticked: true), (Path: t2, Ticked: true), (Path: t3, Ticked: false) };
+            var questions = new List<string>();
+            int movedTicked = 0;
+            foreach (var row in TickedRowsService.Chosen(archiveRows, r => r.Ticked, r => Path.GetFileName(r.Path)))
+                if (FolderMoveService.Move(row.Path, IF, InspectFolder.MyList, q => { questions.Add(q); return false; }, local, _ => { }).Outcome == MoveOutcome.Moved)
+                    movedTicked++;
+            Check("TICK-4", movedTicked == 1 && File.Exists(Path.Combine(myList, "3000001-CPP-1-PQE.ins")) && !File.Exists(t1) &&
+                            File.Exists(t2) && File.ReadAllText(mine).Contains("\"mine\":true") && File.Exists(t3) &&
+                            questions.SequenceEqual(new[] { "My List already contains '3000002-CPP-1-PQE'. Replace it?" }),
+                "Move to My List moves the ticked Archive rows; an existing My List copy is asked about first (No keeps both); the unticked row stays");
+
+            // Remove: the ticked rows only (the window still asks its Yes/No safety question first).
+            string r1 = Path.Combine(myList, "4000001-CPP-1-PQE.ins"), r2 = Path.Combine(myList, "4000002-CPP-1-PQE.ins");
+            File.WriteAllText(r1, Doc("4000001-CPP-1-PQE"));
+            File.WriteAllText(r2, Doc("4000002-CPP-1-PQE"));
+            int removedTicked = 0;
+            foreach (var row in TickedRowsService.Chosen(new[] { (Path: r1, Ticked: true), (Path: r2, Ticked: false) }, r => r.Ticked, r => Path.GetFileName(r.Path)))
+                if (RemoveFromDeviceService.Remove(row.Path, IF, _ => { }))
+                    removedTicked++;
+            Check("TICK-5", removedTicked == 1 && !File.Exists(r1) && File.Exists(r2), "Remove deletes only the ticked My List file");
+
+            // The window's rule for which ticked rows count (InspectionPickerWindow.TickedRows uses Counts).
+            var tickedNow = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Path.Combine(myList, "a.ins"), Path.Combine(archive, "b.ins") };
+            Check("TICK-6", TickedRowsService.Counts(Path.Combine(myList, "a.ins"), tickedNow, myList + "\\") &&
+                            !TickedRowsService.Counts(Path.Combine(archive, "b.ins"), tickedNow, myList) &&
+                            !TickedRowsService.Counts(Path.Combine(myList, "c.ins"), tickedNow, myList) &&
+                            !TickedRowsService.Counts(Path.Combine(myList, "a.ins"), tickedNow, null),
+                "only ticked rows of the folder now listed count: an old folder's rows still on screen during a tab switch do not");
         }
         finally
         {

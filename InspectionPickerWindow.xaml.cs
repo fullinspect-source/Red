@@ -47,6 +47,15 @@ namespace InspectionEditor
         private bool _listIsScrolling = false;
         private bool _listScrollStarted = false;
         private InspectionFileInfo? _pendingTapInspection;
+        // Owner 2026-10-19: a tap in the tick strip at the left of a row (outside the box itself) ticks the row, never
+        // opens or selects the report.
+        private InspectionFileInfo? _pendingTapTick;
+        private bool _tapInTickZone;
+        private const double TickZoneWidth = 8 + TickColumnWidth + 6; // row padding + tick column + cell margin
+        // The strip is the tick column's place; after a header drag moves another column first, the strip is off.
+        private bool InTickZone(ListViewItem item, MouseEventArgs e) =>
+            InspectionListView.View is GridView { Columns.Count: > 0 } grid && grid.Columns[0] == CheckColumn &&
+            e.GetPosition(item).X <= TickZoneWidth;
         private int _selectionOpenRequestId = 0;
         private double _listFontSize = 16;
         private bool _isLoadingSettingsUi = false;
@@ -155,6 +164,14 @@ namespace InspectionEditor
             string? inspectionsFolder = InspectorProfileService.Load()?.InspectionsFolder;
             if (savedPath != null && !string.IsNullOrWhiteSpace(inspectionsFolder) && Directory.Exists(inspectionsFolder) &&
                 !InspectorProfileService.IsInside(savedPath, inspectionsFolder))
+            {
+                savedPath = null;
+            }
+            // Owner 2026-10-19 (folder tabs): RED starts on the My List tab, so a remembered Outbox or Review list is not
+            // reopened under it (Archive is already dropped above).
+            if (savedPath != null && !string.IsNullOrWhiteSpace(inspectionsFolder) &&
+                (PathEquals(savedPath, InspectFolders.PathOf(inspectionsFolder, InspectFolder.Outbox)) ||
+                 PathEquals(savedPath, InspectFolders.PathOf(inspectionsFolder, InspectFolder.Review))))
             {
                 savedPath = null;
             }
@@ -468,7 +485,14 @@ namespace InspectionEditor
                    SuppressFolderViewColumn(key); // F-014
         }
 
-        private void MyListTabButton_Click(object sender, RoutedEventArgs e) => ShowMyListTab();
+        private void MyListTabButton_Click(object sender, RoutedEventArgs e) => ShowFolderTab(FolderView.MyList);
+
+        // Owner 2026-10-19: the F-014/F-018 folder views are side tabs now.
+        private void OutboxTabButton_Click(object sender, RoutedEventArgs e) => ShowFolderTab(FolderView.Outbox);
+
+        private void ArchiveTabButton_Click(object sender, RoutedEventArgs e) => ShowFolderTab(FolderView.Archive);
+
+        private void ReviewTabButton_Click(object sender, RoutedEventArgs e) => ShowFolderTab(FolderView.Review);
 
         private void OrdersTabButton_Click(object sender, RoutedEventArgs e) => ShowOrdersTab();
 
@@ -489,17 +513,48 @@ namespace InspectionEditor
 
             bool shouldRefresh = _myListTabHasBeenShown && IsLoaded;
             _myListTabHasBeenShown = true;
+            ShowMyListPanel();
+            EnsureFolderViewBar();   // F-014 commands; the views themselves are side tabs
+            UpdateFolderViewBar();
+            if (shouldRefresh)
+                RefreshCurrentMyListFolder();
+        }
+
+        // A folder tab (My List, Outbox, Archive, Review): the My List panel showing that folder. The active tab again
+        // refreshes it, unless the list holds another folder (a skipped load, Browse): then the tab's folder loads.
+        private void ShowFolderTab(FolderView view)
+        {
+            string? root = InspectionsRoot();
+            bool listShowsTab = root != null && SameFolder(_currentFolderPath, InspectFolders.PathOf(root, ToInspectFolder(view)));
+            if (_profileLocked || root == null || (view == _folderView && listShowsTab))
+            {
+                ShowMyListTab();
+                return;
+            }
+            _myListTabHasBeenShown = true;
+            ShowMyListPanel();
+            EnsureFolderViewBar();
+            ShowFolderView(view); // loads the folder and updates the tabs
+            SetActiveTab(FolderTabButton(_folderView));
+        }
+
+        private void ShowMyListPanel()
+        {
             MyListPanel.Visibility = Visibility.Visible;
             SettingsPanel.Visibility = Visibility.Collapsed;
             OrdersPanel.Visibility = Visibility.Collapsed;
             BuyerWalkPanel.Visibility = Visibility.Collapsed;
             AboutPanel.Visibility = Visibility.Collapsed;
-            SetActiveTab(MyListTabButton);
-            EnsureFolderViewBar();   // F-014 views: My List, Outbox, Archive
-            UpdateFolderViewBar();
-            if (shouldRefresh)
-                RefreshCurrentMyListFolder();
+            SetActiveTab(FolderTabButton(_folderView));
         }
+
+        private Button FolderTabButton(FolderView view) => view switch
+        {
+            FolderView.Outbox => OutboxTabButton,
+            FolderView.Archive => ArchiveTabButton,
+            FolderView.Review => ReviewTabButton,
+            _ => MyListTabButton
+        };
 
         private void ShowSettingsTab()
         {
@@ -547,21 +602,30 @@ namespace InspectionEditor
                 : Color.FromRgb(46, 125, 50));
         }
 
+        private Button? _activeTab;
+        private bool _outboxHasFiles; // set by UpdateFolderViewBar: a non-empty Outbox tab is red, as its view button was
+
+        // Owner 2026-10-19: folder-tab look. The active tab is white like the content page and reaches left over the gap
+        // and the page's 1 px border (20 = 18 gap + 1 page border + 1 side-panel border), so tab and page read as one
+        // shape. Inactive tabs stay grey and short of the page.
         private void SetActiveTab(Button activeButton)
         {
+            _activeTab = activeButton;
             var inactiveForeground = new SolidColorBrush(Color.FromRgb(31, 41, 51));
             var inactiveBackground = new SolidColorBrush(Color.FromRgb(232, 236, 239));
             var inactiveBorder = new SolidColorBrush(Color.FromRgb(196, 205, 213));
-            foreach (var button in new[] { MyListTabButton, OrdersTabButton, BuyerWalkTabButton, SettingsTabButton, AboutTabButton })
+            var pageBorder = new SolidColorBrush(Color.FromRgb(208, 213, 218)); // ContentPage's BorderBrush
+            var outboxRed = new SolidColorBrush(Color.FromRgb(185, 28, 28));
+            foreach (var button in new[] { MyListTabButton, OrdersTabButton, BuyerWalkTabButton, OutboxTabButton, ArchiveTabButton, ReviewTabButton, SettingsTabButton, AboutTabButton })
             {
-                button.Background = inactiveBackground;
-                button.BorderBrush = inactiveBorder;
-                button.Foreground = inactiveForeground;
+                bool active = ReferenceEquals(button, activeButton);
+                button.Background = active ? Brushes.White : inactiveBackground;
+                button.BorderBrush = active ? pageBorder : inactiveBorder;
+                button.Foreground = active ? new SolidColorBrush(Color.FromRgb(153, 0, 0))
+                    : ReferenceEquals(button, OutboxTabButton) && _outboxHasFiles ? outboxRed : inactiveForeground;
+                button.FontWeight = active ? FontWeights.Bold : FontWeights.SemiBold;
+                button.Margin = new Thickness(active ? -20 : -12, 0, 0, 8);
             }
-
-            activeButton.Background = Brushes.White;
-            activeButton.BorderBrush = new SolidColorBrush(Color.FromRgb(153, 0, 0));
-            activeButton.Foreground = new SolidColorBrush(Color.FromRgb(153, 0, 0));
         }
 
         public void NotifyInspectionWindowClosed()
@@ -1056,6 +1120,7 @@ namespace InspectionEditor
                 });
                 
                 _allInspections = loadedInspections;
+                RestoreRowChecks(); // ticks survive a reload of the same folder (watcher, Refresh)
                 AssignRowColors();
 
                 // Activation can precede this async load. Hydrate every completed
@@ -1079,6 +1144,7 @@ namespace InspectionEditor
                 InspectionListView.IsEnabled = true;
                 _isLoading = false;
                 RunPendingMyListRepoint();
+                RunPendingFolderViewLoad(); // owner 2026-10-19: tabs make quick folder switches easy
             }
         }
 
@@ -1398,10 +1464,13 @@ namespace InspectionEditor
             
             InspectionListView.SelectedItem = null;
             OpenButton.IsEnabled = false;
+            UpdateCheckAllBox();
 
             // Re-apply persisted sort after ItemsSource is replaced
             ApplyCurrentSort();
             ApplySortIndicators();
+            // Grouped rows have no containers until layout; the tick-all box counts the visible ones.
+            Dispatcher.BeginInvoke(new Action(UpdateCheckAllBox), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void ApplyCurrentSort()
@@ -1442,6 +1511,8 @@ namespace InspectionEditor
             string arrow = _lastDirection == ListSortDirection.Ascending ? " ▲" : " ▼";
             foreach (var col in gridView.Columns)
             {
+                if (col.Header is not string)
+                    continue; // the tick column's header is the tick-all box
                 string hdr = col.Header?.ToString()?.Replace(" ▲", "").Replace(" ▼", "") ?? "";
                 // Use the same header→path map as the click handler (most columns use CellTemplate, not DisplayMemberBinding)
                 if (!_headerSortPaths.TryGetValue(hdr, out string? colPath))
@@ -1501,6 +1572,10 @@ namespace InspectionEditor
                 _defaultColumnWidthsByKey[kvp.Key] = kvp.Value.Width;
         }
 
+        // Owner 2026-10-19: the tick column keeps one width (a gripper double-click would make it auto, i.e. NaN, and break
+        // FitColumnsToViewport for every column).
+        private const double TickColumnWidth = 52;
+
         private void WatchColumnWidthChanges()
         {
             var descriptor = DependencyPropertyDescriptor.FromProperty(
@@ -1510,11 +1585,20 @@ namespace InspectionEditor
             if (descriptor == null)
                 return;
 
+            descriptor.RemoveValueChanged(CheckColumn, TickColumnWidth_Changed);
+            descriptor.AddValueChanged(CheckColumn, TickColumnWidth_Changed);
+
             foreach (var column in _columnsByKey.Values)
             {
                 descriptor.RemoveValueChanged(column, ColumnWidth_Changed);
                 descriptor.AddValueChanged(column, ColumnWidth_Changed);
             }
+        }
+
+        private void TickColumnWidth_Changed(object? sender, EventArgs e)
+        {
+            if (CheckColumn.Width != TickColumnWidth)
+                CheckColumn.Width = TickColumnWidth;
         }
 
         private void ColumnWidth_Changed(object? sender, EventArgs e)
@@ -1571,6 +1655,7 @@ namespace InspectionEditor
                 if (_hasAppliedColumnSettingsOnce)
                     CaptureVisibleColumnWidths();
                 gridView.Columns.Clear();
+                gridView.Columns.Add(CheckColumn); // owner 2026-10-19: the tick column, always first
 
                 foreach (string key in _columnOrder)
                 {
@@ -1610,7 +1695,7 @@ namespace InspectionEditor
         {
             if (!_hasAppliedColumnSettingsOnce || InspectionListView.ActualWidth <= 0) return;
             var visible = _columnOrder.Where(IsColumnInView).ToArray();
-            double available = Math.Max(0, InspectionListView.ActualWidth - 32);
+            double available = Math.Max(0, InspectionListView.ActualWidth - 32 - TickColumnWidth);
             double preferred = visible.Sum(k => Math.Max(FitMinimumWidth(k), _preferredColumnWidths.GetValueOrDefault(k, _columnsByKey[k].Width)));
             double minimum = visible.Sum(k => FitMinimumWidth(k));
             ScrollViewer.SetHorizontalScrollBarVisibility(InspectionListView,
@@ -1763,6 +1848,9 @@ namespace InspectionEditor
         
         private void InspectionListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            // A double tap on a tick box, in the tick strip or on the Call button is not an open.
+            if (_tapInTickZone || e.OriginalSource is DependencyObject source && FindAncestor<ButtonBase>(source) != null)
+                return;
             OpenSelectedInspection();
         }
 
@@ -1771,11 +1859,14 @@ namespace InspectionEditor
             if (!_stayOpenHome || _isLoading || _listScrollStarted)
                 return;
 
+            // ButtonBase: the Call button and the row tick box never open the report.
             if (e.OriginalSource is DependencyObject source &&
-                (FindAncestor<Button>(source) != null || FindAncestor<Expander>(source) != null))
+                (FindAncestor<ButtonBase>(source) != null || FindAncestor<Expander>(source) != null))
             {
                 return;
             }
+            if (sender is ListViewItem tickItem && InTickZone(tickItem, e))
+                return; // the tick strip ticks (PreviewMouseLeftButtonUp), it never opens
 
             if (sender is ListViewItem { DataContext: InspectionFileInfo info })
             {
@@ -1794,6 +1885,9 @@ namespace InspectionEditor
 
             if (InspectionListView.SelectedItem is not InspectionFileInfo selected)
                 return;
+
+            if (_tapInTickZone)
+                return; // a tap in the tick strip selects nothing to open (the mouse-up ticks and clears the selection)
 
             int requestId = ++_selectionOpenRequestId;
             await Task.Delay(140);
@@ -2089,6 +2183,8 @@ namespace InspectionEditor
                 _listScrollStarted = false;
                 _listScrollStartPoint = null;
                 _pendingTapInspection = null;
+                _pendingTapTick = null;
+                _tapInTickZone = false;
                 return;
             }
 
@@ -2099,12 +2195,26 @@ namespace InspectionEditor
             _listIsScrolling  = true;
             _listScrollStarted = false;
             _pendingTapInspection = null;
+            _pendingTapTick = null;
+            _tapInTickZone = false;
+
+            // The tick strip at the left of a row ticks the row (the box itself handles its own taps).
+            if (listView == InspectionListView &&
+                e.OriginalSource is DependencyObject tickSource &&
+                FindAncestor<ButtonBase>(tickSource) == null &&
+                ItemsControl.ContainerFromElement(listView, tickSource) is ListViewItem { DataContext: InspectionFileInfo tickRow } tickItem &&
+                InTickZone(tickItem, e))
+            {
+                _tapInTickZone = true;
+                _pendingTapTick = tickRow;
+                return;
+            }
 
             if (listView == InspectionListView &&
                 _stayOpenHome &&
                 e.OriginalSource is DependencyObject source &&
                 FindAncestor<Expander>(source) == null &&
-                FindAncestor<Button>(source) == null &&
+                FindAncestor<ButtonBase>(source) == null && // a tap on the tick box only ticks
                 GetInspectionInfoFromSource(listView, source) is InspectionFileInfo info)
             {
                 _pendingTapInspection = info;
@@ -2159,6 +2269,14 @@ namespace InspectionEditor
                 _listScrollStartPoint = null;
                 _listScrollStarted = false;
                 _pendingTapInspection = null;
+                _pendingTapTick = null;
+                if (_tapInTickZone)
+                {
+                    // A press in the tick strip released over the header: no tick, and nothing stays selected to open.
+                    _tapInTickZone = false;
+                    ++_selectionOpenRequestId;
+                    InspectionListView.SelectedItem = null;
+                }
                 _columnWidthSaveTimer.Stop();
                 CaptureVisibleColumnWidths();
                 SaveSettings();
@@ -2171,6 +2289,27 @@ namespace InspectionEditor
             _listScrollStarted = false;
             var pendingTapInspection = _pendingTapInspection;
             _pendingTapInspection = null;
+            var pendingTapTick = _pendingTapTick;
+            _pendingTapTick = null;
+            bool tickZone = _tapInTickZone;
+            _tapInTickZone = false;
+
+            if (tickZone)
+            {
+                // A tap in the tick strip: toggle the row's tick; the report is not opened and stays unselected.
+                if (wasScrolling)
+                    Mouse.Capture(null);
+                else if (pendingTapTick != null)
+                {
+                    pendingTapTick.IsChecked = !pendingTapTick.IsChecked;
+                    TickedRowsService.Set(_checkedPaths, pendingTapTick.FilePath, pendingTapTick.IsChecked);
+                    UpdateCheckAllBox();
+                }
+                ++_selectionOpenRequestId;
+                InspectionListView.SelectedItem = null;
+                e.Handled = true;
+                return;
+            }
 
             if (wasScrolling)
             {
@@ -2247,13 +2386,26 @@ namespace InspectionEditor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastEditTooltip)));
         }
 
+        // Owner 2026-10-19: the row's tick box (Remove, Move to My List, Approve act on ticked rows).
+        private bool _isChecked;
+        public bool IsChecked
+        {
+            get => _isChecked;
+            set
+            {
+                if (_isChecked == value) return;
+                _isChecked = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+            }
+        }
+
         public string FilePath { get; set; } = "";
         public string Address { get; set; } = "";
         public string Subdivision { get; set; } = "";
         public string InspectionCode { get; set; } = "";
         public string Builder { get; set; } = "";
         public DateTime Date { get; set; }
-        
+
         // Contact info for notifications
         public string ContactName { get; set; } = "";
         public string ContactPhone { get; set; } = "";

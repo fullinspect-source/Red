@@ -21,7 +21,7 @@
                     <TextBlock x:Name="ZoomText" Foreground="White" VerticalAlignment="Center" Width="50" TextAlignment="Center"/>
                     <Button Content="+" Click="ZoomIn_Click" ToolTip="Zoom in"/>
                 </StackPanel>
-                <TextBlock Text="CPP Plan Check Beta — suggestions are starting points; inspector verification is required."
+                <TextBlock Text="CPP Plan Check Beta"
                            Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0" TextTrimming="CharacterEllipsis"/>
             </DockPanel>
         </Border>

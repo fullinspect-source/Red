@@ -3,14 +3,17 @@ import unittest
 ROOT=Path(__file__).resolve().parents[1]
 CODE=(ROOT/'MainWindow.xaml.cs').read_text()
 class HetTransferWiring(unittest.TestCase):
- def test_explicit_click_rechecks_and_confirms(self):
+ def test_explicit_click_rechecks_and_applies(self):
+  # Owner fix list 2026-10-19: no "Confirm measured HET transfer" question; the click re-checks, copies and flashes.
   s=CODE[CODE.index('private UIElement? CreateInlineHetMeasuredChip'):CODE.index('private UIElement? CreateInlineDesignAssistChip')]
-  self.assertEqual(s.count('HetMeasuredTransferService.Resolve('),3)
+  self.assertEqual(s.count('HetMeasuredTransferService.Resolve('),2)
   self.assertIn('if (fresh != proposal)',s)
-  self.assertIn('confirmed != fresh',s)
-  self.assertIn('MessageBoxResult.No',s)
+  self.assertNotIn('MessageBoxButton.YesNo',s)
+  self.assertNotIn('MessageBoxResult.Yes',s)
   self.assertIn('EditorEditService.Owns(_currentInspection, item)',s)
-  self.assertIn('SetInlineItemValue(item, fresh.Value!)',s)
+  self.assertIn('ItemControls.TryValueForControl(item, fresh.Value!, out string stored)',s)
+  self.assertIn('SetInlineItemValue(item, stored, toggle: false)',s)
+  self.assertIn('FlashChangedValues(item)',s)
   self.assertIn('Calculate: {proposal.Value}%',s)
   self.assertIn('Copy HET: {proposal.Value}',s)
   self.assertIn('proposal.Detail.Contains("WARNING")',s)

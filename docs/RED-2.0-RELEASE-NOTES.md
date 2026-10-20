@@ -1,5 +1,22 @@
 # RED 2.0 Release Notes
 
+## 2.3.1 — My List tabs, a result button, and no "please confirm" popups
+
+- **My List is quicker to use:**
+  - The views are tabs on the right with their counts: My List, ORDERS, BUYER WALK, Outbox, Archive and Review.
+    Review shows only for reviewers. Settings and About moved to the bottom.
+  - The big "My List" heading is gone, so the list has more room. Add is green. "Reset size" resets the text size;
+    Refresh reloads the list.
+  - Each row has a tick box. Remove, Move to My List and Approve act on the ticked rows. Move to Archive and Move to
+    Review are gone.
+- **Result button in the editor.** The top of the checklist shows the report's result: NO RESULT, PASSED,
+  FAIL (PO required) and so on. Tap it to set or change the result.
+- **No more "please confirm" popups.** When RED fills in or changes values for you, it applies them and flashes the
+  changed fields red 5 times. A changed field you can't see is named for a few seconds at the top of the checklist.
+  Deleting, overwriting, Submit and Approve still ask first.
+  - A window-rating sticker now fills both window fields (operable and fixed) when the other one is blank.
+- **Forms with the same name**, for example two "HERS Energy Rough", show their form number in ORDERS and in Add.
+
 ## 2.3.0 — Submit, Approve, Buyer Walk and the rest of INSPECT's report workflow
 
 - **Submit and Approve work as they do in INSPECT:**

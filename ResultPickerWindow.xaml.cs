@@ -61,10 +61,18 @@ namespace InspectionEditor
             int failedItems,
             InspectionEditor.Services.InspectionTypeConfig? config = null,
             bool expirationStageDone = false,
-            IReadOnlyCollection<int>? allowedStatusIds = null)
+            IReadOnlyCollection<int>? allowedStatusIds = null,
+            bool changeOnly = false)
         {
             InitializeComponent();
             _allowedStatusIds = allowedStatusIds;
+            if (changeOnly)
+            {
+                // Owner 2026-10-19 (item 14): opened from the editor's result button, so there is no close to skip or
+                // keep open; Cancel leaves the result as it is.
+                SkipButton.Visibility = Visibility.Collapsed;
+                KeepOpenButton.Content = "Cancel";
+            }
 
             string typeName = TypeNames.TryGetValue(inspectionCode.ToUpper(), out var n) ? n : inspectionCode;
             InspTypeText.Text = typeName;

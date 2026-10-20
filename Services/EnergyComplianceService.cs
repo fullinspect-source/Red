@@ -102,7 +102,7 @@ namespace InspectionEditor.Services
             TargetFreshAirCfm, TargetRunTime, VentFanWatts
         }.Count(v => !string.IsNullOrWhiteSpace(v));
         public string ExtractionStatus => ExtractedFieldCount > 0
-            ? $"EC report: {ExtractedFieldCount} fields available (parsed/calculated). Review available values; unrecognized or inapplicable fields remain blank."
+            ? $"EC report: {ExtractedFieldCount} fields available (parsed/calculated). Unrecognized or inapplicable fields remain blank."
             : "EC report found but no supported data fields could be extracted.";
 
         public bool IsLoaded =>

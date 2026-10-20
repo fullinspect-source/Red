@@ -23,6 +23,7 @@ static class FontStyles {public static object Italic=new();} static class TextWr
 class Stack {public List<object> Children=new();}
 class Probe {
  Inspection? _currentInspection=new();bool _readOnlyMode; Stack SuggestionsStack=new(); void MarkUnsaved(){}
+ List<Item> flashed=new(); void FlashChangedValues(params Item?[] items){foreach(var i in items) if(i!=null) flashed.Add(i);} // owner 2026-10-19: changed values flash red
  static int checks;static void Check(bool b,string n){if(!b)throw new Exception(n);checks++;}
  static Item I(string n,string? v=null)=>new(){Name=n,Value=v};
  public static void Main(){
@@ -34,7 +35,18 @@ class Probe {
   s.Value="NI";p.ApplyTranscriptionSuggestion(m,"Model: NEW / Serial: WRONG");Check((string?)s.Value=="NI","NI preserved");
   p.ApplyTranscriptionSuggestion(m2,"Model: SECOND / Serial: SECOND-SERIAL");Check((string?)m2.Value=="SECOND"&&(string?)s2.Value=="SECOND-SERIAL","explicitunit2 siblings");Check((string?)s.Value=="NI","unit1 untouched by2");
   var cross=I("Unit: Serial Number");p._currentInspection.Sections=new(){new(){Items=new(){m}},new(){Items=new(){cross}}};p.ApplyTranscriptionSuggestion(m,"Model: M / Serial: S");Check(cross.Value==null,"section boundary");
-  var u=I("U-Factor");var sh=I("SHGC");p._currentInspection.Sections=new(){new(){Items=new(){u,sh}}};p.ApplyTranscriptionSuggestion(u,"U-Factor: 0.30 / SHGC: 0.25");Check((string?)u.Value=="0.30"&&(string?)sh.Value=="0.25","window companion preserved");
+  var u=I("U-Factor");var sh=I("SHGC");p._currentInspection.Sections=new(){new(){Items=new(){u,sh}}};p.flashed.Clear();p.ApplyTranscriptionSuggestion(u,"U-Factor: 0.30 / SHGC: 0.25");Check((string?)u.Value=="0.30"&&(string?)sh.Value=="0.25","window companion preserved");
+  Check(p.flashed.Contains(u)&&p.flashed.Contains(sh),"applied value and autofilled companion flash");
+  // Owner fix list 2026-10-19 p3: no "Confirm window ratings for both types" popup (no MessageBox stub exists, so any popup fails the build).
+  var op=I("2.1 Operable Windows SHGC/U-Factor (Grid and No Grid)");var fx=I("2.2 Fixed Windows SHGC/U-Factor (Grid and No Grid)");
+  var keepU=u;p._currentInspection.Sections=new(){new(){Items=new(){op,fx}}};p.flashed.Clear();
+  p.ApplyTranscriptionSuggestion(op,"U-Factor: 0.34 / SHGC: 0.20");Check((string?)op.Value=="U-Factor: 0.34 / SHGC: 0.20"&&(string?)fx.Value=="U-Factor: 0.34 / SHGC: 0.20","blank fixed field gets the operable rating at once");
+  Check(p.flashed.Contains(op)&&p.flashed.Contains(fx),"both changed window fields flash");
+  p.ApplyTranscriptionSuggestion(op,"U-Factor: 0.30 / SHGC: 0.25");Check((string?)fx.Value=="U-Factor: 0.30 / SHGC: 0.25","an in-sync partner follows a new scan");
+  fx.Value="U-Factor: 0.29 / SHGC: 0.22";p.flashed.Clear();p.ApplyTranscriptionSuggestion(op,"U-Factor: 0.31 / SHGC: 0.24");Check((string?)fx.Value=="U-Factor: 0.29 / SHGC: 0.22"&&!p.flashed.Contains(fx)&&p.flashed.Contains(op),"the other windows' own rating is kept");
+  op.Value="NI";fx.Value="NI";p.ApplyTranscriptionSuggestion(op,"U-Factor: 0.32 / SHGC: 0.26");Check((string?)op.Value=="U-Factor: 0.32 / SHGC: 0.26"&&(string?)fx.Value=="NI","an NI partner is kept even when it was in sync");
+  var fx2=I("2.3 Fixed Windows SHGC/U-Factor");p._currentInspection.Sections[0].Items.Add(fx2);fx.Value=null;p.ApplyTranscriptionSuggestion(op,"U-Factor: 0.33 / SHGC: 0.27");Check(fx.Value==null&&fx2.Value==null,"two possible partners: none is guessed");
+  p._currentInspection.Sections=new(){new(){Items=new(){u,sh}}};u=keepU;
   sh.Value=null;p.ApplyTranscriptionSuggestion(u,"0.32");Check(sh.Value==null&&(string?)u.Value=="0.32","selected simple option only");
   var stale=I("Model");p.ApplyTranscriptionSuggestion(stale,"MODEL: X / SERIAL: Y");Check(stale.Value==null,"stale owner rejected");
   p._readOnlyMode=true;p.ApplyTranscriptionSuggestion(u,"9");Check((string?)u.Value=="0.32","readonly rejected");
@@ -42,15 +54,7 @@ class Probe {
   Console.WriteLine($"PASS {checks} actual OCR distribution checks");
  }
 '''
-        code+='\n'.join(method(n) for n in ['ApplyTranscriptionSuggestion','IsCompositeWindowRatingItem','CompositeWindowRating','WindowRatingKind','OfferWindowRatingShare','TranscriptionUnit','ParseTranscriptionPairs','TranscriptionKeyMatchesItem'])+'\n}'
-        code+='''
-namespace System.Windows {
- enum MessageBoxButton {YesNo} enum MessageBoxImage {Question} enum MessageBoxResult {Yes,No,Cancel}
- static class MessageBox {
-  public static MessageBoxResult Show(string text,string title,MessageBoxButton buttons,MessageBoxImage icon,MessageBoxResult defaultResult)=>MessageBoxResult.No;
- }
-}
-'''
+        code+='\n'.join(method(n) for n in ['ApplyTranscriptionSuggestion','IsCompositeWindowRatingItem','CompositeWindowRating','WindowRatingKind','ShareWindowRating','TranscriptionUnit','ParseTranscriptionPairs','TranscriptionKeyMatchesItem'])+'\n}'
         with tempfile.TemporaryDirectory() as t:
             d=Path(t);(d/'Program.cs').write_text(code)
             (d/'Probe.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><RollForward>Major</RollForward><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>')
