@@ -58,7 +58,7 @@ This file is the concise cross-session source of development context for work pe
     MainWindow_Closing untouched); the new writes use the existing save paths.
   - Packaged smoke start skipped: a non-dev Red.exe uses the real `%LOCALAPPDATA%\RED` profile and the real
     Inspections folder, which this release must not touch.
-- **Deployment:** pending.
+- **Deployment:** GitHub release v2.3.1 (commit `eee94f8`), Latest since 2026-10-20 04:54 UTC. Assets `Red-v2.3.1.zip` (93,784,195 bytes, 502 entries, version.txt 2.3.1) and `update_red.bat`. `releases/latest` shows v2.3.1 and the zip answers HEAD 200. Installed copies update at their next 24-hour check.
 
 ### 2026-10-19 — RED 2.3.0 — F-005 to F-026 in one combined release
 
