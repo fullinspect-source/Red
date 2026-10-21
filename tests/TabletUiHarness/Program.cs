@@ -231,7 +231,7 @@ static class Harness
                 "A+/A- scale the right panel with the left list (16 = 100%, 22 = 137.5%, 9 = 56%), also at start from the saved size");
         }
 
-        // ---------- A-022-29 / A-003-xx Press-and-drag scrolling and the Settings page (owner tablet test of 2.3.4, items 5 and 7) ----------
+        // ---------- A-022-29 / A-003-15 Press-and-drag scrolling and the Settings page (owner tablet test of 2.3.4, items 5 and 7) ----------
         {
             string preview = File.ReadAllText(Path.Combine("..", "..", "ReportPreviewWindow.cs"));
             string header = File.ReadAllText(Path.Combine("..", "..", "MainWindow.HeaderSections.cs"));
@@ -251,7 +251,7 @@ static class Harness
             string house = File.ReadAllText(Path.Combine("..", "..", "InspectionPickerWindow.Housekeeping.cs"));
             int import = picker.IndexOf("x:Name=\"ProfileImportButton\"", StringComparison.Ordinal);
             int profile = picker.IndexOf("Text=\"Inspector Profile\"", StringComparison.Ordinal);
-            Check("A-003-14", import > 0 && import < profile && !picker.Contains("FeeTokenPanel") && !picker.Contains("Text=\"iPad fee token") &&
+            Check("A-003-15", import > 0 && import < profile && !picker.Contains("FeeTokenPanel") && !picker.Contains("Text=\"iPad fee token") &&
                               !house.Contains("\"Check Archive cleanup") && !house.Contains("\"Check job folder purge") && !house.Contains("\"Show Review") &&
                               !house.Contains("MessageBox.Show") && house.Contains("InspectLiveSettings.WriteArchiveRetention("),
                 "Settings: Import from INSPECT first; no iPad fee token, no Check buttons, no Show Review; Download Offline Data reports on its line; Archive retention editable (source check)");
