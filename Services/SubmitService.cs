@@ -266,7 +266,7 @@ namespace InspectionEditor.Services
             if (removedReference.Count > 0)
                 ctx.Log.Inspect($"   Clearing {removedReference.Count} reference only attachments from temp folder.");
             ctx.DeleteRemovedWorkingCopies?.Invoke(removedReference);
-            MoveBackupSidecars(sourceFolder, Path.GetFileName(src), Path.Combine(localRoot, SubmitBackupsFolder));
+            DeleteBackupSidecars(sourceFolder, Path.GetFileName(src));
 
             // 17.
             string done = kind == InspectUserKind.NonDropBox ? SentToOutboxNonDropBoxMessage : SentToOutboxMessage;
@@ -312,7 +312,7 @@ namespace InspectionEditor.Services
                     bool removed = RemoveSource(src, bytes, localRoot, ctx.Sleep);
                     CopyAttachmentsToJob(ctx, inspections, removedReference);
                     ctx.DeleteRemovedWorkingCopies?.Invoke(removedReference);
-                    MoveBackupSidecars(Path.GetDirectoryName(src)!, Path.GetFileName(src), Path.Combine(localRoot, SubmitBackupsFolder));
+                    DeleteBackupSidecars(Path.GetDirectoryName(src)!, Path.GetFileName(src));
                     return new SubmitResult
                     {
                         Stage = removed ? SubmitStage.Done : SubmitStage.SourceNotRemoved,
@@ -595,18 +595,45 @@ namespace InspectionEditor.Services
             return messages;
         }
 
-        // Step 16: RED's own backup sidecars of this report leave My List.
-        private static void MoveBackupSidecars(string sourceFolder, string sourceName, string backupFolder)
+        // Step 16: RED's own backup sidecars of this report (its earlier versions from editing) are deleted from My List.
+        // Owner 2026-10-21 (tablet test of 2.3.5): simply deleted, no local copy: the submitted report is already verified
+        // byte for byte in Archive and the Outbox, and a move out of the shared Dropbox folder made Dropbox ask "Remove ...
+        // from everyone's Dropbox?" (a delete does not).
+        private static void DeleteBackupSidecars(string sourceFolder, string sourceName)
         {
             try
             {
                 foreach (var sidecar in Directory.EnumerateFiles(sourceFolder, sourceName + ".red-save-backup-*.completed"))
                 {
-                    Directory.CreateDirectory(backupFolder);
-                    File.Move(sidecar, Path.Combine(backupFolder, Path.GetFileName(sidecar)), overwrite: true);
+                    try { File.Delete(sidecar); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+        }
+
+        // Owner 2026-10-21: RED's local SubmitBackups folder (outside Dropbox) never grows without limit: at each start the
+        // files in it last changed more than 30 days ago are deleted (top level only; links and folders are left alone).
+        // This also clears the editing copies that RED 2.3.x moved there. Returns how many were deleted.
+        public const int SubmitBackupsRetentionDays = 30;
+
+        public static int PruneSubmitBackups(string? localRoot, DateTime now)
+        {
+            string folder = Path.Combine(localRoot ?? AppIdentity.LocalAppDataPath, SubmitBackupsFolder);
+            int deleted = 0;
+            try
+            {
+                if (!Directory.Exists(folder)) return 0;
+                DateTime cutoff = now.AddDays(-SubmitBackupsRetentionDays);
+                foreach (var file in new DirectoryInfo(folder).GetFiles())
+                {
+                    if ((file.Attributes & FileAttributes.ReparsePoint) != 0 || file.LastWriteTime >= cutoff) continue;
+                    try { file.Delete(); deleted++; }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            return deleted;
         }
 
         private static byte[] ReadBack(string path)

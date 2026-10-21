@@ -1,5 +1,13 @@
 # RED 2.0 Release Notes
 
+## 2.3.6 — Submit works like INSPECT: no extra questions, no Dropbox warning
+
+- **No "first live Submit / is the owner present?" questions** before or after Submit (or Sync).
+- **No Dropbox "remove from everyone's Dropbox?" warning.** RED no longer moves files out of the Dropbox folder: its own
+  earlier versions of a submitted report are simply deleted (the report itself is safe in Outbox and Archive).
+- **A successful Submit just closes the report**, with no "Sent to Outbox" box. A real problem still shows.
+- RED's own local backup folder on the tablet is cleaned automatically: anything older than 30 days is deleted.
+
 ## 2.3.5 — Second round of tablet fixes: a bigger Add window, cleaner toolbar and Settings, plans that print your marks
 
 - **Add is bigger and simpler.** Large text and buttons throughout. You always pick the address from the search (no

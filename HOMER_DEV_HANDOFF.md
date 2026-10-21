@@ -4,6 +4,27 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-21 — RED 2.3.6 — Submit works like INSPECT (owner, tablet test of 2.3.5)
+
+- **Base:** 2.3.5 (`290b834`). Built in `Dropbox\P\PL`; released by the owner ("Yes: delete the editing safety copies at
+  Submit (no local copy), clean SubmitBackups of anything older than 30 days at each start, then release 2.3.6.").
+  Ported as hunks from PL, line endings kept.
+- **Files:** `MainWindow.Submit.cs` (no first-live questions, `SubmitState` flags gone; a successful Submit closes
+  without the "Sent to Outbox" box, NonDropBox keeps its Sync line), `InspectionPickerWindow.FolderViews.cs` (no
+  first-live Sync questions), `Services/SubmitService.cs` (`DeleteBackupSidecars`: step-16 sidecars deleted, never
+  moved out of Dropbox; `PruneSubmitBackups`: 30 days), `App.Housekeeping.cs` (the prune after the lists load),
+  `tests/SubmitHarness/Program.cs` (A-013-19, A-013-51 to 54). Version 2.3.6 in the csproj and the four
+  release-metadata tests; release notes; this handoff.
+- **Behavior:** the owner saw "Is the owner present?", Dropbox's "Remove ... from everyone's Dropbox?" (RED moved its
+  `.red-save-backup` sidecars to `%LOCALAPPDATA%\RED\SubmitBackups`) and "mark the first live Submit as checked", then
+  "Sent to Outbox". None of these appear now. SubmitBackups (earlier Archive copies, max 20 per report, plus 2.3.x's
+  moved sidecars) loses files older than 30 days at each start (top level only).
+- **Verification:** Debug build `--no-incremental`: 0 errors, 28 warnings. On this tree: the 36-harness suite
+  (SubmitHarness 58 with A-013-19 and A-013-51 to 54), OrdersRules 65, PdfCleanup 52, CommentSnippet 53, AppUpdate 34:
+  all exit 0. Python 36/46: the known 10. Not run: corpus round trip (save code unchanged), packaged-exe smoke start
+  (would use the real profile), a live Submit (owner check on the tablet).
+- **Deployment:** pending.
+
 ### 2026-10-21 — RED 2.3.5 — second round of the owner's tablet fixes, plus ORDERS Unassign
 
 - **Base:** 2.3.4 (`953aa46`). Built in `Dropbox\P\PL`; released by the owner ("do all the fixes from feedback and bump

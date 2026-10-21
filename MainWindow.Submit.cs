@@ -173,14 +173,8 @@ namespace InspectionEditor
                 SubmitState.MarkOtherNoticeSeen(rawUserType);
             }
 
-            // §8: the first live Submit of each kind on this device needs the owner present.
-            string flagKind = profile.Kind == InspectUserKind.Other ? InspectUserKind.Inspector.ToString() : profile.Kind.ToString();
-            bool firstLive = !practice && !SubmitState.IsLiveVerified(flagKind);
-            if (firstLive && MessageBox.Show(this,
-                    $"This is the first live Submit for a {flagKind} user on this device. Is the owner present?",
-                    "First live Submit", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
-
+            // Owner 2026-10-21 (tablet test of 2.3.5): no "first live Submit / is the owner present?" questions; Submit
+            // asks nothing INSPECT does not ask.
             var removedWorkingCopies = new List<string>();
             var ctx = new SubmitContext
             {
@@ -237,9 +231,6 @@ namespace InspectionEditor
                     return;
                 case SubmitStage.Done:
                 case SubmitStage.SourceNotRemoved:
-                    if (firstLive && MessageBox.Show(this, $"Owner: mark the first live {flagKind} Submit on this device as checked (Outbox picked up, Archive processed)?\n\nNo asks again next time.",
-                            "First live Submit", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                        SubmitState.MarkLiveVerified(flagKind);
                     // F-014 S1: remember what RED submitted, for the waiting / processed / not-returned notes.
                     if (result.OutboxPath != null)
                         SubmittedTracker.Record(Path.GetFileNameWithoutExtension(result.OutboxPath), inspections, profile.Kind, DateTime.Now);
@@ -249,8 +240,11 @@ namespace InspectionEditor
                     }
                     _hasUnsavedChanges = false;
                     CloseReportWithoutSaving();
-                    MessageBox.Show(this, result.Message, "Submit", MessageBoxButton.OK,
-                        result.Stage == SubmitStage.Done ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                    // Owner 2026-10-21 (tablet test of 2.3.5): a successful Submit just closes the report, with no "Sent to
+                    // Outbox" box. A NonDropBox user still gets the one line that says to press Sync; a problem still shows.
+                    if (result.Stage != SubmitStage.Done || profile.Kind == InspectUserKind.NonDropBox)
+                        MessageBox.Show(this, result.Message, "Submit", MessageBoxButton.OK,
+                            result.Stage == SubmitStage.Done ? MessageBoxImage.Information : MessageBoxImage.Warning);
                     if (_openedAsCompanion) Close(); // back to My List
                     return;
                 default:
@@ -283,12 +277,12 @@ namespace InspectionEditor
         }
     }
 
-    // RED's own Submit state on this device (never INSPECT's config): first-live flags per kind and the kind-Other notice.
+    // RED's own Submit state on this device (never INSPECT's config): the kind-Other notice. (The first-live flags are
+    // gone with their questions, owner 2026-10-21; an old file's LiveVerifiedKinds is ignored.)
     internal static class SubmitState
     {
         private sealed class State
         {
-            public HashSet<string> LiveVerifiedKinds { get; set; } = new(StringComparer.Ordinal);
             public HashSet<string> OtherNoticesSeen { get; set; } = new(StringComparer.Ordinal);
         }
 
@@ -308,8 +302,6 @@ namespace InspectionEditor
             File.Move(temp, StatePath, overwrite: true);
         }
 
-        public static bool IsLiveVerified(string kind) => Load().LiveVerifiedKinds.Contains(kind);
-        public static void MarkLiveVerified(string kind) { var s = Load(); s.LiveVerifiedKinds.Add(kind); Save(s); }
         public static bool HasSeenOtherNotice(string value) => Load().OtherNoticesSeen.Contains(value);
         public static void MarkOtherNoticeSeen(string value) { var s = Load(); s.OtherNoticesSeen.Add(value); Save(s); }
     }

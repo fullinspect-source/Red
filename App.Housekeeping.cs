@@ -65,6 +65,13 @@ namespace InspectionEditor
             // Local copies only, so not behind the shared-folder gate above.
             try { Services.Camera.CameraRollCopy.PurgeOld(DateTime.Now, InspectLiveSettings.ReadArchiveRetention(folder)); }
             catch (Exception ex) { DiagnosticLogService.Log("Camera backup photo cleanup failed", ex); }
+            // Owner 2026-10-21: RED's local SubmitBackups folder keeps 30 days (it is outside Dropbox and RED's own).
+            try
+            {
+                int removed = SubmitService.PruneSubmitBackups(null, DateTime.Now);
+                if (removed > 0) DiagnosticLogService.Info($"SubmitBackups: {removed} file(s) older than {SubmitService.SubmitBackupsRetentionDays} days deleted");
+            }
+            catch (Exception ex) { DiagnosticLogService.Log("SubmitBackups cleanup failed", ex); }
         });
 
         // F-020 R2 (owner 2026-10-20): every offline cache at each start, silently, once more 10 s later for any that

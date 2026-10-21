@@ -580,10 +580,7 @@ namespace InspectionEditor
                 return;
             if (InspectUserType.Classify(InspectorProfileService.Load()?.UserType) != InspectUserKind.NonDropBox)
                 return;
-            if (!SubmitState.IsLiveVerified(InspectUserKind.NonDropBox.ToString()) &&
-                MessageBox.Show(this, "This is the first live Sync for a NonDropBox user on this device. Is the owner present?", "First live Sync",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
+            // Owner 2026-10-21: no "first live Sync / is the owner present?" questions (INSPECT asks none).
             _syncButton!.IsEnabled = false;
             StatusText.Text = StrandSyncService.SendingText;
             SyncReport report;
@@ -603,10 +600,6 @@ namespace InspectionEditor
             }
             StatusText.Text = report.Headline;
             MessageBox.Show(this, report.Text, "Sync", MessageBoxButton.OK, report.Stopped ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            if (!report.Stopped && !SubmitState.IsLiveVerified(InspectUserKind.NonDropBox.ToString()) &&
-                MessageBox.Show(this, "Owner: mark the first live NonDropBox Sync on this device as checked?", "First live Sync",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                SubmitState.MarkLiveVerified(InspectUserKind.NonDropBox.ToString());
             RefreshCurrentMyListFolder();
             UpdateFolderViewBar();
         }

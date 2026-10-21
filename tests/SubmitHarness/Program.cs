@@ -407,8 +407,41 @@ static class Harness
             string sidecar = path + ".red-save-backup-" + Guid.NewGuid().ToString("N") + ".completed";
             File.WriteAllText(sidecar, "backup");
             await Submit(box, path);
-            Check("A-013-19", !File.Exists(sidecar) && Directory.GetFiles(Path.Combine(box.Local, SubmitService.SubmitBackupsFolder)).Any(f => f.EndsWith(".completed")),
-                "backup sidecars move from My List to RED's local backup folder");
+            string backups = Path.Combine(box.Local, SubmitService.SubmitBackupsFolder);
+            Check("A-013-19", !File.Exists(sidecar) && !(Directory.Exists(backups) && Directory.GetFiles(backups).Any(f => f.EndsWith(".completed"))),
+                "backup sidecars are simply deleted from My List, with no local copy (owner 2026-10-21)");
+            // Owner 2026-10-21 (tablet test of 2.3.5): a move out of a shared Dropbox folder makes Dropbox ask "Remove ... from
+            // everyone's Dropbox?". The sidecars are deleted, never moved or copied out.
+            string service = File.ReadAllText(Path.Combine("..", "..", "Services", "SubmitService.cs"));
+            int start = service.IndexOf("private static void DeleteBackupSidecars", StringComparison.Ordinal);
+            string body = start < 0 ? "" : service.Substring(start, service.IndexOf("public const int SubmitBackupsRetentionDays", start, StringComparison.Ordinal) - start);
+            Check("A-013-51", body.Contains("File.Delete(sidecar)") && !body.Contains("File.Move(") && !body.Contains("File.Copy("),
+                "nothing is moved out of the Dropbox folder at Submit, so Dropbox never asks to remove files from everyone's Dropbox (source check)");
+            string submit = File.ReadAllText(Path.Combine("..", "..", "MainWindow.Submit.cs")) + File.ReadAllText(Path.Combine("..", "..", "InspectionPickerWindow.FolderViews.cs"));
+            Check("A-013-52", !submit.Contains("Is the owner present?") && !submit.Contains("\"First live Submit\"") && !submit.Contains("\"First live Sync\"") &&
+                              !submit.Contains("IsLiveVerified"),
+                "Submit and Sync ask no \"first live / is the owner present?\" questions (owner 2026-10-21; source check)");
+            Check("A-013-53", submit.Contains("if (result.Stage != SubmitStage.Done || profile.Kind == InspectUserKind.NonDropBox)"),
+                "a successful Submit closes the report with no \"Sent to Outbox\" box (NonDropBox keeps its Sync line; problems still show; source check)");
+
+            // ---------- A-013-54 SubmitBackups keeps 30 days (owner 2026-10-21) ----------
+            Directory.CreateDirectory(backups);
+            var now = new DateTime(2026, 10, 21, 9, 0, 0);
+            string old = Path.Combine(backups, "1234567-CPP-1-PQE.ins.red-save-backup-" + Guid.NewGuid().ToString("N") + ".completed");
+            string boundary = Path.Combine(backups, "20260921-090000000-1234567-CPP-1-PQE.ins");
+            string recent = Path.Combine(backups, "20261015-090000000-1234567-CPP-1-PQE.ins");
+            string nested = Path.Combine(backups, "keep-me", "inner.ins");
+            Directory.CreateDirectory(Path.GetDirectoryName(nested)!);
+            foreach (var (file, when) in new[] { (old, now.AddDays(-45)), (boundary, now.AddDays(-30).AddMinutes(1)), (recent, now.AddDays(-6)), (nested, now.AddDays(-90)) })
+            {
+                File.WriteAllText(file, "x");
+                File.SetLastWriteTime(file, when);
+            }
+            int pruned = SubmitService.PruneSubmitBackups(box.Local, now);
+            Check("A-013-54", pruned == 1 && !File.Exists(old) && File.Exists(boundary) && File.Exists(recent) && File.Exists(nested) &&
+                              SubmitService.SubmitBackupsRetentionDays == 30 &&
+                              File.ReadAllText(Path.Combine("..", "..", "App.Housekeeping.cs")).Contains("SubmitService.PruneSubmitBackups(null, DateTime.Now)"),
+                "at each start RED deletes the files in SubmitBackups last changed more than 30 days ago (top level only); newer files and folders stay");
         }
 
         // ---------- A-013-21 Missing Outbox and Archive folders are created ----------
