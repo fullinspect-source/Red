@@ -58,7 +58,7 @@ This file is the concise cross-session source of development context for work pe
   - Not verifiable here: real finger input (press-and-drag, signature strokes) and the default PDF program (the PC has
     no touch screen; the test build used a stand-in launcher). Corpus round trip not run: the save code is unchanged.
     The packaged exe was not smoke-started (a non-dev Red.exe would use the real profile).
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-21: GitHub v2.3.5 (fullinspect-source/Red), Latest since 13:11 UTC; release commit `826b776`. `releases/latest` = v2.3.5; Red-v2.3.5.zip 93,849,791 bytes (503 entries, sha256 `22da32e526f1fbbc200ca5f3de0221ba1395d77cfdcbdec3f7c2c328be1b4320`) answers HEAD 200 and downloads byte-identical; update_red.bat attached; AppUpdateHarness 34/34. RedCamera.Core unchanged (1.0.0).
 
 ### 2026-10-20 — RED 2.3.4 — fixes from the owner's tablet test of 2.3.3
 
