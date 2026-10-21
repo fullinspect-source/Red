@@ -50,8 +50,8 @@ namespace InspectionEditor.Services
                         {
                             if (!Hex(Path.GetFileName(session), 32) || !PlainDirectory(session)) continue;
                             string marker = Path.Combine(session, LockName);
-                            string pdf = Path.Combine(session, "Orientation.pdf");
-                            if (!OwnedFilesOnly(session) || !Old(session, now) || !Old(marker, now) || !Old(pdf, now)) continue;
+                            string? pdf = OwnedPdf(session);
+                            if (pdf == null || !Old(session, now) || !Old(marker, now) || !Old(pdf, now)) continue;
                             // This is the same lifetime lock held by every live monitor, including
                             // other RED processes. Missing/legacy/unknown ownership is never inferred.
                             using var ownerLease = OpenRetirementLease(marker);
@@ -61,7 +61,7 @@ namespace InspectionEditor.Services
                             using (var pdfLease = OpenRetirementLease(pdf))
                             {
                                 RequirePlainPath(session);
-                                if (!OwnedFilesOnly(session) || !Old(session, now) || !Old(marker, now) || !Old(pdf, now)) continue;
+                                if (OwnedPdf(session) != pdf || !Old(session, now) || !Old(marker, now) || !Old(pdf, now)) continue;
                                 DeleteLeasedFile(pdfLease, pdf);
                             }
                             DeleteLeasedFile(ownerLease, marker);
@@ -82,12 +82,15 @@ namespace InspectionEditor.Services
         private static bool PlainDirectory(string path) =>
             (File.GetAttributes(path) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) == FileAttributes.Directory;
         private static bool Old(string path, DateTimeOffset now) => File.GetLastWriteTimeUtc(path) < (now - Retention).UtcDateTime;
-        private static bool OwnedFilesOnly(string session)
+        // Exactly the marker and one PDF with a safe attachment name (the monitor names the working copy after its
+        // attachment; older sessions hold "Orientation.pdf"), both plain files. Anything else keeps the whole session.
+        private static string? OwnedPdf(string session)
         {
             var entries = Directory.GetFileSystemEntries(session);
-            return entries.Length == 2 && entries.All(p =>
-                (Path.GetFileName(p) == LockName || Path.GetFileName(p) == "Orientation.pdf") &&
-                (File.GetAttributes(p) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) == 0);
+            if (entries.Length != 2 || entries.Any(p =>
+                (File.GetAttributes(p) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)) return null;
+            var pdfs = entries.Where(p => Path.GetFileName(p) != LockName).ToArray();
+            return pdfs.Length == 1 && PdfAttachmentService.SafeFilename(Path.GetFileName(pdfs[0])) ? pdfs[0] : null;
         }
 
         internal static void RequirePlainPath(string path)

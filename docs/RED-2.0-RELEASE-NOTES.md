@@ -1,5 +1,26 @@
 # RED 2.0 Release Notes
 
+## 2.3.5 — Second round of tablet fixes: a bigger Add window, cleaner toolbar and Settings, plans that print your marks
+
+- **Add is bigger and simpler.** Large text and buttons throughout. You always pick the address from the search (no
+  "Skip this"), and it stays in view on the next pages. The inspection list shows the date only, newest first. The
+  extra-information page keeps only Re-inspection / Attempt and Purchase Order. The last page says **Finished** and
+  **Begin editing**.
+- **Report editor:** no Open INS and no History buttons. Greyed-out buttons stay readable. A+ / A− now resize both
+  sides of the screen.
+- **Status only offers what this inspection allows** (the same choices as the result button). The signature box keeps
+  your whole stroke instead of drawing dashes.
+- **Scrolling by dragging:** press and drag scrolls the print preview, the End section and the Add lists on tablets
+  where a swipe did nothing.
+- **Plans you mark up print correctly:** the plan opens in your default PDF program; only the pages you changed are
+  attached and printed, with your ink on them. The PDF program shows the plan's own name.
+- **My List tabs are grouped:** My List, Outbox | Archive, Review | ORDERS, BUYER WALK | Settings, About | Close App.
+- **Settings:** Import from INSPECT is at the top. Archive retention can be changed here and changes INSPECT's setting
+  too. The Check buttons, Show Review and the iPad fee token are gone. Offline data downloads quietly every time RED
+  starts.
+- **ORDERS:** Assign is replaced by **Unassign**; adding an order far from today asks first, and adding one offers the
+  other open orders at the same address that day.
+
 ## 2.3.4 — Fixes from the tablet test: Add, Sign and Submit, swipe to scroll, marked-up plans
 
 - **Add on My List works on a fresh tablet.** When the offline lists are missing or old, Add now downloads them itself

@@ -126,6 +126,11 @@ namespace InspectionEditor.Services
             return list;
         }
 
+        // Owner 2026-10-20: the End section's Status list offers only the allowed results (the result picker's rule), in
+        // the form's own order. With nothing allowed (no settings and no list), the form's whole list stays, as before.
+        public static List<StatusOption> OfferedStatuses(IReadOnlyList<StatusOption> statuses, IReadOnlyCollection<int> allowedIds) =>
+            allowedIds.Count == 0 ? statuses.ToList() : statuses.Where(s => allowedIds.Contains(s.Id)).ToList();
+
         // F-013 O5 / Inspection::BuildInspectionNumber: {job7}-{code}-{attempt}-{initials}, with "-P-" before the
         // attempt when IsPreinspection. Initials are Inspection::GetInitials of the file's InspectorName.
         public static string BuildInspectionNumber(string? jobNumber, string? code, int attempt, string? inspectorName,

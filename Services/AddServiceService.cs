@@ -25,6 +25,8 @@ namespace InspectionEditor.Services
         public string? LastWorkOrderId { get; set; }
         public string LastReport { get; set; } = "";
         public string LastDate { get; set; } = "";
+        // Owner 2026-10-20 (tablet test of 2.3.4): the Last Date column shows the date only.
+        public string LastDateText => AddServiceService.DateOnly(LastDate);
         public string LastStatus { get; set; } = "";
         public string NextAction { get; set; } = "";
         public string? LastLocalPath { get; set; }
@@ -208,7 +210,54 @@ namespace InspectionEditor.Services
             }
         }
 
+        // A Last Date as the server or a file header gives it (e.g. "2026-10-19T08:27:08-05:00"), read as written: the
+        // clock time in the text, no time-zone conversion. Null when it is blank or not a date.
+        public static DateTime? ParseLastDate(string? text) =>
+            !string.IsNullOrWhiteSpace(text) && DateTimeOffset.TryParse(text.Trim(), EnUs, DateTimeStyles.AllowWhiteSpaces, out var value)
+                ? value.DateTime : null;
+
+        // Owner 2026-10-20: "It just needs date. no time." M/d/yyyy; a value that is not a date is shown as it is.
+        public static string DateOnly(string? text) =>
+            ParseLastDate(text) is DateTime value ? value.ToString("M/d/yyyy", EnUs) : (text ?? "").Trim();
+
+        // Owner 2026-10-20: page 2 lists the most recent Last Date first (by day), then by name; forms never done on this
+        // job (no date) come last, by name.
+        public static List<AddFormRow> SortForms(IEnumerable<AddFormRow> forms) =>
+            forms.OrderByDescending(f => ParseLastDate(f.LastDate)?.Date ?? DateTime.MinValue)
+                 .ThenBy(f => f.DisplayName.Trim(), StringComparer.OrdinalIgnoreCase)
+                 .ToList();
+
+        // Owner 2026-10-20: the selected job's address, shown on pages 2 and 3.
+        public static string AddressLine(JObject? job)
+        {
+            if (job == null) return "";
+            string address = S(job["Address"]).Trim(), city = S(job["City"]).Trim();
+            return address.Length > 0 && city.Length > 0 ? $"{address}, {city}" : address + city;
+        }
+
         // ── Page 3 ──────────────────────────────────────────────────────────────────────────────────────────────────
+
+        // Owner 2026-10-20: page 3 keeps Re-inspection/Attempt and Purchase Order/PO Number only. Contact Name, Contact
+        // Phone, Date, Requests and Other are gone from the page; the new report gets the values they started with (the D1
+        // defaults, no date), exactly as when the inspector left them untouched.
+        public static AddRequest RequestWithDefaults(JObject? job, AddFormRow form, bool reinspection, string attemptText,
+                                                     bool purchaseOrderRequired, string purchaseOrderNumber)
+        {
+            var (contact, phone, other) = NhoDefaults(job, form.ServiceId);
+            return new AddRequest
+            {
+                Job = job,
+                Form = form,
+                Contact = contact,
+                ContactPhone = phone,
+                Date = null,
+                Reinspection = reinspection,
+                AttemptText = attemptText,
+                PurchaseOrderRequired = purchaseOrderRequired,
+                PurchaseOrderNumber = purchaseOrderNumber,
+                Requests = RequestsText(false, false, false, other)
+            };
+        }
 
         // Any run of 10 digits becomes (ddd) ddd-dddd as typed.
         public static string FormatPhone(string text) =>

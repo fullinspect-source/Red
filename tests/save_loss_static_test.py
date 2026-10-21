@@ -29,7 +29,8 @@ class SaveLossTests(unittest.TestCase):
     def test_focus_persists_and_failed_save_blocks_report_reset(self):
         self.assertIn('Editor_LostKeyboardFocus', SRC)
         self.assertIn('if (!TrySaveCurrentInspection()) return;', method('DoSave'))
-        self.assertIn('if (!TrySaveCurrentInspection()) return false;', method('ShowResultPicker'))
+        # The picker's save guard lives in ShowResultPickerWindow since the result rule was shared (2026-10-20).
+        self.assertIn('if (!TrySaveCurrentInspection()) return false;', method('ShowResultPickerWindow'))
     def test_stale_focus_handlers_do_not_replay_old_text(self):
         for name in ['InlineCommentsBox_LostFocus', 'InlineValueBox_LostFocus', 'InlineValueCombo_LostFocus']:
             s = method(name)

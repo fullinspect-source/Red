@@ -130,6 +130,7 @@ namespace InspectionEditor
             System.Windows.Input.Stylus.SetIsPressAndHoldEnabled(scroller, false);
             System.Windows.Input.Stylus.SetIsFlicksEnabled(scroller, false);
             scroller.ManipulationBoundaryFeedback += (_, e) => e.Handled = true;
+            DragScroll.Attach(scroller); // owner tablet test of 2.3.4: touch arrives as mouse on the owner's tablets
             return scroller;
         }
 

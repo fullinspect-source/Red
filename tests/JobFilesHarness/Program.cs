@@ -371,6 +371,23 @@ static class Harness
                                   !monitor.WorkingPath.StartsWith(inspections, StringComparison.OrdinalIgnoreCase),
                     "first press: one reference-only attachment and a working copy outside Inspections; second press reuses it (no second attachment)");
 
+                // ---------- A-016-14 The PDF app opens {session}\{Filename}, so it shows the plan's own name ----------
+                {
+                    string session = Path.GetDirectoryName(monitor.WorkingPath)!;
+                    string identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(ins2).ToUpperInvariant())));
+                    var system = PdfAppLauncher.StartInfoFor(monitor.WorkingPath, "(default)", _ => false);
+                    var acrobat = PdfAppLauncher.StartInfoFor(monitor.WorkingPath, "AcrobatDC", _ => true);
+                    string launch = File.ReadAllText(Path.Combine("..", "..", "MainWindow.JobFiles.cs"));
+                    Check("A-016-14", Path.GetDirectoryName(session) == Path.Combine(Path.GetFullPath(workingRoot), identity) &&
+                                      Guid.TryParseExact(Path.GetFileName(session), "N", out _) &&
+                                      monitor.WorkingPath == Path.Combine(session, "1234567 Foundation Plan.pdf") &&
+                                      system.UseShellExecute && system.FileName == monitor.WorkingPath &&
+                                      acrobat.UseShellExecute && acrobat.FileName == monitor.WorkingPath && // owner 2026-10-20: always the default PDF program
+
+                                      launch.Contains("using var process = Process.Start(PdfAppLauncher.StartInfoFor(monitor.WorkingPath));"),
+                        "the button launches the PDF app on {session}\\1234567 Foundation Plan.pdf (the plan's name, not Orientation.pdf)");
+                }
+
                 // The PDF app saves a markup on page 3 (index 2) of the working copy.
                 using (var working = PdfSharp.Pdf.IO.PdfReader.Open(monitor.WorkingPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify))
                 {
@@ -436,6 +453,78 @@ static class Harness
                                   source.Contains("if (plan.Action == JobFileOpenAction.AskMarkedUp && FindPdfMonitor(index)?.HasLaunched == true) break;") &&
                                   !source.Contains("default:\r\n                {\r\n                    index = plan.Index!.Value;\r\n                    if (FindPdfMonitor(index)?.HasLaunched == true) break;"),
                     "a PDF that cannot be attached (unsafe name, unreadable, over 100 MiB, embedding declined, save failed) still opens as a read-only copy; only O3 is skipped for an open copy, O4 (newer Dropbox file) is always asked (source check)");
+            }
+
+            // ---------- A-016-15 / A-016-16 Marked-up pages and ink that prints (owner tablet test of 2.3.4) ----------
+            {
+                // An engineering-style plan: every page already has a link annotation. Then "the PDF app" adds blue ink to page 3.
+                byte[] BuildPlan(bool withInk)
+                {
+                    using var document = new PdfDocument();
+                    for (int i = 0; i < 5; i++)
+                    {
+                        var page = document.AddPage();
+                        var link = new PdfSharp.Pdf.PdfDictionary(document);
+                        link.Elements.SetName("/Type", "/Annot");
+                        link.Elements.SetName("/Subtype", "/Link");
+                        link.Elements["/Rect"] = new PdfRectangle(new PdfSharp.Drawing.XRect(20, 20, 40, 10));
+                        document.Internals.AddObject(link);
+                        page.Elements["/Annots"] = new PdfSharp.Pdf.PdfArray(document, link.Reference!);
+                        if (withInk && i == 2)
+                        {
+                            var form = new PdfSharp.Pdf.PdfDictionary(document);
+                            form.Elements.SetName("/Type", "/XObject");
+                            form.Elements.SetName("/Subtype", "/Form");
+                            form.Elements["/BBox"] = new PdfRectangle(new PdfSharp.Drawing.XRect(0, 0, 50, 50));
+                            form.CreateStream(Encoding.ASCII.GetBytes("0 0 1 rg 0 0 50 50 re f"));
+                            document.Internals.AddObject(form);
+                            var ink = new PdfSharp.Pdf.PdfDictionary(document);
+                            ink.Elements.SetName("/Type", "/Annot");
+                            ink.Elements.SetName("/Subtype", "/Ink");
+                            ink.Elements["/Rect"] = new PdfRectangle(new PdfSharp.Drawing.XRect(100, 100, 50, 50));
+                            ink.Elements.SetInteger("/F", 4);
+                            var ap = new PdfSharp.Pdf.PdfDictionary(document);
+                            ap.Elements["/N"] = form.Reference;
+                            ink.Elements["/AP"] = ap;
+                            document.Internals.AddObject(ink);
+                            ((PdfSharp.Pdf.PdfArray)page.Elements["/Annots"]!).Elements.Add(ink.Reference!);
+                        }
+                    }
+                    using var output = new MemoryStream();
+                    document.Save(output);
+                    return output.ToArray();
+                }
+                byte[] original = BuildPlan(withInk: false), marked = BuildPlan(withInk: true);
+                var changed = PdfMarkup.ChangedPages(original, marked);
+                Check("A-016-15", changed is { Length: 1 } && changed[0] == 2 && PdfAttachmentService.AnnotatedPages(marked).Length == 5,
+                    $"with a link on every page, only the page with new ink counts as marked up ([{string.Join(",", changed ?? Array.Empty<int>())}]; any-annotation rule: {PdfAttachmentService.AnnotatedPages(marked).Length} pages)");
+
+                byte[] flat = PdfMarkup.Flatten(marked);
+                bool inkOnPage;
+                using (var reread = PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(flat), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
+                {
+                    var annots = reread.Pages[2].Elements.GetArray("/Annots");
+                    inkOnPage = annots != null && annots.Elements.Count == 1; // the link stays, the ink is drawn into the page
+                }
+                // Through the real report: the marked page is the attachment's only printed page; PDFium (the preview's
+                // renderer) must show the blue ink at its place (PDF 100..150 from the bottom-left of a 595 x 842 page).
+                var printDoc = Report();
+                printDoc["Attachments"] = new JArray(new JObject
+                {
+                    ["InspectVersion"] = null, ["Id"] = Guid.NewGuid().ToString(), ["EditPath"] = null, ["FileData"] = Convert.ToBase64String(marked),
+                    ["FileType"] = "pdf", ["Filename"] = "1234567FD.pdf", ["AnnotatedPages"] = new JArray(2), ["IncludedPages"] = new JArray(),
+                    ["ReferenceOnly"] = false, ["LastWriteTime"] = PdfAttachmentService.FormatTime(DateTime.Now), ["CanExcludePages"] = true
+                });
+                var printed = InspectionEditor.Services.Reports.ReportService.Render(printDoc, new InspectionEditor.Services.Reports.ReportSettings(),
+                    new InspectionEditor.Services.Reports.ReportOptions(false, true, true), DateTime.Now);
+                string printedPath = Path.Combine(root, "printed.pdf");
+                File.WriteAllBytes(printedPath, printed.Pdf);
+                var (pixels, width, height) = PlanCheckService.RenderPage(printedPath, printed.ReportPages, 1.0);
+                int px = (int)(125.0 * width / 595), py = (int)((842 - 125.0) * height / 842);
+                int at = (py * width + px) * 4;
+                bool blue = pixels[at] > 180 && pixels[at + 1] < 80 && pixels[at + 2] < 80; // BGRA
+                Check("A-016-16", inkOnPage && printed.AttachmentsAdded == 1 && blue,
+                    $"ink saved as an annotation prints: it is drawn into the page (the link stays) and the printed page shows it (pixel B{pixels[at]} G{pixels[at + 1]} R{pixels[at + 2]})");
             }
 
             Check("C3", Hash(plan) == planHash, "after every step the shared job file is byte-for-byte unchanged");

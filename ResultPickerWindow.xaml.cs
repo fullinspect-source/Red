@@ -89,6 +89,51 @@ namespace InspectionEditor
             InspectionEditor.Services.InspectionTypeConfig? config,
             bool expirationStageDone)
         {
+            var options = Options(code, hasFails, config, expirationStageDone, _allowedStatusIds);
+
+            foreach (var (choice, grayed, reason) in options)
+            {
+                if (grayed && !string.IsNullOrEmpty(reason))
+                {
+                    var wrapper = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+                    var btn = MakeButton(choice, grayed: true);
+                    btn.Margin = new Thickness(0); // wrapper supplies the bottom spacing
+                    wrapper.Children.Add(btn);
+                    wrapper.Children.Add(new TextBlock
+                    {
+                        Text = reason,
+                        FontSize = 11,
+                        FontStyle = FontStyles.Italic,
+                        Foreground = Brushes.Gray,
+                        Margin = new Thickness(4, 2, 0, 0),
+                    });
+                    ButtonPanel.Children.Add(wrapper);
+                }
+                else
+                {
+                    ButtonPanel.Children.Add(MakeButton(choice, grayed: grayed));
+                }
+            }
+        }
+
+        // Owner 2026-10-20: the End section's Status list offers exactly the statuses this picker would let the inspector
+        // choose for this inspection (its type, failed items, next phase, the file's StatusList), no others.
+        public static IReadOnlyList<int> AllowedStatusIds(
+            string inspectionCode,
+            bool hasFails,
+            InspectionEditor.Services.InspectionTypeConfig? config,
+            bool expirationStageDone,
+            IReadOnlyCollection<int>? statusListIds) =>
+            Options(inspectionCode.ToUpper(), hasFails, config, expirationStageDone, statusListIds)
+                .Where(o => !o.grayed).Select(o => o.choice.StatusId).Distinct().ToList();
+
+        public static List<(ResultChoice choice, bool grayed, string grayReason)> Options(
+            string code,
+            bool hasFails,
+            InspectionEditor.Services.InspectionTypeConfig? config,
+            bool expirationStageDone,
+            IReadOnlyCollection<int>? allowedStatusIds)
+        {
             var options = new List<(ResultChoice choice, bool grayed, string grayReason)>();
 
             if (config != null)
@@ -179,31 +224,7 @@ namespace InspectionEditor
             }
 
             // F-007 E5: only statuses present in the file's StatusList (no filter when the file has no list).
-            options = FilterByStatusList(options, _allowedStatusIds);
-
-            foreach (var (choice, grayed, reason) in options)
-            {
-                if (grayed && !string.IsNullOrEmpty(reason))
-                {
-                    var wrapper = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-                    var btn = MakeButton(choice, grayed: true);
-                    btn.Margin = new Thickness(0); // wrapper supplies the bottom spacing
-                    wrapper.Children.Add(btn);
-                    wrapper.Children.Add(new TextBlock
-                    {
-                        Text = reason,
-                        FontSize = 11,
-                        FontStyle = FontStyles.Italic,
-                        Foreground = Brushes.Gray,
-                        Margin = new Thickness(4, 2, 0, 0),
-                    });
-                    ButtonPanel.Children.Add(wrapper);
-                }
-                else
-                {
-                    ButtonPanel.Children.Add(MakeButton(choice, grayed: grayed));
-                }
-            }
+            return FilterByStatusList(options, allowedStatusIds);
         }
 
         private readonly IReadOnlyCollection<int>? _allowedStatusIds;

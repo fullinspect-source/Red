@@ -4,6 +4,62 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-21 — RED 2.3.5 — second round of the owner's tablet fixes, plus ORDERS Unassign
+
+- **Base:** 2.3.4 (`953aa46`). Built in `Dropbox\P\PL`; released by the owner ("do all the fixes from feedback and bump
+  - build, deploy to github"; ORDERS included on the owner's answer). Program: `Dropbox/ios-port/program` CHANGELOG
+  2026-10-20/21; iPad rules in `program/fixes-2026-10-20/TABLET-FEEDBACK-FOR-IPAD.md`.
+  - Ported per file as hunks from PL (each line keeps its ending). `MainWindow.xaml.cs` got only the new hunks and keeps
+    this tree's comment-snippet lines; `Models/InspectionModels.cs`, `Services/GrokApiClient.cs` and the
+    comment-snippet files are this tree's and unchanged.
+- **Files:**
+  - New: `DragScroll.cs`, `Services/PdfMarkup.cs`, `Services/OrdersAddRules.cs`, `OrdersTouchDialog.cs`; tests
+    `OrdersRulesHarness`, `orders_toolbar_static_test.py`.
+  - Modified: the Add window (`AddServiceWindow.cs`, `Services/AddServiceService.cs`); the editor (`MainWindow.xaml(.cs)`,
+    `MainWindow.HeaderSections.cs`, `MainWindow.Print.cs`, `ResultPickerWindow.xaml.cs`, `Services/HeaderRules.cs`,
+    `SignaturePad.cs`, `ReportPreviewWindow.cs`); PDFs (`Services/PdfAppLauncher.cs`, `PdfEditMonitor.cs`,
+    `PdfWorkingSession.cs`, `Reports/ReportRenderer.cs`); Settings and housekeeping (`InspectionPickerWindow.xaml(.cs)`,
+    `.Housekeeping.cs`, `.StrandAccount.cs`, `Services/InspectLiveSettings.cs`, `OfflineCacheService.cs`,
+    `ReviewAccess.cs`, `App.Housekeeping.cs`); ORDERS (`InspectionPickerWindow.Orders.cs`, `.AddToMyList.cs`,
+    `OrdersDialogs.cs`, `OrderRequestWindow.xaml.cs`, `Services/StrandScheduleService.cs`, `docs/ORDERS_SCHEDULE_SPEC.md`);
+    tests (AddService, ArchiveRetention, JobFiles, OfflineCache, OrientationPdf/PdfCleanup/WalkTemplateEvidence csproj,
+    PdfAnnotation, PdfCleanup, Review, TabletUi, `save_loss_static_test.py`); version 2.3.5 (2026-10-21) in the csproj
+    and the four release-metadata tests; release notes; this handoff.
+- **Behavior:**
+  - Add: 18 pt / 26 pt touch sizes; no Skip; the picked address on pages 2-3; Last Date date-only, newest first then by
+    name; page 3 only Re-inspection/Attempt and Purchase Order/PO Number (the removed fields keep their starting values,
+    `RequestWithDefaults`); Finished / Begin editing.
+  - Editor: no Open INS, no History; disabled toolbar buttons keep their colours (about 7:1); A+/A- scale the right
+    panel too (`EditorScaleRoot`, size/16); End Status lists only the result picker's allowed statuses
+    (`ResultPickerWindow.AllowedStatusIds`, `HeaderRules.OfferedStatuses`).
+  - Signature pad: suspends panning of the scroll areas around it during a stroke; press-and-hold and flicks off.
+  - `DragScroll`: press-and-drag scrolling (touch arrives as mouse on the owner's tablets) on the print preview, the End
+    window and the Add lists.
+  - PDFs: the working copy opens with the default PDF program and is named after the attachment; job files count only
+    pages changed in RED's copy (`PdfMarkup.ChangedPages`); annotations are drawn into the page when printed
+    (`PdfMarkup.Flatten`).
+  - My List tabs grouped; Review only when the Review folder has reports (no setting).
+  - Settings: Import from INSPECT on top; Archive retention editable, written into INSPECT's `config.json` (only that
+    number; backup in RED's app data); no Check buttons, Show Review or iPad fee token; offline data downloaded silently
+    at every start; Download Offline Data reports on its line.
+  - ORDERS: Unassign replaces Assign; the 30-hour date question; the same-address checklist (see the ORDERS spec).
+- **Verification:**
+  - Debug build `--no-incremental` of this tree: 0 errors, 28 warnings.
+  - On this tree: the 36-harness suite (AddService 47, JobFiles 36, TabletUi 24, ArchiveRetention 37, OfflineCache 24,
+    Review 12, PdfAnnotation 11, ...), OrdersRulesHarness 65, PdfCleanupHarness 52, CommentSnippetHarness 53,
+    AppUpdateHarness 34: all exit 0. Python 36/46: the known 10 environment failures (save_loss_static_test updated
+    for the moved save guard; orders_toolbar_static_test passes).
+  - Rendered check (JobFilesHarness A-016-16): ink saved as an annotation shows on the printed attachment page (PDFium).
+  - In-app run of an isolated Red2Dev build of PL (synthetic sandbox, loopback mock website): My List tab groups;
+    Add pages 1-4 (search, address beside Back and on top, page 3 two rows, Finished/Begin editing); editor toolbar
+    without Open INS/History and readable greyed-out buttons; End Status for BWT offered Complete only (Ordered greyed);
+    Settings order; retention 5 -> 6 written into the sandbox config.json with nothing else changed; Download Offline
+    Data reported on its line with no dialog.
+  - Not verifiable here: real finger input (press-and-drag, signature strokes) and the default PDF program (the PC has
+    no touch screen; the test build used a stand-in launcher). Corpus round trip not run: the save code is unchanged.
+    The packaged exe was not smoke-started (a non-dev Red.exe would use the real profile).
+- **Deployment:** pending.
+
 ### 2026-10-20 — RED 2.3.4 — fixes from the owner's tablet test of 2.3.3
 
 - **Base:** 2.3.3 (`5225e82`). Program features F-011, F-013, F-015, F-016, F-018 to F-023 (`Dropbox/ios-port/program`,

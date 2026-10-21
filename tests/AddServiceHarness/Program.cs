@@ -472,6 +472,79 @@ static class Harness
                 $"page 2's Name column shows the labelled name ({failure ?? formNamePath})");
         }
 
+        // ---------- A-021-32 to A-021-35 Owner 2026-10-20 (tablet test of 2.3.4): the Add window's pages ----------
+        {
+            Check("A-021-32", AddServiceService.DateOnly("2026-10-19T08:27:08.1234567-05:00") == "10/19/2026" &&
+                              AddServiceService.DateOnly("2026-10-19T23:30:00+00:00") == "10/19/2026" &&
+                              AddServiceService.DateOnly("10/19/2026 8:27:08 AM") == "10/19/2026" &&
+                              AddServiceService.DateOnly("") == "" && AddServiceService.DateOnly(null) == "" &&
+                              AddServiceService.DateOnly("not a date") == "not a date" &&
+                              new AddFormRow { LastDate = "2026-10-05T14:00:00-05:00" }.LastDateText == "10/5/2026",
+                "Last Date shows the date only, as written (no time-zone shift); a value that is not a date shows as it is");
+
+            AddFormRow F(string name, string date) => new() { Name = name, DisplayName = name, LastDate = date };
+            var sorted = AddServiceService.SortForms(new[]
+            {
+                F("Concrete Pour", "2026-10-15T09:00:00-05:00"), F("Framing", "2026-10-19T08:00:00-05:00"), F("Drive", ""),
+                F("Alpha Check", "2026-10-19T07:00:00-05:00"), F("Brick", "not a date"), F("alpha later", "2026-10-19T16:00:00-05:00")
+            }).Select(f => f.Name).ToList();
+            Check("A-021-33", sorted.SequenceEqual(new[] { "Alpha Check", "alpha later", "Framing", "Concrete Pour", "Brick", "Drive" }),
+                $"page 2 by Last Date, most recent day first, then by name; no date last, by name ({string.Join(", ", sorted)})");
+
+            var nhoJob = new JObject { ["JobNumber"] = "1234567", ["Address"] = "100 Example St", ["City"] = "Example City", ["BuyerName"] = "Alex Example", ["BuyerPhone1"] = "5125550100", ["Requests"] = "Gate code on file" };
+            var nho = AddServiceService.RequestWithDefaults(nhoJob, new AddFormRow { ServiceId = BuyerWalkRules.NewHomeOrientationServiceId, Name = "New Home Orientation", Attempt = 2 }, true, "2", false, "PO-1");
+            var other = AddServiceService.RequestWithDefaults(nhoJob, new AddFormRow { ServiceId = 20, Name = "Pre-Pour" }, false, "1", true, "");
+            Check("A-021-34", nho.Contact == "Alex Example" && nho.ContactPhone == "(512) 555-0100" && nho.Requests == "Gate code on file" && nho.Date == null &&
+                              nho.Reinspection && nho.AttemptText == "2" && !nho.PurchaseOrderRequired && nho.PurchaseOrderNumber == "PO-1" &&
+                              other.Contact == "" && other.ContactPhone == "" && other.Requests == "" && other.Date == null && other.PurchaseOrderRequired &&
+                              AddServiceService.AddressLine(nhoJob) == "100 Example St, Example City" && AddServiceService.AddressLine(null) == "",
+                "without the removed fields the report gets what they started with: buyer contact, phone and requests for New Home Orientation, nothing otherwise, no date");
+
+            string? failure = null;
+            var seen = new Dictionary<string, string>();
+            var ui = new Thread(() =>
+            {
+                try
+                {
+                    var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    var type = typeof(InspectionEditor.AddServiceWindow);
+                    var window = new InspectionEditor.AddServiceWindow(Profile(Path.GetTempPath()), "Inspector", StrandWebsiteSession.ForLoopbackMock(new Uri("http://127.0.0.1:9/"), () => (null, null)));
+                    T Field<T>(string name) => (T)type.GetField(name, flags)!.GetValue(window)!;
+                    IEnumerable<System.Windows.DependencyObject> All(System.Windows.DependencyObject root) =>
+                        new[] { root }.Concat(System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>().SelectMany(All));
+                    var goTo = type.GetMethod("GoTo", flags)!;
+                    var page1 = Field<System.Windows.UIElement>("_page1");
+                    var page3 = Field<System.Windows.UIElement>("_page3");
+                    seen["skip"] = All(window).Concat(All(page1)).OfType<System.Windows.Controls.CheckBox>().Any(c => (c.Content as string ?? "").Contains("Skip")) ? "present" : "none";
+                    var p3Text = All(page3).OfType<System.Windows.Controls.TextBlock>().Select(t => t.Text).ToList();
+                    seen["page3"] = string.Join("|", p3Text);
+                    seen["page3Boxes"] = All(page3).OfType<System.Windows.Controls.TextBox>().Count().ToString();
+                    seen["buttons"] = $"{Field<System.Windows.Controls.Button>("_close").Content}|{Field<System.Windows.Controls.Button>("_open").Content}";
+                    seen["fonts"] = $"{window.FontSize}|{Field<System.Windows.Controls.TextBlock>("_title").FontSize}|{System.Windows.Documents.TextElement.GetFontSize(page3)}";
+                    var forms = Field<System.Windows.Controls.ListView>("_formsList");
+                    seen["lastDate"] = ((System.Windows.Data.Binding)((System.Windows.Controls.GridView)forms.View).Columns[2].DisplayMemberBinding).Path.Path;
+                    type.GetField("_selectedJob", flags)!.SetValue(window, nhoJob);
+                    goTo.Invoke(window, new object[] { 3, false });
+                    var top = Field<System.Windows.Controls.TextBlock>("_addressTop");
+                    var footer = Field<System.Windows.Controls.TextBlock>("_addressFooter");
+                    seen["p3address"] = $"{top.Visibility}:{top.Text}|{footer.Visibility}";
+                    goTo.Invoke(window, new object[] { 1, false });
+                    seen["p1address"] = $"{top.Visibility}|{footer.Visibility}";
+                    window.Close();
+                }
+                catch (Exception ex) { failure = (ex.InnerException ?? ex).GetType().Name + ": " + (ex.InnerException ?? ex).Message; }
+            });
+            ui.SetApartmentState(ApartmentState.STA);
+            ui.Start();
+            ui.Join();
+            string Seen(string key) => seen.TryGetValue(key, out var v) ? v : "?";
+            Check("A-021-35", failure == null && Seen("skip") == "none" && Seen("buttons") == "Finished|Begin editing" &&
+                              Seen("page3") == "Re-inspection:|Attempt:|Purchase Order:|PO Number:" && Seen("page3Boxes") == "2" &&
+                              Seen("fonts") == "18|26|24" && Seen("lastDate") == nameof(AddFormRow.LastDateText) &&
+                              Seen("p3address") == "Visible:100 Example St, Example City|Collapsed" && Seen("p1address") == "Collapsed|Collapsed",
+                $"no Skip box; page 3 has only Re-inspection/Attempt and Purchase Order/PO Number; Finished and Begin editing; 18/26/24 pt text; the address on page 3 ({failure ?? string.Join("; ", seen.Select(k => k.Key + "=" + k.Value))})");
+        }
+
         // ---------- Owner fix list 2026-10-19: forms with the same name (HERS Energy Rough, FormId 96 and 299) ----------
         {
             var sameName = new JArray(

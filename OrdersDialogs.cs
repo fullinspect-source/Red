@@ -79,30 +79,6 @@ namespace InspectionEditor
         }
     }
 
-    internal sealed class OrderAssignWindow : OrdersDialogBase
-    {
-        private readonly ComboBox _inspectorCombo = new() { Padding = new Thickness(6, 5, 6, 5) };
-
-        public StrandUserOption? SelectedInspector => _inspectorCombo.SelectedItem as StrandUserOption;
-
-        public OrderAssignWindow(IReadOnlyList<StrandUserOption> inspectors, int selectedCount) : base("Assign Selected", "Assign")
-        {
-            Body.Children.Add(Label(selectedCount == 1
-                ? "Who do you want to assign to the selected request?"
-                : $"Who do you want to assign to the {selectedCount} selected requests?"));
-            Body.Children.Add(_inspectorCombo);
-            _inspectorCombo.ItemsSource = inspectors;
-        }
-
-        protected override bool Validate()
-        {
-            if (SelectedInspector != null)
-                return true;
-            MessageBox.Show(this, "Please select an inspector to be assigned.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
-            return false;
-        }
-    }
-
     // Inspect's ChooseFormWindow: shown when a service has more than one form.
     internal sealed class OrderFormChooserWindow : OrdersDialogBase
     {

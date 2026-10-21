@@ -287,6 +287,35 @@ static class Harness
                 "the Dropbox log prune (no owner decision) still waits for LiveCleanupVerified");
         }
 
+        // ---------- A-015-24 Archive retention edited in RED is INSPECT's value too (owner 2026-10-20) ----------
+        using (var box = new Box(retention: null))
+        {
+            string config = Path.Combine(box.IF, "config.json");
+            string original = "{\r\n  \"UserType\": \"Inspector\",\r\n  \"ArchiveRetention\": 5,\r\n  \"DropboxLogRetention\": 10,\r\n  \"Signature\": \"abc\"\r\n}";
+            File.WriteAllBytes(config, new UTF8Encoding(true).GetPreamble().Concat(Encoding.UTF8.GetBytes(original)).ToArray());
+            string backups = Path.Combine(box.Root, "RedAppData");
+            string? ok = InspectLiveSettings.WriteArchiveRetention(box.IF, 7, backups);
+            byte[] after = File.ReadAllBytes(config);
+            string afterText = Encoding.UTF8.GetString(after, 3, after.Length - 3);
+            bool onlyNumber = afterText == original.Replace("\"ArchiveRetention\": 5", "\"ArchiveRetention\": 7") && after[0] == 0xEF;
+            var saved = Directory.Exists(Path.Combine(backups, "Backups", "inspect-config")) ? Directory.GetFiles(Path.Combine(backups, "Backups", "inspect-config")) : Array.Empty<string>();
+            Check("A-015-24", ok == null && onlyNumber && InspectLiveSettings.ReadArchiveRetention(box.IF) == 7 &&
+                              saved.Length == 1 && File.ReadAllText(saved[0]).Contains("\"ArchiveRetention\": 5"),
+                "Save writes 7 into INSPECT's config.json: only the number changes (BOM, layout and other keys kept), RED reads 7, and the old file is backed up in RED's app data");
+            string before = File.ReadAllText(config);
+            bool refused = InspectLiveSettings.WriteArchiveRetention(box.IF, 0, backups) != null &&
+                           InspectLiveSettings.WriteArchiveRetention(box.IF, 4000, backups) != null && File.ReadAllText(config) == before;
+            File.WriteAllText(config, "{\"Signature\":\"abc\"}");
+            bool inserted = InspectLiveSettings.WriteArchiveRetention(box.IF, 12, backups) == null && InspectLiveSettings.ReadArchiveRetention(box.IF) == 12 &&
+                            File.ReadAllText(config).Contains("\"Signature\":\"abc\"");
+            File.WriteAllText(config, "{\"ArchiveRetention\":\"9\"}");
+            bool quoted = InspectLiveSettings.WriteArchiveRetention(box.IF, 11, backups) == null && File.ReadAllText(config) == "{\"ArchiveRetention\":\"11\"}";
+            File.Delete(config);
+            bool missing = InspectLiveSettings.WriteArchiveRetention(box.IF, 6, backups) != null && !File.Exists(config);
+            Check("A-015-24", refused && inserted && quoted && missing,
+                "0 and 4000 are refused with nothing written; a file without the key gets it; a quoted value stays quoted; with no config.json nothing is created");
+        }
+
         // ---------- Live-risk gate and settings safety ----------
         using (var box = new Box())
         {

@@ -276,9 +276,19 @@ static class Harness
                               JobFilesService.PreInspectorBlockedMessage == "This functionality is not available in PreInspector mode.",
                 "only the exact value PreInspector is blocked, with INSPECT's message");
 
-            // ---------- A1 PDF app from Settings ----------
+            // ---------- A1 / A-017-11 PDF app from Settings, on the working copy {session}\{Filename} ----------
             {
-                string work = @"C:\Work\Orientation.pdf";
+                var withPlan = JArray.FromObject(model.Attachments!);
+                withPlan.Add(JobFilesService.ReferenceAttachment("1234567R2 Slab Eng.pdf", Plan(2), DateTime.Now));
+                Transact(model, withPlan, SaveIns);
+                var slab = new PdfAttachmentService(model).Open(withPlan.Count - 1, insPath, workingRoot);
+                string work = slab.WorkingPath, session = Path.GetDirectoryName(work)!;
+                string identity = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    Encoding.UTF8.GetBytes(Path.GetFullPath(insPath).ToUpperInvariant())));
+                Check("A-017-11", Path.GetDirectoryName(session) == Path.Combine(Path.GetFullPath(workingRoot), identity) &&
+                            Guid.TryParseExact(Path.GetFileName(session), "N", out _) &&
+                            work == Path.Combine(session, "1234567R2 Slab Eng.pdf") && File.Exists(work),
+                    "the working copy is {session}\\{Filename}, so the PDF app shows the attachment's own name (not Orientation.pdf)");
                 string acro = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe");
                 string foxit = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Foxit Software\Foxit Reader\FoxitReader.exe");
                 var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { acro, foxit };
@@ -288,11 +298,10 @@ static class Harness
                 var drawboard = PdfAppLauncher.StartInfoFor(work, "DrawboardPdf", installed.Contains);
                 var system = PdfAppLauncher.StartInfoFor(work, "(default)", installed.Contains);
                 var acrobatMissing = PdfAppLauncher.StartInfoFor(work, "AcrobatDC", _ => false);
-                Check("A1", acrobat.FileName == acro && acrobat.Arguments == "/n \"C:\\Work\\Orientation.pdf\"" && !acrobat.UseShellExecute &&
-                            fox.FileName == foxit && fox.Arguments == "\"C:\\Work\\Orientation.pdf\"",
-                    "AcrobatDC opens with /n, FoxitReader opens the working copy");
-                Check("A1", new[] { edgeMissing, drawboard, system, acrobatMissing }.All(s => s.UseShellExecute && s.FileName == work),
-                    "DrawboardPdf, (default) and an app that is not installed use the system .pdf handler on the working copy");
+                // Owner 2026-10-20 (tablet test of 2.3.4): always the device's default PDF program, whatever INSPECT's setting.
+                Check("A1", new[] { acrobat, fox, edgeMissing, drawboard, system, acrobatMissing }.All(s => s.UseShellExecute && s.FileName == work && s.Arguments == ""),
+                    "every INSPECT PDF-app setting (AcrobatDC, FoxitReader, MicrosoftEdge, DrawboardPdf, (default)) opens {session}\\{Filename} in the default PDF program");
+                slab.Cleanup();
             }
         }
         catch (Exception ex)

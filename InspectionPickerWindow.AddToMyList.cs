@@ -18,8 +18,9 @@ namespace InspectionEditor
         // skipRowChecks: the order dialog already validated fresh data; the grid row may be stale.
         // dialogProfile: the profile the order dialog already checked before its assign PATCH, so nothing read
         // again after that server write can refuse or disagree with it.
+        // dialogItem: the request as the order dialog saved it; its date question was asked there, with the edited date.
         private async Task AddOrdersToMyListAsync(List<StrandScheduleRequest> selected, bool skipRowChecks = false,
-                                                  CompleteProfile? dialogProfile = null)
+                                                  CompleteProfile? dialogProfile = null, OrderAddItem? dialogItem = null)
         {
             if (selected.Count == 0 || _ordersBusy || _pickerClosed)
                 return;
@@ -65,6 +66,29 @@ namespace InspectionEditor
             }
             InspectUserKind userKind = profile.Kind;
             string initialsName = profile.InspectorName;
+
+            // Owner 2026-10-20: an order for an earlier day, or more than 30 hours ahead, asks first (once, listing them
+            // all); No leaves those out. Orders inside the window go ahead either way.
+            var items = OrdersAddRules.ItemsFor(rows, dialogItem);
+            var declined = new HashSet<Guid>();
+            if (dialogItem == null)
+            {
+                var now = DateTimeOffset.Now;
+                var asked = items.Where(i => OrdersAddRules.NeedsDateQuestion(i, now)).ToList();
+                if (asked.Count > 0 && !AskOrdersTouch(OrdersAddRules.DateQuestion(asked, items.Count)))
+                {
+                    declined.UnionWith(asked.Select(i => i.Id));
+                    rows.RemoveAll(r => declined.Contains(r.Id));
+                    items.RemoveAll(i => declined.Contains(i.Id));
+                }
+                if (rows.Count == 0 || _pickerClosed)
+                    return;
+            }
+
+            // Owner 2026-10-20: other open orders at the same address on the same day can join this add.
+            rows.AddRange(ChooseSameAddressOrders(items, rows, declined, inspectorFolder));
+            if (_pickerClosed)
+                return;
 
             int toCopy = rows.Count;
             int copied = 0;
@@ -233,6 +257,51 @@ namespace InspectionEditor
             try { await StrandMyListService.RequestJobFilesAsync(userKind, request.JobNumber); }
             catch (Exception ex) { DiagnosticLogService.Log($"Could not request job files for {request.JobNumber}", ex); }
             return true;
+        }
+
+        // The same-address checklist: other open orders in the loaded list (filters ignored) at the address of an order
+        // being added, on its day, that are not in this add or declined, and not already in My List. Nothing is ticked.
+        private List<StrandScheduleRequest> ChooseSameAddressOrders(List<OrderAddItem> adding, List<StrandScheduleRequest> rows,
+                                                                    ISet<Guid> declined, string inspectorFolder)
+        {
+            var loaded = (OrdersListView.ItemsSource as IEnumerable<StrandScheduleRequest>)?.ToList() ?? new List<StrandScheduleRequest>();
+            var exclude = new HashSet<Guid>(rows.Select(r => r.Id));
+            exclude.UnionWith(declined);
+            var candidates = OrdersAddRules.SameAddressCandidates(adding, loaded, exclude, MyListFileNames(inspectorFolder));
+            if (candidates.Count == 0)
+                return new List<StrandScheduleRequest>();
+
+            string me = StrandScheduleService.Username;
+            var choices = candidates.Select(c => (c, c.ServiceName, OrdersAddRules.CandidateDetail(c, me))).ToList();
+            _ordersDialogOpen = true;
+            try
+            {
+                return OrdersTouchDialog.ChooseMany(this, "Add to My List", "Do you want any of these additional orders added to My List as well?",
+                                                    choices, "Add selected", "Add none");
+            }
+            finally { _ordersDialogOpen = false; }
+        }
+
+        // The file names (InspectionNumbers) in My List; none when it cannot be read, so every order is offered.
+        private static List<string> MyListFileNames(string inspectorFolder)
+        {
+            try
+            {
+                return Directory.EnumerateFiles(StrandMyListService.MyListFolder(inspectorFolder), "*.ins", SearchOption.TopDirectoryOnly)
+                    .Select(Path.GetFileNameWithoutExtension).OfType<string>().ToList();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                DiagnosticLogService.Log("Could not list My List for the same-address check", ex);
+                return new List<string>();
+            }
+        }
+
+        private bool AskOrdersTouch(string text)
+        {
+            _ordersDialogOpen = true;
+            try { return OrdersTouchDialog.Ask(this, "Add to My List", text); }
+            finally { _ordersDialogOpen = false; }
         }
 
         private MessageBoxResult AskOrders(string text, MessageBoxButton buttons)

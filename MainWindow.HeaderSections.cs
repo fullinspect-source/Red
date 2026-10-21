@@ -162,11 +162,19 @@ namespace InspectionEditor
 
             var statuses = HeaderRules.StatusList(Header("StatusList"));
             int statusId = HeaderRules.Int(Header("StatusId"));
+            // Owner 2026-10-20: only the results the result picker allows for this inspection; the current status, when it
+            // is not one of them (e.g. Ordered), is shown greyed out and cannot be picked again.
+            var (code, _, failed, config, expirationStageDone) = ResultPickerInputs();
+            var allowed = ResultPickerWindow.AllowedStatusIds(code, failed > 0, config, expirationStageDone, CurrentStatusListIds());
+            var offered = HeaderRules.OfferedStatuses(statuses, allowed);
             var statusCombo = new ComboBox { MinWidth = 220, IsEnabled = !_readOnlyMode, Margin = new Thickness(0, 2, 0, 2) };
-            foreach (var status in statuses)
+            foreach (var status in offered)
                 statusCombo.Items.Add(new ComboBoxItem { Content = status.Name, Tag = status.Id });
-            if (!statuses.Any(s => s.Id == statusId))
-                statusCombo.Items.Insert(0, new ComboBoxItem { Content = $"(status {statusId}, not in this form's list)", Tag = statusId });
+            if (!offered.Any(s => s.Id == statusId))
+            {
+                string current = statuses.FirstOrDefault(s => s.Id == statusId)?.Name ?? $"(status {statusId}, not in this form's list)";
+                statusCombo.Items.Insert(0, new ComboBoxItem { Content = current, Tag = statusId, IsEnabled = false });
+            }
             statusCombo.SelectedItem = statusCombo.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (int)i.Tag == statusId);
             statusCombo.SelectionChanged += (_, _) =>
             {
@@ -490,6 +498,15 @@ namespace InspectionEditor
             return node;
         }
 
+        // Owner tablet test of 2.3.4: press and drag scrolls the section (touch reaches RED as mouse input on the owner's
+        // tablets); the signature pad, text boxes and drop-downs keep their own input (DragScroll).
+        private static ScrollViewer HeaderSectionScroller(UIElement body)
+        {
+            var scroller = new ScrollViewer { Content = new Border { Padding = new Thickness(14), Child = body }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, PanningMode = PanningMode.VerticalFirst };
+            DragScroll.Attach(scroller);
+            return scroller;
+        }
+
         // focusKey: a header field to scroll to once the window shows (the problem list's Go to, the Sign button).
         private void OpenHeaderSectionWindow(bool top, string? focusKey = null)
         {
@@ -505,7 +522,7 @@ namespace InspectionEditor
                 Width = 640,
                 Height = top ? 760 : 460,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Content = new ScrollViewer { Content = new Border { Padding = new Thickness(14), Child = body }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, PanningMode = PanningMode.VerticalFirst }
+                Content = HeaderSectionScroller(body)
             };
             if (focusKey != null)
                 window.Loaded += (_, _) =>

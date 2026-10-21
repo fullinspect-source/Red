@@ -116,7 +116,39 @@
                 <!-- Left: Buttons. Owner tablet test 2026-10-20: a WrapPanel whose MaxWidth follows the visible window width
                      (MainWindow.Submit.cs), so on a narrow screen the buttons wrap to a second line instead of being cut off. -->
                 <WrapPanel x:Name="EditorToolbar" Grid.Column="0" Orientation="Horizontal">
-                    <Button x:Name="OpenFileButton" Content="📂 _Open INS" Click="OpenFileButton_Click" Background="#A52A2A" Foreground="White" BorderThickness="0" TabIndex="100"/>
+                    <WrapPanel.Resources>
+                        <!-- Owner 2026-10-20: readable when greyed out. The default template paints a disabled button pale grey
+                             on pale grey whatever its colour; here it keeps its colours with only the background dimmed, so the
+                             text stays about 7:1 against it. Buttons with no colour of their own are light with dark text. -->
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="Background" Value="#F2F2F2"/>
+                            <Setter Property="Foreground" Value="#222222"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Grid SnapsToDevicePixels="True">
+                                            <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="3"/>
+                                            <ContentPresenter x:Name="Text" Margin="{TemplateBinding Padding}" HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Chrome" Property="Opacity" Value="0.88"/>
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="Chrome" Property="Opacity" Value="0.75"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="Chrome" Property="Opacity" Value="0.65"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </WrapPanel.Resources>
+                    <!-- Owner 2026-10-20: no "Open INS" button (reports are opened from My List). -->
                     <Button x:Name="SaveFileButton" Content="💾 _Save" Click="SaveFileButton_Click" Background="#228B22" Foreground="White" BorderThickness="0" IsEnabled="False" TabIndex="101"/>
 
                     <!-- Template Buttons -->
@@ -256,7 +288,7 @@
                                     FontWeight="Bold"
                                     Padding="8,4"
                                     Margin="6,0,0,0"
-                                    ToolTip="Make checklist text bigger"
+                                    ToolTip="Make the text bigger (both panels)"
                                     IsTabStop="False"/>
                             <Button x:Name="TopTextSizeDownButton"
                                     DockPanel.Dock="Right"
@@ -270,7 +302,7 @@
                                     FontWeight="Bold"
                                     Padding="8,4"
                                     Margin="6,0,0,0"
-                                    ToolTip="Make checklist text smaller"
+                                    ToolTip="Make the text smaller (both panels)"
                                     IsTabStop="False"/>
                             <!-- Owner 2026-10-19 (item 14): the report's result, always shown. Declared after the right-docked A-/A+/Classic/Trip so they keep their room in a narrow panel; the text trims; a tap opens the result picker
                                  (not in read-only reports). Text and colours: Services\ResultLabel.cs, MainWindow.ResultButton.cs. -->
@@ -712,7 +744,8 @@
                           PreviewMouseLeftButtonDown="EditorScrollViewer_PreviewMouseLeftButtonDown"
                           PreviewMouseMove="EditorScrollViewer_PreviewMouseMove"
                           PreviewMouseLeftButtonUp="EditorScrollViewer_PreviewMouseLeftButtonUp">
-                <Grid>
+                <!-- Owner 2026-10-20: A+/A- scale this panel too (MainWindow.xaml.cs ApplyEditorScale). -->
+                <Grid x:Name="EditorScaleRoot">
                     <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
 
                         <!-- Item Header with Nav, slab info, and Duplicate Buttons -->

@@ -308,6 +308,24 @@ namespace InspectionEditor.Services
             SendAsync(HttpMethod.Patch, "Inspect/Request/assign",
                 new { RequestIds = requestIds.ToList(), AssignedUsername = assignedUsername }, cancellationToken);
 
+        // Unassign (owner 2026-10-20) is INSPECT's Assign with its "[Unassigned]" row picked: that row's username, which
+        // is the server's own row from Inspect/User/Inspectors when it sends one, else "" (INSPECT's built-in row when the
+        // list cannot be loaded). Never JSON null.
+        public static async Task UnassignAsync(IEnumerable<Guid> requestIds, CancellationToken cancellationToken = default)
+        {
+            int generation = SessionGeneration;
+            string unassigned;
+            try { unassigned = (await GetInspectorsAsync(cancellationToken)).First(o => o.IsUnassigned).Username; }
+            catch (Exception ex) when (ex is not StrandAuthRequiredException and not OperationCanceledException)
+            {
+                DiagnosticLogService.Log("Could not load inspectors for Unassign; sending INSPECT's built-in [Unassigned]", ex);
+                unassigned = "";
+            }
+            if (generation != SessionGeneration)
+                throw new InvalidOperationException("The Strand account changed while this request was running. Refresh to try again.");
+            await AssignAsync(requestIds, unassigned, cancellationToken);
+        }
+
         // Inspect sends work-order status 7 for a completed survey and 3 for a failed one.
         public static Task CompleteSurveyAsync(Guid requestId, bool passed, CancellationToken cancellationToken = default) =>
             SendAsync(HttpMethod.Patch, "Inspect/Request/Complete",

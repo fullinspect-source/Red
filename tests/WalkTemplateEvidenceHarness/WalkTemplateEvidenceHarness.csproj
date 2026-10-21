@@ -10,6 +10,7 @@
     <Compile Include="../../Services/PdfAttachmentService.cs" Link="PdfAttachmentService.cs" Condition="Exists('../../Services/PdfAttachmentService.cs')" />
     <Compile Include="../../Services/PdfWorkingSession.cs" Link="PdfWorkingSession.cs" />
     <Compile Include="../../Services/PdfEditMonitor.cs" Link="PdfEditMonitor.cs" Condition="Exists('../../Services/PdfEditMonitor.cs')" />
+    <Compile Include="../../Services/PdfMarkup.cs" Link="PdfMarkup.cs" Condition="Exists('../../Services/PdfMarkup.cs')" />
     <Compile Include="../../Services/SurgicalSaveService.cs" Link="SurgicalSaveService.cs" /><Compile Include="../../Services/ItemControls.cs" Link="ItemControls.cs" /><Compile Include="../../Services/InspectionFileReader.cs" Link="InspectionFileReader.cs" /><Compile Include="../../Services/InspectProjectionWriter.cs" Link="InspectProjectionWriter.cs" />
     <Compile Include="../../Services/AtomicInspectionWriter.cs" Link="AtomicInspectionWriter.cs" />
     <Compile Include="../../Services/FailedSaveRecoveryService.cs" Link="FailedSaveRecoveryService.cs" />

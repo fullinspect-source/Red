@@ -326,7 +326,6 @@ namespace InspectionEditor
             OrdersSignedInText.Text = StrandScheduleService.IsSignedIn
                 ? $"Signed in as {StrandScheduleService.DisplayName}"
                 : "Not signed in";
-            UpdateFeeTokenUi();
         }
 
         private void UpdateOrdersSelectionUi()
@@ -338,10 +337,7 @@ namespace InspectionEditor
             OrdersDeleteButton.Visibility = StrandScheduleService.CanDeleteRequests ? Visibility.Visible : Visibility.Collapsed;
             OrdersDeleteButton.IsEnabled = canAct && count > 0 && StrandScheduleService.CanDeleteRequests;
             OrdersAddToMyListButton.IsEnabled = canAct && count > 0;
-            OrdersAssignButton.IsEnabled = canAct && count > 0 && StrandScheduleService.IsSuperUser;
-            OrdersAssignButton.ToolTip = StrandScheduleService.IsSignedIn && !StrandScheduleService.IsSuperUser
-                ? "Assign is only available to the super user account."
-                : null;
+            OrdersUnassignButton.IsEnabled = canAct && count > 0;
             OrdersSelectionText.Text = count == 0 ? "" : $"{count} selected";
             UpdateOrderGroupCheckBoxes();
             UpdateOrderFilterUi();
@@ -475,7 +471,7 @@ namespace InspectionEditor
             if (openSettings)
                 ShowSettingsTab();
             else if (window.AddToMyListRequested && !_pickerClosed)
-                await AddOrdersToMyListAsync(new List<StrandScheduleRequest> { request }, skipRowChecks: true, window.CheckedProfile);
+                await AddOrdersToMyListAsync(new List<StrandScheduleRequest> { request }, skipRowChecks: true, window.CheckedProfile, window.AddedItem);
 
             // Like Inspect, reload whenever the dialog closes (also after Add to My List, even if it stopped early).
             // This also resets the UI if the session expired.
@@ -483,92 +479,56 @@ namespace InspectionEditor
             return !openSettings;
         }
 
-        private async void OrdersAssignButton_Click(object sender, RoutedEventArgs e)
+        // Unassign (owner 2026-10-20; Assign is gone): INSPECT's Assign with its "[Unassigned]" row. Anyone may unassign
+        // their own orders; only the super user may unassign someone else's. Blocked rows are skipped and listed once,
+        // after the reload.
+        private async void OrdersUnassignButton_Click(object sender, RoutedEventArgs e)
         {
             var selected = GetSelectedOrders();
-            if (selected.Count == 0 || !StrandScheduleService.IsSuperUser)
+            if (selected.Count == 0 || _ordersBusy || _pickerClosed || !StrandScheduleService.IsSignedIn)
                 return;
 
-            foreach (var request in selected)
-            {
-                string? problem = request.IsPendingJob ? "can not be assigned due to a pending job"
-                    : request.StatusId == StrandRequestStatus.Deleted ? "has a deleted status and can not be updated"
-                    : StrandRequestStatus.IsCompleted(request.StatusId) ? "has a completed status and can not be updated"
-                    : null;
-                if (problem != null)
-                {
-                    MessageBox.Show(this, $"A selected {request.ServiceName} for {request.Address} {problem}.", "Assign", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-            }
-
-            int alreadyAssigned = selected.Count(r => !string.IsNullOrWhiteSpace(r.AssignedUsername));
-            if (alreadyAssigned > 0)
-            {
-                MessageBoxResult confirm;
-                _ordersDialogOpen = true; // keeps the refresh timer from starting a load under the prompt
-                try
-                {
-                    confirm = MessageBox.Show(this, $"{alreadyAssigned} of {selected.Count} items selected are already assigned. Assigning someone else will overwrite the previous selection.",
-                        "Assign", MessageBoxButton.OKCancel, MessageBoxImage.Information);
-                }
-                finally { _ordersDialogOpen = false; }
-                if (confirm != MessageBoxResult.OK)
-                    return;
-            }
-            if (_ordersBusy || _pickerClosed)
-                return;
-
-            string previousStatus = OrdersStatusText.Text;
-            List<StrandUserOption> inspectors;
-            SetOrdersBusy(true, "Loading inspectors...");
-            try { inspectors = await StrandScheduleService.GetInspectorsAsync(); }
-            catch (Exception ex)
-            {
-                OrdersStatusText.Text = $"Could not load inspectors: {ex.Message}";
-                return;
-            }
-            finally { SetOrdersBusy(false); UpdateOrdersSignInUi(); }
-
-            if (_pickerClosed)
-                return;
-            OrdersStatusText.Text = previousStatus;
-
-            var assignWindow = new OrderAssignWindow(inspectors, selected.Count) { Owner = this };
-            _ordersDialogOpen = true;
-            bool? ok;
-            try { ok = assignWindow.ShowDialog(); }
-            finally { _ordersDialogOpen = false; }
-            if (ok != true || assignWindow.SelectedInspector is not StrandUserOption inspector)
-                return;
-
-            SetOrdersBusy(true, "Assigning...");
-            string? assignResult = null;
+            SetOrdersBusy(true, "Unassigning...");
+            UnassignPlan? plan = null;
+            string? result = null;
             try
             {
-                await StrandScheduleService.AssignAsync(selected.Select(r => r.Id), inspector.Username);
-                string who = inspector.IsUnassigned ? "unassigned." : $"assigned to {inspector.DisplayName}.";
-                assignResult = $"{selected.Count} {(selected.Count == 1 ? "request was" : "requests were")} {who}";
+                // Judge each order by the server's list as it is now, not the grid (which can be minutes old), so an
+                // order reassigned or closed since the last load is not unassigned by mistake.
+                int generation = StrandScheduleService.SessionGeneration;
+                var current = (await StrandScheduleService.GetRequestListAsync())
+                    .GroupBy(r => r.Id).ToDictionary(g => g.Key, g => g.First());
+                if (generation != StrandScheduleService.SessionGeneration)
+                    throw new InvalidOperationException("The Strand account changed while this request was running. Refresh to try again.");
+                plan = OrdersAddRules.PlanUnassign(selected, current, StrandScheduleService.Username, StrandScheduleService.IsSuperUser);
+                if (plan.Rows.Count > 0)
+                {
+                    await StrandScheduleService.UnassignAsync(plan.Rows.Select(r => r.Id));
+                    result = OrdersAddRules.UnassignResult(plan.Rows.Count);
+                }
             }
             catch (Exception ex)
             {
-                if (!_pickerClosed)
-                    MessageBox.Show(this, $"Could not assign user to request.\n\n{ex.Message}", "Assign", MessageBoxButton.OK, MessageBoxImage.Warning);
+                plan = null;
+                ShowOrdersMessage($"Could not unassign the selected requests.{Environment.NewLine}{Environment.NewLine}{ex.Message}", "Unassign", MessageBoxImage.Warning);
             }
             finally
             {
                 SetOrdersBusy(false);
+                UpdateOrdersSignInUi();
             }
             if (_pickerClosed)
                 return;
 
-            // Assigned rows are done; don't let them ride along into the next bulk action.
-            if (assignResult != null)
+            // Unassigned rows are done; don't let them ride along into the next bulk action.
+            if (result != null)
                 OrdersListView.UnselectAll();
             bool reloaded = await LoadOrdersAsync();
-            // Keep the reload's own message (including a failure) after the assign result.
-            if (assignResult != null && StrandScheduleService.IsSignedIn)
-                OrdersStatusText.Text = reloaded ? assignResult : $"{assignResult} {OrdersStatusText.Text}";
+            // Keep the reload's own message (including a failure) after the result.
+            if (result != null && StrandScheduleService.IsSignedIn)
+                OrdersStatusText.Text = reloaded ? result : $"{result} {OrdersStatusText.Text}";
+            if (plan is { Skipped.Count: > 0 })
+                ShowOrdersMessage(string.Join(Environment.NewLine + Environment.NewLine, plan.Skipped), "Unassign", MessageBoxImage.Information);
         }
 
         private async void OrdersDeleteButton_Click(object sender, RoutedEventArgs e)

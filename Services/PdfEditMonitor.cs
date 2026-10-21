@@ -112,6 +112,18 @@ namespace InspectionEditor.Services
             Status = "Walk PDF prepared. Only a subsequent external save will be captured to INS.";
         }
 
+        // Owner 2026-10-20 (tablet test of 2.3.4): a job file (CanExcludePages) counts the pages changed in RED's copy since
+        // the last captured save, added to those already marked, so a plan that arrives with annotations on every page does
+        // not print in full. Other attachments keep INSPECT's any-annotation rule (F-017 S2).
+        private int[] AnnotatedPagesAfterSave(JObject previous, byte[] bytes)
+        {
+            bool jobFile = previous["CanExcludePages"]?.Type == JTokenType.Boolean && (bool)previous["CanExcludePages"]!;
+            if (!jobFile || PdfMarkup.ChangedPages(_baseline, bytes) is not int[] changed)
+                return PdfAttachmentService.AnnotatedPages(bytes);
+            var prior = (previous["AnnotatedPages"] as JArray)?.Where(t => t.Type == JTokenType.Integer).Select(t => (int)t) ?? Enumerable.Empty<int>();
+            return prior.Concat(changed).Where(i => i >= 0).Distinct().OrderBy(i => i).ToArray();
+        }
+
         internal PdfEditMonitor(InspectionFile owner, int? index, string filename, byte[] bytes,
             string inspectionPath, string workingRoot, bool pendingAdd = false)
         {
@@ -134,7 +146,7 @@ namespace InspectionEditor.Services
             _directory = Path.Combine(Path.GetFullPath(workingRoot), identity, Guid.NewGuid().ToString("N"));
             PdfWorkingSession.RequirePlainPath(_directory);
             Directory.CreateDirectory(_directory);
-            WorkingPath = Path.Combine(_directory, "Orientation.pdf");
+            WorkingPath = Path.Combine(_directory, WorkingName(_directory, filename));
             try
             {
                 _sessionLease = PdfWorkingSession.CreateLease(_directory);
@@ -146,6 +158,23 @@ namespace InspectionEditor.Services
                 // No recursive deletion, including on unexpected/reparse-point paths.
                 throw;
             }
+        }
+
+        // F-016 J5, F-017 A1: the PDF app shows the working copy's file name, so it is the attachment's own (safe) Filename,
+        // as INSPECT's %TEMP%\Strand\{WorkOrderId}\{Filename}. The leases (CreateFile) and PDF apps take classic paths, so
+        // a name that would pass MAX_PATH keeps its start and its extension.
+        internal const int MaxWorkingPath = 259;
+        internal static string WorkingName(string directory, string filename)
+        {
+            int room = MaxWorkingPath - directory.Length - 1;
+            if (filename.Length <= room) return filename;
+            string extension = Path.GetExtension(filename);
+            int keep = room - extension.Length;
+            if (keep < 1) return filename; // the folder alone is too long; no shorter name helps
+            string stem = filename[..keep];
+            if (char.IsHighSurrogate(stem[^1])) stem = stem[..^1];
+            string name = stem.TrimEnd(' ', '.') + extension;
+            return name.Length > extension.Length && PdfAttachmentService.SafeFilename(name) ? name : filename;
         }
 
         private DateTime WorkingFileTime()
@@ -199,7 +228,7 @@ namespace InspectionEditor.Services
                     // F-017 S1-S4 (F-016 R1): after a captured save the attachment carries the full bytes, its annotated
                     // pages, the working copy's modified time, and is no longer reference-only. IncludedPages and
                     // CanExcludePages are left as they are (S5, S6).
-                    attachment["AnnotatedPages"] = new JArray(PdfAttachmentService.AnnotatedPages(bytes).Cast<object>().ToArray());
+                    attachment["AnnotatedPages"] = new JArray(AnnotatedPagesAfterSave(_expectedAttachment!, bytes).Cast<object>().ToArray());
                     if (attachment["ReferenceOnly"]?.Type == JTokenType.Boolean && (bool)attachment["ReferenceOnly"]!)
                         attachment["ReferenceOnly"] = false;
                     attachment["LastWriteTime"] = PdfAttachmentService.FormatTime(WorkingFileTime());

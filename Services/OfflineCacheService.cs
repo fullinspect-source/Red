@@ -261,9 +261,11 @@ namespace InspectionEditor.Services
             }
         }
 
-        // R2: at home-window load, the stale caches only; once more 10 s later for any still stale (a one-shot retry).
+        // R2: the stale caches only; once more 10 s later for any still stale (a one-shot retry). everything (owner
+        // 2026-10-20, tablet test of 2.3.4: "always do that for the inspector whenever inspector opens RED"): every cache,
+        // at each start, then once more for any that failed. Silent: results go only to RED's log.
         public static async Task AutoRefreshAsync(StrandWebsiteSession session, Func<DateTime>? clock = null, string? root = null,
-            Func<TimeSpan, Task>? delay = null, Action<string>? redLog = null)
+            Func<TimeSpan, Task>? delay = null, Action<string>? redLog = null, bool everything = false)
         {
             clock ??= () => DateTime.Now;
             delay ??= Task.Delay;
@@ -275,13 +277,13 @@ namespace InspectionEditor.Services
                                                          !SavedLoginRefused && StrandScheduleService.SessionGeneration == generation);
             if (!Allowed()) return;
             List<OfflineCache> Stale() => Enum.GetValues<OfflineCache>().Where(cache => IsStale(cache, clock(), root)).ToList();
-            var stale = Stale();
-            if (stale.Count == 0) return;
-            await RefreshAsync(session, stale, root, redLog);
+            var first = everything ? Enum.GetValues<OfflineCache>().ToList() : Stale();
+            if (first.Count == 0) return;
+            var result = await RefreshAsync(session, first, root, redLog);
             await delay(RetryDelay);
-            stale = Stale();
-            if (stale.Count > 0 && Allowed()) // signed out meanwhile: no retry
-                await RefreshAsync(session, stale, root, redLog);
+            var again = everything ? result.Failed.ToList() : Stale();
+            if (again.Count > 0 && Allowed()) // signed out meanwhile: no retry
+                await RefreshAsync(session, again, root, redLog);
         }
         // R4: the result text of a forced download.
         public static string ResultText(OfflineRefreshResult result) =>

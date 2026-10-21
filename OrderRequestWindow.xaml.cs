@@ -30,6 +30,10 @@ namespace InspectionEditor
         // The inspector profile checked before the assign PATCH, handed on with AddToMyListRequested.
         public CompleteProfile? CheckedProfile { get; private set; }
 
+        // The request as saved for Add to My List (its edited date answered the date question), handed on with
+        // AddToMyListRequested for the same-address check.
+        public OrderAddItem? AddedItem { get; private set; }
+
         public OrderRequestWindow(Guid requestId)
         {
             _requestId = requestId;
@@ -136,8 +140,9 @@ namespace InspectionEditor
             // Inspect hides Delete without the Strand "Service Request Delete" or "Edit - All" permission.
             DeleteButton.Visibility = StrandScheduleService.CanDeleteRequests ? Visibility.Visible : Visibility.Collapsed;
 
-            // Reassigning is reserved for the super user, here as on the ORDERS toolbar.
-            AssignedCombo.IsEnabled = StrandScheduleService.IsSuperUser;
+            // Owner 2026-10-20: Assign is gone, so Assigned To is shown and never changed here, for everyone. Save sends
+            // it back as shown; Add to My List assigns the request to me.
+            AssignedCombo.IsEnabled = false;
             // Inspect offers Add to My List for open requests (Requested or Assigned) without a pending job.
             AddToMyListButton.Visibility = (request.StatusId is StrandRequestStatus.Requested or StrandRequestStatus.Assigned) && !request.IsPendingJob
                 ? Visibility.Visible
@@ -189,12 +194,20 @@ namespace InspectionEditor
             if (!TryReadForm(out var updated))
                 return;
 
+            // Owner 2026-10-20: a request for an earlier day, or more than 30 hours ahead, asks first, with the date as
+            // set here. No sends nothing and keeps the dialog open.
+            var item = new OrderAddItem(updated.Id, updated.ServiceName, updated.Address, updated.City, updated.Date, updated.RequestTimeRequired, updated.ServiceTypeId);
+            if (OrdersAddRules.NeedsDateQuestion(item, DateTimeOffset.Now) &&
+                !OrdersTouchDialog.Ask(this, Title, OrdersAddRules.DateQuestion(new[] { item }, 1)))
+                return;
+
             updated.AssignedUsername = StrandScheduleService.Username;
             SetBusy(true, saving: true);
             try
             {
                 await StrandScheduleService.UpdateRequestAsync(updated);
                 CheckedProfile = profile;
+                AddedItem = item;
                 AddToMyListRequested = true;
                 CloseWithSavedChanges();
             }

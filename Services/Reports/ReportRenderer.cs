@@ -832,6 +832,8 @@ namespace InspectionEditor.Services.Reports
                 byte[] bytes;
                 try { bytes = PdfAttachmentService.EmbeddedPdf(attachment); }
                 catch (IOException) { continue; }
+                // Owner 2026-10-20: ink saved as annotations is drawn into its page, so it prints (PdfMarkup.Flatten).
+                bytes = PdfMarkup.Flatten(bytes);
                 bool exclude = attachment["CanExcludePages"]?.Type == JTokenType.Boolean && (bool)attachment["CanExcludePages"]!;
                 var annotated = (attachment["AnnotatedPages"] as JArray)?.Select(t => (int)t).ToList() ?? new List<int>();
                 using var input = PdfReader.Open(new MemoryStream(bytes), PdfDocumentOpenMode.Import);

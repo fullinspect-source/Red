@@ -110,6 +110,20 @@ static class Harness
                     "only /Inspect/Forms/GetOfflineList is requested (the fresh ones are not, and the 10 s retry finds nothing stale)");
             }
 
+            // ---------- A-020-11 Every start downloads everything, silently; a failed one is tried once more (owner 2026-10-20) ----------
+            {
+                var now = new DateTime(2026, 10, 17, 9, 0, 0); // every cache is fresh (written today)
+                int before = mock.Requests.Count;
+                mock.Handler = path => path.Contains("Templates") ? (500, "") : path.Contains("Forms") ? (200, Forms) : (200, Jobs);
+                await OfflineCacheService.AutoRefreshAsync(session, () => now, root, NoDelay, redLog.Add, everything: true);
+                var gets = mock.Requests.Skip(before).Where(r => r.StartsWith("GET ")).Select(r => r.Split('?')[0]).ToList();
+                Check("A-020-11", gets.Count(g => g.Contains("Forms")) == 1 && gets.Count(g => g.Contains("Jobs") || g.Contains("Request")) >= 1 &&
+                                  gets.Count(g => g.Contains("Templates")) == 2,
+                    $"at start every list is downloaded even when fresh, and only the failed one is tried again ({string.Join(", ", gets)})");
+                mock.Handler = path => path.Contains("Forms") ? (200, Forms) : path.Contains("Templates") ? (200, Templates) : (200, Jobs);
+                File.WriteAllText(OfflineCacheService.PathOf(OfflineCache.Templates, root), Templates);
+            }
+
             // ---------- A-020-02 Failed fetch keeps the old file ----------
             {
                 string jobs = OfflineCacheService.PathOf(OfflineCache.Jobs, root);

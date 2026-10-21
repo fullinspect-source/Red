@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -32,15 +33,41 @@ namespace InspectionEditor
             _ink.DefaultDrawingAttributes.Color = Color.FromRgb(0, 0, 255);
             _ink.StrokeCollected += (_, _) => StrokeFinished?.Invoke(this, EventArgs.Empty);
             Children.Add(_ink);
-            // Owner tablet test 2026-10-20: the pad sits inside scroll areas that pan by touch (the inline checklist, the
-            // End window). Taking the touch manipulation here, and cancelling it, keeps a finger stroke on the pad from
-            // scrolling the page; the stroke itself still reaches the InkCanvas as stylus input.
-            IsManipulationEnabled = true;
-            ManipulationStarting += (_, e) =>
-            {
-                e.Cancel();
-                e.Handled = true;
-            };
+            // Owner tablet test of 2.3.4: in a scroll area that pans by touch (the End window) a finger stroke drew a few
+            // pixels and then the page took it over, leaving dashes. While a finger or pen is down on the pad, every scroll
+            // area around it stops panning, and pans again when the stroke ends. Windows' press-and-hold and flick
+            // gestures are off on the pad, so they cannot cut a stroke short either.
+            Stylus.SetIsPressAndHoldEnabled(this, false);
+            Stylus.SetIsFlicksEnabled(this, false);
+            Stylus.SetIsTapFeedbackEnabled(this, false);
+            PreviewStylusDown += (_, _) => SuspendPanning();
+            PreviewTouchDown += (_, _) => SuspendPanning();
+            PreviewStylusUp += (_, _) => ResumePanning();
+            PreviewTouchUp += (_, _) => ResumePanning();
+            LostStylusCapture += (_, _) => ResumePanning();
+            LostTouchCapture += (_, _) => ResumePanning();
+            StylusOutOfRange += (_, _) => ResumePanning();
+            Unloaded += (_, _) => ResumePanning();
+        }
+
+        private readonly List<(ScrollViewer Viewer, PanningMode Mode)> _suspendedPanning = new();
+
+        private void SuspendPanning()
+        {
+            if (_suspendedPanning.Count > 0) return;
+            for (DependencyObject? node = this; node != null; node = VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node))
+                if (node is ScrollViewer viewer && viewer.PanningMode != PanningMode.None)
+                {
+                    _suspendedPanning.Add((viewer, viewer.PanningMode));
+                    viewer.PanningMode = PanningMode.None;
+                }
+        }
+
+        private void ResumePanning()
+        {
+            foreach (var (viewer, mode) in _suspendedPanning)
+                viewer.PanningMode = mode;
+            _suspendedPanning.Clear();
         }
 
         public bool IsEnabledForInk

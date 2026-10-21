@@ -134,16 +134,7 @@ namespace InspectionEditor
             };
             Loaded += (_, _) => _lastEditTimer.Start();
             Closed += (_, _) => { _pickerClosed = true; ++_lastEditRefreshGeneration; _lastEditTimer.Stop(); _columnWidthSaveTimer.Stop(); _ordersRefreshTimer?.Stop(); };
-            // Any sign-in or sign-out, in any picker window, clears this window's iPad fee token at once.
-            Action onStrandSessionChanged = () => Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (_pickerClosed)
-                    return;
-                ClearFeeToken();
-                UpdateFeeTokenUi();
-            }));
-            Services.StrandScheduleService.SessionChanged += onStrandSessionChanged;
-            Closed += (_, _) => Services.StrandScheduleService.SessionChanged -= onStrandSessionChanged;
+            // Owner 2026-10-20: no iPad fee token in Settings (zero fees are written automatically, as INSPECT does).
             if (_stayOpenHome)
             {
                 OpenButton.Content = "Open";

@@ -20,10 +20,6 @@ namespace InspectionEditor
 
         private void LoadStrandAccountUi()
         {
-            // The fee token is shown once: opening Settings again starts with an empty box.
-            ClearFeeToken();
-            UpdateFeeTokenUi();
-
             // Leave the fields and the "Testing..." status alone while Test & Save runs.
             if (_strandTestSaveRunning)
                 return;
@@ -174,50 +170,6 @@ namespace InspectionEditor
             UpdateProfileLock(); // the Strand login is part of the required profile
         }
 
-        // iPad fee token (ORDERS D-03 = B): super user only, shown once, never saved or logged.
-        private void UpdateFeeTokenUi()
-        {
-            bool owner = StrandScheduleService.IsSuperUser;
-            FeeTokenPanel.Visibility = owner ? Visibility.Visible : Visibility.Collapsed;
-            if (!owner)
-                ClearFeeToken();
-        }
-
-        private void ClearFeeToken()
-        {
-            FeeTokenBox.Clear();
-            FeeTokenCopyButton.IsEnabled = false;
-        }
-
-        private void FeeTokenMakeButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!StrandScheduleService.IsSuperUser)
-            {
-                ClearFeeToken();
-                return;
-            }
-
-            FeeTokenBox.Text = StrandMyListService.CreateFeeToken();
-            FeeTokenCopyButton.IsEnabled = true;
-            FeeTokenBox.Focus();
-            FeeTokenBox.SelectAll();
-        }
-
-        private void FeeTokenCopyButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!StrandScheduleService.IsSuperUser || FeeTokenBox.Text.Length == 0)
-                return;
-            try
-            {
-                Clipboard.SetText(FeeTokenBox.Text);
-                StrandAccountStatusText.Text = "Fee token copied. Paste it into the iPad.";
-            }
-            catch (System.Runtime.InteropServices.COMException)
-            {
-                // Another app is holding the clipboard; the token is still selectable in the box.
-                StrandAccountStatusText.Text = "Could not copy (the clipboard is busy). Select the token and press Ctrl+C.";
-            }
-        }
 
         // Tries RED's saved login. Inspect's login is used when nothing is saved, or as a fallback
         // for the same user (password changed in Inspect); it never replaces a different saved account.

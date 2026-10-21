@@ -703,6 +703,13 @@
                                FontSize="15"
                                Foreground="#66737F"
                                Margin="0,5,0,0"/>
+                    <!-- Owner 2026-10-20 (tablet test of 2.3.4): Import from INSPECT is the first thing in Settings. -->
+                    <DockPanel Margin="0,12,0,0">
+                        <Button x:Name="ProfileImportButton" Content="Import from INSPECT" Click="ProfileImportButton_Click"
+                                Style="{StaticResource QuietButtonStyle}" VerticalAlignment="Top"/>
+                        <TextBlock x:Name="ProfileStatusText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                   Foreground="#52616F" TextWrapping="Wrap"/>
+                    </DockPanel>
 
                     <!-- Shown while the inspector profile is incomplete; My List and ORDERS stay locked (owner, 2026-10-18). -->
                     <Border x:Name="ProfileBanner" Visibility="Collapsed" Margin="0,12,0,0" Padding="14,12"
@@ -786,12 +793,6 @@
                                 <TextBlock Text="Your Strand username and password are under Strand Account below."
                                            Foreground="#66737F" TextWrapping="Wrap" Margin="0,12,0,0"/>
                                 <TextBlock x:Name="ProfileOtherText" Foreground="#66737F" TextWrapping="Wrap" Margin="0,6,0,0"/>
-                                <DockPanel Margin="0,14,0,0">
-                                    <Button x:Name="ProfileImportButton" Content="Import from INSPECT" Click="ProfileImportButton_Click"
-                                            Style="{StaticResource QuietButtonStyle}" VerticalAlignment="Top"/>
-                                    <TextBlock x:Name="ProfileStatusText" VerticalAlignment="Center" Margin="14,0,0,0"
-                                               Foreground="#52616F" TextWrapping="Wrap"/>
-                                </DockPanel>
                             </StackPanel>
                         </Border>
 
@@ -821,22 +822,7 @@
                                     <TextBlock x:Name="StrandAccountStatusText" VerticalAlignment="Center" Margin="14,0,0,0"
                                                Foreground="#52616F" TextWrapping="Wrap"/>
                                 </DockPanel>
-
-                                <!-- Owner only (super-user account). The token is shown here once and never saved or logged. -->
-                                <StackPanel x:Name="FeeTokenPanel" Visibility="Collapsed" Margin="0,18,0,0">
-                                    <TextBlock Text="iPad fee token (owner only)" FontWeight="SemiBold" Foreground="#1F2933"/>
-                                    <TextBlock Text="Paste this into RED on the iPad, Settings > Strand Account > Fee token."
-                                               TextWrapping="Wrap" Foreground="#66737F" Margin="0,4,0,10"/>
-                                    <DockPanel>
-                                        <Button x:Name="FeeTokenMakeButton" DockPanel.Dock="Left" Content="Make Fee Token"
-                                                Click="FeeTokenMakeButton_Click" Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0"/>
-                                        <Button x:Name="FeeTokenCopyButton" DockPanel.Dock="Right" Content="Copy"
-                                                Click="FeeTokenCopyButton_Click" Style="{StaticResource QuietButtonStyle}" Margin="8,0,0,0"
-                                                IsEnabled="False"/>
-                                        <TextBox x:Name="FeeTokenBox" IsReadOnly="True" Padding="8,6" FontFamily="Consolas"
-                                                 VerticalContentAlignment="Center" IsUndoEnabled="False"/>
-                                    </DockPanel>
-                                </StackPanel>
+                                <!-- Owner 2026-10-20: no iPad fee token here; zero fees are written automatically, as INSPECT does. -->
                             </StackPanel>
                         </Border>
 
@@ -1316,17 +1302,17 @@
                 </Grid>
 
                 <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
-                    <!-- Same Action buttons as Inspect's Schedule ribbon: Open, Delete, Add to My List, Assign. -->
+                    <!-- Owner 2026-10-20: Open, Add to My List, Delete, Unassign. Assign is gone (Add to My List assigns to me). -->
                     <Button x:Name="OrdersOpenButton" Content="Open" Click="OrdersOpenButton_Click"
+                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"/>
+                    <Button x:Name="OrdersAddToMyListButton" Content="Add to My List" Click="OrdersAddToMyListButton_Click"
                             Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"/>
                     <Button x:Name="OrdersDeleteButton" Content="Delete…" Click="OrdersDeleteButton_Click"
                             Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"
                             Visibility="Collapsed"/>
-                    <Button x:Name="OrdersAddToMyListButton" Content="Add to My List" Click="OrdersAddToMyListButton_Click"
-                            Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"/>
-                    <Button x:Name="OrdersAssignButton" Content="Assign…" Click="OrdersAssignButton_Click"
+                    <Button x:Name="OrdersUnassignButton" Content="Unassign" Click="OrdersUnassignButton_Click"
                             Style="{StaticResource QuietButtonStyle}" Margin="0,0,8,0" IsEnabled="False"
-                            ToolTipService.ShowOnDisabled="True"/>
+                            ToolTip="Make the selected orders unassigned. Only the super user can unassign someone else's."/>
                     <TextBlock x:Name="OrdersSelectionText" Foreground="#66737F" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     <Button x:Name="OrdersClearFiltersButton" DockPanel.Dock="Right" Content="Clear Filters" Click="OrdersClearFiltersButton_Click"
                             Style="{StaticResource QuietButtonStyle}" Margin="8,0,0,0" Visibility="Collapsed"/>
@@ -1646,24 +1632,15 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Owner 2026-10-19: My List (n), ORDERS, BUYER WALK, Outbox (n), Archive (n), Review (n); the folder
-                     tabs replace the old view buttons above the list. Captions and counts are set in UpdateFolderViewBar,
-                     margins and colours in SetActiveTab. Review shows only for reviewers (F-018 W2, ReviewAccess). -->
+                <!-- Owner 2026-10-20 (tablet test of 2.3.4): groups, top to bottom: My List, Outbox | Archive, Review |
+                     ORDERS, BUYER WALK | Settings, About | Close App, with a small gap inside a pair of groups and a bigger
+                     one between them. The gaps are their own elements, so SetActiveTab (which sets the tabs' margins and
+                     colours) keeps them. Captions and counts are set in UpdateFolderViewBar. Review shows only for
+                     reviewers (F-018 W2, ReviewAccess). -->
                 <StackPanel Grid.Row="0">
                     <Button x:Name="MyListTabButton"
                             Content="My List"
                             Click="MyListTabButton_Click"
-                            Margin="-12,0,0,8"
-                            Style="{StaticResource SideTabStyle}"/>
-                    <Button x:Name="OrdersTabButton"
-                            Content="ORDERS"
-                            Click="OrdersTabButton_Click"
-                            Margin="-12,0,0,8"
-                            Style="{StaticResource SideTabStyle}"/>
-                    <!-- F-025 (BW-D12): INSPECT's Buyer Walk view, right after ORDERS. -->
-                    <Button x:Name="BuyerWalkTabButton"
-                            Content="BUYER WALK"
-                            Click="BuyerWalkTabButton_Click"
                             Margin="-12,0,0,8"
                             Style="{StaticResource SideTabStyle}"/>
                     <Button x:Name="OutboxTabButton"
@@ -1671,6 +1648,7 @@
                             Click="OutboxTabButton_Click"
                             Margin="-12,0,0,8"
                             Style="{StaticResource SideTabStyle}"/>
+                    <Border x:Name="TabGapSmall1" Height="10"/>
                     <Button x:Name="ArchiveTabButton"
                             Content="Archive"
                             Click="ArchiveTabButton_Click"
@@ -1682,10 +1660,19 @@
                             Margin="-12,0,0,8"
                             Visibility="Collapsed"
                             Style="{StaticResource SideTabStyle}"/>
-                </StackPanel>
-
-                <!-- Settings and About sit at the bottom, above Close App. -->
-                <StackPanel Grid.Row="2">
+                    <Border x:Name="TabGapLarge1" Height="28"/>
+                    <Button x:Name="OrdersTabButton"
+                            Content="ORDERS"
+                            Click="OrdersTabButton_Click"
+                            Margin="-12,0,0,8"
+                            Style="{StaticResource SideTabStyle}"/>
+                    <!-- F-025 (BW-D12): INSPECT's Buyer Walk view, right after ORDERS. -->
+                    <Button x:Name="BuyerWalkTabButton"
+                            Content="BUYER WALK"
+                            Click="BuyerWalkTabButton_Click"
+                            Margin="-12,0,0,8"
+                            Style="{StaticResource SideTabStyle}"/>
+                    <Border x:Name="TabGapLarge2" Height="28"/>
                     <Button x:Name="SettingsTabButton"
                             Content="Settings"
                             Click="SettingsTabButton_Click"
@@ -1696,7 +1683,9 @@
                             Click="AboutTabButton_Click"
                             Margin="-12,0,0,8"
                             Style="{StaticResource SideTabStyle}"/>
-                    <Button Content="Close App"
+                    <Border x:Name="TabGapSmall2" Height="10"/>
+                    <Button x:Name="CloseAppButton"
+                            Content="Close App"
                             Click="CancelButton_Click"
                             Margin="0,4,0,0"
                             Padding="16,11"

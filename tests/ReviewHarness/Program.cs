@@ -124,25 +124,23 @@ static class Harness
 
     public static async Task<int> Run()
     {
-        // ---------- A-018-02 / A-018-08 / W1 / W3 Who sees Review (unchanged) ----------
+        // ---------- A-018-02 / A-018-08 / W1 / W3 Who sees Review (owner 2026-10-20: not a setting) ----------
         using (var box = new Sandbox())
         {
-            string settings = Path.Combine(box.Root, "settings");
-            var auto = new ReviewSettings { ShowReview = ReviewVisibility.Auto };
-            Check("A-018-02", !ReviewAccess.Allowed(box.IF, auto), "auto, empty Review: no Review view");
+            Check("A-018-02", !ReviewAccess.Allowed(box.IF), "empty Review folder: no Review view (common inspectors never see it)");
             box.Place(Fixture());
-            Check("A-018-02", ReviewAccess.Allowed(box.IF, auto) && ReviewAccess.CountReviewFiles(box.IF) == 1, "auto, one .ins: the Review view appears (count without parsing)");
-            Check("A-018-08", !ReviewAccess.Allowed(box.IF, new ReviewSettings { ShowReview = ReviewVisibility.Never }) &&
+            Check("A-018-02", ReviewAccess.Allowed(box.IF) && ReviewAccess.CountReviewFiles(box.IF) == 1, "one .ins in Review: the Review view appears (count without parsing)");
+            Check("A-018-08", !ReviewAccess.Allowed(Path.Combine(box.Root, "none")) &&
                               ReviewAccess.MoveRefused == "You have insufficient permissions." &&
                               ReviewAccess.ViewRefused == "You have insufficient permissions to view the Review folder.",
-                "never: the Review view and moves to Review are refused with INSPECT's messages");
-            Check("W1", ReviewAccess.Allowed(Path.Combine(box.Root, "none"), new ReviewSettings { ShowReview = ReviewVisibility.Always }), "always: shown even without files");
+                "no Review reports: the Review view and moves to Review are refused with INSPECT's messages");
+            Check("W1", typeof(ReviewAccess).Assembly.GetType("InspectionEditor.Services.ReviewSettings") == null &&
+                        !File.ReadAllText(Path.Combine("..", "..", "InspectionPickerWindow.Housekeeping.cs")).Contains("\"Show Review"),
+                "there is no Show Review setting (owner 2026-10-20)");
             Check("W3", ReviewAccess.IsInReview(Path.Combine(box.Review, "a.ins"), box.IF) &&
                         !ReviewAccess.IsInReview(Path.Combine(box.IF, "Review Notes", "a.ins"), box.IF) &&
                         !ReviewAccess.IsInReview(Path.Combine(box.MyList, "Review.ins"), box.IF),
                 "a Review file is one whose parent folder is exactly {IF}\\Review (not any path containing Review)");
-            new ReviewSettings { ShowReview = ReviewVisibility.Never }.Save(settings);
-            Check("W1", ReviewSettings.Load(settings).ShowReview == ReviewVisibility.Never, "the setting is kept in RED's app data");
         }
 
         // ---------- A-018-21 No Approve anywhere ----------

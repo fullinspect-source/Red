@@ -67,7 +67,8 @@ namespace InspectionEditor
             catch (Exception ex) { DiagnosticLogService.Log("Camera backup photo cleanup failed", ex); }
         });
 
-        // F-020 R2: the stale offline caches at home-window load, once more 10 s later. A dev build makes no website
+        // F-020 R2 (owner 2026-10-20): every offline cache at each start, silently, once more 10 s later for any that
+        // failed; a later sign-in refreshes the stale ones. A dev build makes no website
         // call for them unless RED_DEV_NETWORK=1 (Settings' Download Offline Data and Add's download still work). C3:
         // with no RED cache yet, INSPECT's local copies are taken read only.
         internal static void StartOfflineCaches()
@@ -113,7 +114,8 @@ namespace InspectionEditor
                 Volatile.Write(ref _offlineRefreshRunning, 0);
                 return;
             }
-            OfflineCacheService.AutoRefreshAsync(session).ContinueWith(task =>
+            // Owner 2026-10-20: every cache at each start, silently; a sign-in during the run refreshes what is stale.
+            OfflineCacheService.AutoRefreshAsync(session, everything: trigger == "start").ContinueWith(task =>
             {
                 if (task.IsFaulted)
                     DiagnosticLogService.Info($"Offline cache refresh failed: {task.Exception!.GetBaseException().GetType().Name}");

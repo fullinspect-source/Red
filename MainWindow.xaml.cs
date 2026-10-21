@@ -213,7 +213,7 @@ namespace InspectionEditor
             InstallCompletionCheckButton(); // F-012
             InstallSubmitButton();          // F-013
             InstallPrintButton();           // F-022
-            InstallHistoryButton();         // F-026
+            // F-026: no History button in the toolbar (owner 2026-10-20, tablet test of 2.3.4).
             Title = GetDefaultWindowTitle();
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
@@ -229,6 +229,7 @@ namespace InspectionEditor
             
             // Load user preferences
             LoadPreferences();
+            ApplyEditorScale();
             ApplyChecklistEditorMode();
             _ = Task.Run(() =>
             {
@@ -644,6 +645,20 @@ namespace InspectionEditor
         // "Skip" and "Keep Open".
         private bool ShowResultPicker(bool closeAfterPicker, bool changeOnly = false)
         {
+            var (code, answered, failed, config, expirationStageDone) = ResultPickerInputs();
+
+            // F-007 E5: offer only the statuses in the file's own StatusList.
+            var picker = new ResultPickerWindow(code, answered, failed, config, expirationStageDone, CurrentStatusListIds(), changeOnly)
+            {
+                Owner = this
+            };
+            return ShowResultPickerWindow(picker, closeAfterPicker);
+        }
+
+        // What decides the results this inspection may take: its code, answered and failed items, the type's settings and
+        // whether a later phase is already done. Shared by the result picker and the End section's Status list.
+        private (string Code, int Answered, int Failed, InspectionTypeConfig? Config, bool ExpirationStageDone) ResultPickerInputs()
+        {
             string code = _currentInspectionCode ?? _currentInspection?.InspectionCode ?? "";
             int answered = CountAnsweredItems();
             int failed   = CountFailedItems();
@@ -673,13 +688,11 @@ namespace InspectionEditor
                     }
                 }
             }
+            return (code, answered, failed, config, expirationStageDone);
+        }
 
-            // F-007 E5: offer only the statuses in the file's own StatusList.
-            var picker = new ResultPickerWindow(code, answered, failed, config, expirationStageDone, CurrentStatusListIds(), changeOnly)
-            {
-                Owner = this
-            };
-
+        private bool ShowResultPickerWindow(ResultPickerWindow picker, bool closeAfterPicker)
+        {
             bool? result = picker.ShowDialog();
 
             if (result == true && picker.SelectedResult != null)
@@ -2385,92 +2398,6 @@ namespace InspectionEditor
             catch (Exception ex)
             {
                 MessageBox.Show($"Could not open help file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void OpenFileButton_Click(object sender, RoutedEventArgs e)
-        {
-            bool openInNewWindow = false;
-            
-            // If an inspection is already loaded, ask whether to open in new window or replace
-            if (_currentInspection != null)
-            {
-                var choice = MessageBox.Show(
-                    "You already have an inspection open.\n\n" +
-                    "Yes — Keep this one open and open another RED window\n" +
-                    "No — Close this one and open a new file here",
-                    "Open Another Inspection",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Question);
-                
-                if (choice == MessageBoxResult.Cancel)
-                    return;
-                
-                openInNewWindow = (choice == MessageBoxResult.Yes);
-            }
-            
-            if (!openInNewWindow && _currentInspection != null)
-            {
-                SaveFileButton_Click(this, new RoutedEventArgs());
-                // Cancelled summary/result picker or failed save: keep this report open.
-                if (_currentInspection != null) return;
-            }
-
-            // Pick the file first, then decide what to do with it
-            string? selectedFile = null;
-            
-            // My List in the profile's Inspections folder (F-003 O7), else the user's Dropbox Inspections folder
-            string defaultPath = InspectorProfileService.MyListFolder();
-
-            // Show inspection picker modal
-            if (Directory.Exists(defaultPath))
-            {
-                var picker = new InspectionPickerWindow(defaultPath) { Owner = this };
-                if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedFilePath))
-                    selectedFile = picker.SelectedFilePath;
-            }
-            else
-            {
-                // Fallback to standard file dialog if folder doesn't exist
-                var dialog = new OpenFileDialog
-                {
-                    Filter = "INS Files (*.ins)|*.ins|All Files (*.*)|*.*",
-                    Title = "Open Inspection File",
-                    InitialDirectory = ""
-                };
-
-                if (dialog.ShowDialog() == true)
-                    selectedFile = dialog.FileName;
-            }
-            
-            if (string.IsNullOrEmpty(selectedFile))
-                return;
-            
-            try
-            {
-                if (openInNewWindow)
-                {
-                    // Launch a new RED process with the selected file
-                    string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    // For single-file/self-contained publish, use the .exe not the .dll
-                    if (exePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-                        exePath = exePath.Substring(0, exePath.Length - 4) + ".exe";
-                    
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = exePath,
-                        Arguments = $"\"{selectedFile}\"",
-                        UseShellExecute = false
-                    });
-                }
-                else
-                {
-                    LoadInspectionFileAsync(selectedFile);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error opening file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -10806,6 +10733,7 @@ namespace InspectionEditor
             {
                 _checklistFontSize += 1;
                 PopulateTreeView(SearchFilterBox.Text);
+                ApplyEditorScale();
                 SavePreferences();
             }
         }
@@ -10816,9 +10744,21 @@ namespace InspectionEditor
             {
                 _checklistFontSize -= 1;
                 PopulateTreeView(SearchFilterBox.Text);
+                ApplyEditorScale();
                 SavePreferences();
             }
         }
+
+        // Owner 2026-10-20: A+/A- size both panels. The left list takes _checklistFontSize; the right panel is scaled by the
+        // same factor (16 = 100%), so its text, buttons and photos grow together and still fit its width (it scrolls down).
+        private void ApplyEditorScale()
+        {
+            double scale = EditorScale(_checklistFontSize);
+            EditorScaleRoot.LayoutTransform = scale == 1 ? Transform.Identity : new ScaleTransform(scale, scale);
+        }
+
+        internal static double EditorScale(double checklistFontSize) =>
+            Math.Round(Math.Clamp(checklistFontSize / DefaultChecklistFontSize, 0.5, 2.0), 4);
 
         private async void MessagesButton_Click(object sender, RoutedEventArgs e)
         {
@@ -15757,11 +15697,12 @@ namespace InspectionEditor
             // participate so dragging over saved comments / AI buttons scrolls reliably.
             if (IsInsideTextEditingSurface(e.OriginalSource as DependencyObject) ||
                 IsInsideVerticalNestedEditorScroller(e.OriginalSource as DependencyObject) ||
-                FindAncestor<ComboBox>(e.OriginalSource as DependencyObject) != null)
+                FindAncestor<ComboBox>(e.OriginalSource as DependencyObject) != null ||
+                FindAncestor<SignatureSurface>(e.OriginalSource as DependencyObject) != null) // a stroke is never a drag
             {
                 return;
             }
-            
+
             _editorScrollStartPoint = e.GetPosition(EditorScrollViewer);
             _editorScrollStartOffset = EditorScrollViewer.VerticalOffset;
             _editorIsScrolling = true;

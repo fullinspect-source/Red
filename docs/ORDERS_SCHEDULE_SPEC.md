@@ -58,10 +58,13 @@ Time Required (RequestTimeRequired). There is also a DevExpress checkbox-selecto
     - Save sends `PATCH Inspect/Request` (RestSharp Method 6) with {Id, AssignedUsername, Date, IsReinspection,
       Attempt, PurchaseOrderRequired, PurchaseOrderNumber, RequisitionNumber}.
   - When the dialog closes, the list reloads.
-- **Assign** (multi-select): blocked for a pending job, a deleted status or a completed status, each with its own
-  message. If some selected rows are already assigned it warns "N of M items selected are already assigned…".
-  It then opens the Assign dialog: inspectors come from `Inspect/User/Inspectors`, crew chiefs for surveys from
-  `Inspect/User/CrewChiefs`, and the assignment posts to `Inspect/Request/assign`.
+- **Assign** (multi-select; INSPECT only, removed from RED on 2026-10-20): blocked for a pending job, a deleted
+  status or a completed status, each with its own message. If some selected rows are already assigned it warns "N of
+  M items selected are already assigned…". It then opens the Assign dialog: inspectors come from
+  `Inspect/User/Inspectors`, crew chiefs for surveys from `Inspect/User/CrewChiefs`, and the assignment posts to
+  `Inspect/Request/assign` with `{RequestIds, AssignedUsername}`. Picking "[Unassigned]" sends that row's username:
+  the server's own row from `Inspect/User/Inspectors` when it sends one, else "" (INSPECT's built-in row when the list
+  fails). REA 2026-10-20, static.
 - **Complete:** the ribbon button exists but INSPECT never shows it on the Schedule grid (ShowGrid keeps it hidden
   in every path). Surveys are completed from the Complete Survey dialog.
 - **Delete** (multi-select): requires a reason, picked from a radio list ("The builder cancelled ahead of scheduled
@@ -88,10 +91,33 @@ Time Required (RequestTimeRequired). There is also a DevExpress checkbox-selecto
 ## Toolbar (Inspect's ShowGrid for the Schedule grid)
 Inspect's Schedule ribbon shows Open, Delete, Add to My List, Assign, plus Settings, Refresh and Exit. Delete and
 Assign depend on the Strand permissions "Service Request Edit - All", "Service Request Edit" and "Service Request Delete".
-RED's ORDERS toolbar has Open, Delete…, Add to My List and Assign…, with Refresh in the header. The user asked that
-RED have no Settings or Exit, and that **Assign is enabled only for the super-user account** (`StrandScheduleService.IsSuperUser`).
-The order dialog's Assigned To box is locked the same way. The grid has group-row select checkboxes and Inspect's
-visible columns (Job, Address, Subdivision, Builder, City, Service, Schedule Date, Assigned, Note).
+RED's ORDERS toolbar (owner 2026-10-20) has **Open, Add to My List, Delete…, Unassign**, with Refresh in the header.
+The user asked that RED have no Settings or Exit, and **no Assign at all**: Add to My List assigns to the signed-in
+user. Delete… keeps INSPECT's permission-based visibility. The order dialog's Assigned To box is read-only for
+everyone, the super user included. The grid has group-row select checkboxes and Inspect's visible columns (Job,
+Address, Subdivision, Builder, City, Service, Schedule Date, Assigned, Note).
+
+### Owner rules of 2026-10-20 (`Services/OrdersAddRules.cs`, `OrdersTouchDialog.cs`)
+- **Unassign** (`OrdersUnassignButton_Click`):
+  - Re-reads `Inspect/Request/List` and judges each selected order by its current row.
+  - Anyone may unassign their own orders; only the super user (`StrandScheduleService.IsSuperUser`) may unassign
+    someone else's.
+  - Pending, deleted and completed orders are skipped with INSPECT's Assign messages; so are orders that are not
+    assigned or no longer on the schedule.
+  - It then loads `Inspect/User/Inspectors` and sends one `PATCH Inspect/Request/assign` with the "[Unassigned]" row's
+    username (`StrandScheduleService.UnassignAsync`).
+  - It reloads, then lists the skipped orders in one message.
+- **Date question** (Add to My List, toolbar and order dialog):
+  - It asks once (Yes/No) for orders on an earlier day, more than 30 hours ahead, or with no date.
+  - A date-only order counts from local midnight of its day, so today's and tomorrow's orders never ask.
+  - For one order: "That service is for {date}. Are you sure you want to add it to My List?"
+  - No leaves those orders out.
+- **Same-address checklist** (Add to My List):
+  - It lists other open orders (Requested or Assigned, no pending job) at the same address (normalized, same city),
+    on the same local day and of the same service type.
+  - It leaves out orders already in My List: a file named `{job7}-{service code}-…`.
+  - It is a touch dialog: large rows, nothing ticked, "Add selected (n)" and "Add none".
+  - Ticked orders join the same batch: one assign call, one summary.
 
 ## Auth (traced)
 - `POST {Apps2ApiURL}api/Auth` with body `{Username, Password, ClientId: "InspectClient"}`. Apps2ApiURL defaults
@@ -107,7 +133,9 @@ visible columns (Job, Address, Subdivision, Builder, City, Service, Schedule Dat
 | Strand API client + row/detail models | `Services/StrandScheduleService.cs` |
 | ORDERS grid, grouping, sorting, refresh, actions | `InspectionPickerWindow.Orders.cs`, `InspectionPickerWindow.xaml` (OrdersPanel) |
 | Edit / Complete Survey dialog | `OrderRequestWindow.xaml(.cs)` |
-| Sign-in, Assign, Delete-reason dialogs | `OrdersDialogs.cs` |
+| Sign-in, form-chooser, Delete-reason dialogs | `OrdersDialogs.cs` |
+| Date question and same-address checklist (touch dialog) | `OrdersTouchDialog.cs` |
+| Unassign, date and same-address rules | `Services/OrdersAddRules.cs` (tests: `tests/OrdersRulesHarness`, `tests/orders_toolbar_static_test.py`) |
 | Saved Strand login (DPAPI) + import from Inspect | `Services/StrandCredentialService.cs` |
 | Settings > Strand Account card, silent sign-in | `InspectionPickerWindow.StrandAccount.cs` |
 
@@ -148,7 +176,8 @@ steps above, with these deliberate safety differences:
 ### Known gaps vs. INSPECT2026
 - **Survey point-file and picture downloads** in the Complete Survey dialog are not ported. Completed/Failed
   send no attachment.
-- **Crew-chief assignment for surveys** (`Inspect/User/CrewChiefs`) is not split out: Assign always lists inspectors.
+- **Crew-chief assignment for surveys** (`Inspect/User/CrewChiefs`) is not ported (surveys are out of scope; RED has
+  no Assign since 2026-10-20).
 - **Group-by panel** (drag a column to regroup) is not ported. The filter row is ported
   (`InspectionPickerWindow.OrdersFilter.cs`, Inspect's 12 operators).
 - Column layout is not persisted, and there is no Reset Grid button (INSPECT saves its DevExpress layout to the registry).

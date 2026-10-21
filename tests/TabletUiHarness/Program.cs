@@ -1,9 +1,12 @@
 // Owner tablet test of RED 2.3.3 (2026-10-20): the editor's Submit hint and Sign button (F-013, F-011) and touch
-// scrolling in the print preview (F-022). No files, no network.
+// scrolling in the print preview (F-022). Owner tablet test of 2.3.4: the editor toolbar and A+/A- (F-013), the End
+// section's Status list (F-007), the signature pad inside a panning page (F-011), the My List tab groups (F-014). Reads
+// the app's own XAML and source; no other files, no network.
 //   dotnet run -p:Platform=x64
 // Touch is simulated with a WPF TouchDevice (the same input path a real finger takes into WPF's manipulation system), in a
 // window placed off-screen. A real finger on the tablet stays an owner check.
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -153,6 +156,144 @@ static class Harness
             Check("A-011-14", unsigned.Text == "✍ Sign" && unsigned.Foreground == "#B91C1C" && unsigned.Border == "#DC2626" &&
                               signed.Text == "✍ Signed" && signed.Foreground == "#166534" && lockedUnsigned.Text == "✍ Not signed",
                 "\"✍ Sign\" in red until signed, \"✍ Signed\" in green, \"✍ Not signed\" (grey) on a read-only report");
+        }
+
+        // ---------- A-013-48 / A-013-49 Editor toolbar and A+/A- (owner 2026-10-20, tablet test of 2.3.4) ----------
+        {
+            string xaml = File.ReadAllText(Path.Combine("..", "..", "MainWindow.xaml"));
+            string code = File.ReadAllText(Path.Combine("..", "..", "MainWindow.xaml.cs"));
+            Check("A-013-48", !xaml.Contains("x:Name=\"OpenFileButton\"") && !xaml.Contains("Content=\"📂") && !code.Contains("InstallHistoryButton();") &&
+                              !code.Contains("OpenFileButton_Click"),
+                "no Open INS button and no History button in the editor toolbar (source check)");
+
+            // ---------- A-014-13 My List tabs in groups (owner 2026-10-20) ----------
+            string picker = File.ReadAllText(Path.Combine("..", "..", "InspectionPickerWindow.xaml"));
+            int tabs = picker.IndexOf("<Button x:Name=\"MyListTabButton\"", StringComparison.Ordinal);
+            var order = System.Text.RegularExpressions.Regex.Matches(picker.Substring(tabs), "x:Name=\"(\\w+)\"").Select(m => m.Groups[1].Value)
+                .TakeWhile(n => n != "CloseAppButton").Append("CloseAppButton").ToList();
+            var gaps = System.Text.RegularExpressions.Regex.Matches(picker, "<Border x:Name=\"(TabGap\\w+)\" Height=\"(\\d+)\"/>")
+                .ToDictionary(m => m.Groups[1].Value, m => int.Parse(m.Groups[2].Value));
+            Check("A-014-13", order.SequenceEqual(new[] { "MyListTabButton", "OutboxTabButton", "TabGapSmall1", "ArchiveTabButton", "ReviewTabButton", "TabGapLarge1",
+                                  "OrdersTabButton", "BuyerWalkTabButton", "TabGapLarge2", "SettingsTabButton", "AboutTabButton", "TabGapSmall2", "CloseAppButton" }) &&
+                              gaps.Count == 4 && gaps["TabGapSmall1"] < gaps["TabGapLarge1"] && gaps["TabGapSmall2"] < gaps["TabGapLarge2"],
+                $"tabs: My List, Outbox | Archive, Review || ORDERS, BUYER WALK || Settings, About | Close App ({string.Join(", ", order)})");
+
+            // The toolbar's own button style, rendered disabled over the toolbar's dark red, against WPF's default template.
+            int start = xaml.IndexOf("<WrapPanel.Resources>", StringComparison.Ordinal) + "<WrapPanel.Resources>".Length;
+            int end = xaml.IndexOf("</WrapPanel.Resources>", StringComparison.Ordinal);
+            string styleXaml = xaml.Substring(start, end - start).Replace(" BasedOn=\"{StaticResource {x:Type Button}}\"", "");
+            var resources = (ResourceDictionary)System.Windows.Markup.XamlReader.Parse(
+                "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" + styleXaml + "</ResourceDictionary>");
+            var toolbarStyle = (Style)resources[typeof(Button)];
+            static double Luminance(Color c)
+            {
+                static double Channel(byte v) { double s = v / 255.0; return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4); }
+                return 0.2126 * Channel(c.R) + 0.7152 * Channel(c.G) + 0.0722 * Channel(c.B);
+            }
+            static double Ratio(Color a, Color b) { double x = Luminance(a), y = Luminance(b); return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05); }
+            double Contrast(Style? style, Brush? background, Brush? foreground)
+            {
+                var button = new Button { Content = "Apply Template", IsEnabled = false, FontSize = 13, Padding = new Thickness(12, 6, 12, 6), Width = 200, Height = 40 };
+                if (style != null) button.Style = style;
+                if (background != null) button.Background = background;
+                if (foreground != null) button.Foreground = foreground;
+                var host = new Border { Background = new SolidColorBrush(Color.FromRgb(0x8B, 0, 0)), Padding = new Thickness(10), Child = button };
+                host.Measure(new Size(220, 60));
+                host.Arrange(new Rect(0, 0, 220, 60));
+                host.UpdateLayout();
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(220, 60, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(host);
+                var pixels = new byte[220 * 60 * 4];
+                bitmap.CopyPixels(pixels, 220 * 4, 0);
+                Color At(int x, int y) { int i = (y * 220 + x) * 4; return Color.FromRgb(pixels[i + 2], pixels[i + 1], pixels[i]); }
+                Color back = At(15, 30); // inside the button, left of the text (padding 12)
+                double best = 1;
+                for (int y = 18; y < 42; y++)
+                    for (int x = 30; x < 190; x++)
+                        best = Math.Max(best, Ratio(back, At(x, y)));
+                return best;
+            }
+            var white = Brushes.White;
+            double apply = Contrast(toolbarStyle, new SolidColorBrush(Color.FromRgb(0x2E, 0x86, 0xAB)), white);
+            double saveTemplate = Contrast(toolbarStyle, new SolidColorBrush(Color.FromRgb(0xA2, 0x3B, 0x72)), white);
+            double save = Contrast(toolbarStyle, new SolidColorBrush(Color.FromRgb(0x22, 0x8B, 0x22)), white);
+            double plain = Contrast(toolbarStyle, null, null);
+            double before = Contrast(null, new SolidColorBrush(Color.FromRgb(0x2E, 0x86, 0xAB)), white);
+            Check("A-013-49", apply >= 4.5 && saveTemplate >= 4.5 && save >= 4.5 && plain >= 4.5 && before < apply,
+                $"greyed-out toolbar buttons stay readable: Apply Template {apply:0.0}:1, Save Template {saveTemplate:0.0}:1, Save {save:0.0}:1, plain {plain:0.0}:1 (control, WPF's default template: {before:0.0}:1)");
+
+            var scale = typeof(MainWindow).GetMethod("EditorScale", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            double S(double size) => (double)scale.Invoke(null, new object[] { size })!;
+            Check("A-013-50", S(16) == 1 && S(20) == 1.25 && S(22) == 1.375 && S(9) == 0.5625 &&
+                              xaml.Contains("<Grid x:Name=\"EditorScaleRoot\">") &&
+                              System.Text.RegularExpressions.Regex.Matches(code, @"_checklistFontSize [+-]= 1;\s+PopulateTreeView\(SearchFilterBox\.Text\);\s+ApplyEditorScale\(\);").Count == 2 &&
+                              System.Text.RegularExpressions.Regex.IsMatch(code, @"LoadPreferences\(\);\s+ApplyEditorScale\(\);"),
+                "A+/A- scale the right panel with the left list (16 = 100%, 22 = 137.5%, 9 = 56%), also at start from the saved size");
+        }
+
+        // ---------- A-022-29 / A-003-xx Press-and-drag scrolling and the Settings page (owner tablet test of 2.3.4, items 5 and 7) ----------
+        {
+            string preview = File.ReadAllText(Path.Combine("..", "..", "ReportPreviewWindow.cs"));
+            string header = File.ReadAllText(Path.Combine("..", "..", "MainWindow.HeaderSections.cs"));
+            string add = File.ReadAllText(Path.Combine("..", "..", "AddServiceWindow.cs"));
+            string drag = File.ReadAllText(Path.Combine("..", "..", "DragScroll.cs"));
+            Check("A-022-29", preview.Contains("DragScroll.Attach(scroller)") && header.Contains("DragScroll.Attach(scroller)") &&
+                              add.Contains("DragScroll.AttachWhenLoaded(_jobs)") && add.Contains("DragScroll.AttachWhenLoaded(_formsList)") && add.Contains("!Dragged(_jobs)") &&
+                              drag.Contains("SignatureSurface") && drag.Contains("TextBoxBase") && drag.Contains("ComboBox") && drag.Contains("ScrollBar") &&
+                              DragScroll.Threshold == 10,
+                "press-and-drag scrolls the print preview, the End window and the Add lists (a drag is never a row pick); the signature pad, text boxes, drop-downs and scroll bars keep their own input (source check)");
+            var viewer = new ScrollViewer { Content = new Border { Height = 2000, Width = 200 } };
+            DragScroll.Attach(viewer);
+            DragScroll.Attach(viewer); // a second attach is ignored
+            Check("A-022-29", !DragScroll.IsDragging(viewer), "a viewer is not dragging until a press moves 10 px");
+
+            string picker = File.ReadAllText(Path.Combine("..", "..", "InspectionPickerWindow.xaml"));
+            string house = File.ReadAllText(Path.Combine("..", "..", "InspectionPickerWindow.Housekeeping.cs"));
+            int import = picker.IndexOf("x:Name=\"ProfileImportButton\"", StringComparison.Ordinal);
+            int profile = picker.IndexOf("Text=\"Inspector Profile\"", StringComparison.Ordinal);
+            Check("A-003-14", import > 0 && import < profile && !picker.Contains("FeeTokenPanel") && !picker.Contains("Text=\"iPad fee token") &&
+                              !house.Contains("\"Check Archive cleanup") && !house.Contains("\"Check job folder purge") && !house.Contains("\"Show Review") &&
+                              !house.Contains("MessageBox.Show") && house.Contains("InspectLiveSettings.WriteArchiveRetention("),
+                "Settings: Import from INSPECT first; no iPad fee token, no Check buttons, no Show Review; Download Offline Data reports on its line; Archive retention editable (source check)");
+        }
+
+        // ---------- A-007-14 The End section's Status offers only the allowed results (owner 2026-10-20) ----------
+        {
+            var statuses = new List<StatusOption> { new(0, "Ordered"), new(2, "Passed"), new(3, "Failed"), new(5, "Correct & Proceed"), new(7, "Complete"), new(24, "For Engineer Review") };
+            var listIds = statuses.Select(s => s.Id).ToList();
+            var config = new InspectionTypeConfig { ShowPass = true, ShowCorrectAndProceed = true, ShowFailPO = true, ShowFailNext = true };
+            string Names(IReadOnlyCollection<int> allowed) => string.Join("/", HeaderRules.OfferedStatuses(statuses, allowed).Select(s => s.Name));
+            string clean = Names(ResultPickerWindow.AllowedStatusIds("cpr", false, config, false, listIds));
+            string withFails = Names(ResultPickerWindow.AllowedStatusIds("CPR", true, config, false, listIds));
+            string complete = Names(ResultPickerWindow.AllowedStatusIds("BWT", false, new InspectionTypeConfig { ShowComplete = true }, false, listIds));
+            string review = Names(ResultPickerWindow.AllowedStatusIds("SCI", false, new InspectionTypeConfig { EngineerReview = true }, false, listIds));
+            string nextDone = Names(ResultPickerWindow.AllowedStatusIds("CPR", true, new InspectionTypeConfig { ShowFailNext = true, ShowCorrectAndProceed = true }, true, listIds));
+            Check("A-007-14", clean == "Passed" && withFails == "Failed/Correct & Proceed" && complete == "Complete" && review == "For Engineer Review" &&
+                              nextDone == "Correct & Proceed" && Names(new List<int>()) == string.Join("/", statuses.Select(s => s.Name)),
+                $"no fails: {clean}; fails: {withFails}; BWT: {complete}; SCI: {review}; next phase done: {nextDone} (the result picker's own rule, in the form's order)");
+            string headerSource = File.ReadAllText(Path.Combine("..", "..", "MainWindow.HeaderSections.cs"));
+            Check("A-007-14", headerSource.Contains("ResultPickerWindow.AllowedStatusIds(") && headerSource.Contains("HeaderRules.OfferedStatuses(") &&
+                              headerSource.Contains("IsEnabled = false"),
+                "the End section builds its Status list from that rule; a current status outside it shows greyed out (source check)");
+        }
+
+        // ---------- A-011-16 A stroke on the pad switches off panning around it until it ends (owner tablet test of 2.3.4) ----------
+        {
+            var surface = new SignatureSurface(770, 105);
+            var inner = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
+            var outer = new ScrollViewer { Content = new StackPanel { Children = { new Border { Height = 200 }, inner, new Border { Height = 900 } } }, PanningMode = PanningMode.VerticalFirst };
+            var window = new Window { Content = outer, Width = 900, Height = 400, Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+            window.Show();
+            window.UpdateLayout();
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            typeof(SignatureSurface).GetMethod("SuspendPanning", flags)!.Invoke(surface, null);
+            var during = outer.PanningMode;
+            typeof(SignatureSurface).GetMethod("ResumePanning", flags)!.Invoke(surface, null);
+            var after = outer.PanningMode;
+            bool gesturesOff = !Stylus.GetIsFlicksEnabled(surface) && !Stylus.GetIsPressAndHoldEnabled(surface) && !surface.IsManipulationEnabled;
+            window.Close();
+            Check("A-011-16", during == PanningMode.None && after == PanningMode.VerticalFirst && gesturesOff,
+                $"while a stroke is down the page around the pad does not pan ({during}), afterwards it pans again ({after}); flicks and press-and-hold are off on the pad");
         }
 
         // ---------- A-022-26 to A-022-28 Print preview scrolls with a finger ----------
