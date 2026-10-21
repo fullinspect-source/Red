@@ -23,7 +23,7 @@ This file is the concise cross-session source of development context for work pe
   (SubmitHarness 58 with A-013-19 and A-013-51 to 54), OrdersRules 65, PdfCleanup 52, CommentSnippet 53, AppUpdate 34:
   all exit 0. Python 36/46: the known 10. Not run: corpus round trip (save code unchanged), packaged-exe smoke start
   (would use the real profile), a live Submit (owner check on the tablet).
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-21: GitHub v2.3.6 (fullinspect-source/Red), Latest since 20:13 UTC; release commit `6eb0499`. `releases/latest` = v2.3.6; Red-v2.3.6.zip 93,849,591 bytes (503 entries, sha256 `a7e1cae97e944a459ab387fdc412dd5a81fb4d77d2d115f464dff2a044d1318c`) answers HEAD 200 and downloads byte-identical; update_red.bat attached; AppUpdateHarness 34/34.
 
 ### 2026-10-21 — RED 2.3.5 — second round of the owner's tablet fixes, plus ORDERS Unassign
 
