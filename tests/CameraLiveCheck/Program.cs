@@ -1,8 +1,11 @@
-// F-027 A-027-16 (and the capture half of A-027-15): drives the RedCamera.Core capture-session controller against this PC's
-// camera. It never disables a device and never writes outside the folder given as the first argument (default: a temp
+// F-027 A-027-16, A-027-28 (zoom) and the capture half of A-027-15: drives the RedCamera.Core capture-session controller
+// against this PC's camera. It never disables a device and never writes outside the folder given as the first argument (default: a temp
 // folder). Exit 0 = all checks passed, 1 = a check failed, 3 = no camera on this PC (skipped).
 using System.Diagnostics;
 using System.IO;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using RedCamera.Core;
 using Microsoft.Win32;
@@ -62,6 +65,12 @@ static class LiveCheck
         var controller = new CameraSessionController(backend, new MemoryPreferences(), () => DateTime.UtcNow, log: Write);
         int frames = 0;
         controller.PreviewFrame += _ => Interlocked.Increment(ref frames);
+        controller.PreviewFrame += frame =>
+        {
+            var wanted = Volatile.Read(ref _frameWanted);
+            if (wanted != null && !frame.AllBlack)
+                wanted.TrySetResult(new CameraPreviewFrame(frame.Width, frame.Height, frame.Stride, (byte[])frame.Pixels.Clone(), false));
+        };
         var states = new List<(double T, CameraState S)>();
         controller.StateChanged += () => states.Add((Clock.Elapsed.TotalSeconds, controller.State));
 
@@ -138,10 +147,103 @@ static class LiveCheck
         var second = await controller.CaptureAsync(1);
         Check("L10", second.Still != null, "a still after all the cycles");
 
+        // F-027 Z1-Z3 on the real camera: what it zooms with, stills at 2x and 4x showing the preview's region, the zoom
+        // kept through a rebuilt session, and 1x again when the screen opens. Stills and frames stay in memory.
+        Check("L12", controller.IsHardwareZoom ? controller.ZoomMax > 1 : controller.ZoomMax == CameraZoom.DigitalMax,
+            controller.IsHardwareZoom ? $"zoom: the camera's own, up to {controller.ZoomMax:0.##}x" : $"zoom: digital (this camera has none of its own), up to {controller.ZoomMax:0}x");
+        int fullW = shot.Still?.Width ?? 0, fullH = shot.Still?.Height ?? 0;
+
+        async Task<(bool Ok, string Info)> ZoomShot(double zoom)
+        {
+            controller.SetZoom(zoom);
+            zoom = controller.ZoomFactor; // a camera's own zoom may stop below the asked factor
+            await TickUntil(() => false, 0.6); // a camera's own zoom needs a moment
+            var frame = await NextFrameAsync();
+            var taken = await controller.CaptureAsync(1);
+            if (taken.Still == null || frame.Pixels == null) return (false, "no still or no preview frame");
+            var expected = controller.IsHardwareZoom ? new ZoomCrop(0, 0, fullW, fullH) : CameraZoom.CropFor(fullW, fullH, zoom);
+            bool sized = taken.Still.Width == expected.Width && taken.Still.Height == expected.Height && taken.Still.Zoom == zoom;
+            var region = controller.IsHardwareZoom ? new ZoomCrop(0, 0, frame.Width, frame.Height) : CameraZoom.CropFor(frame.Width, frame.Height, zoom);
+            var frameSource = BitmapSource.Create(frame.Width, frame.Height, 96, 96, PixelFormats.Bgr32, null, frame.Pixels, frame.Stride);
+            var still = BitmapDecoder.Create(new MemoryStream(taken.Still.Jpeg), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+            // A photo of another shape than the preview (4:3 against 16:9) is compared on its centred part of the
+            // preview's shape, and every picture is scaled to the same size.
+            double aspect = (double)region.Width / region.Height;
+            int w = 160, h = Math.Max(1, (int)Math.Round(160 / aspect));
+            byte[] stillPx = Small(CenterToAspect(still, aspect), w, h);
+            double match = MeanDifference(stillPx, Small(new CroppedBitmap(frameSource, new Int32Rect(region.X, region.Y, region.Width, region.Height)), w, h));
+            double whole = MeanDifference(stillPx, Small(frameSource, w, h));
+            bool same = match < 25 && match <= whole * 0.7;
+            return (sized && same, $"{zoom}x: still {taken.Still.Width}x{taken.Still.Height} (expected {expected.Width}x{expected.Height}), "
+                + $"difference to the preview's region {match:0.0} vs the whole preview {whole:0.0}");
+        }
+
+        var (z2, z2Info) = await ZoomShot(2);
+        Check("L13", z2, "2x still shows the preview's region: " + z2Info);
+        var (z4, z4Info) = await ZoomShot(4);
+        Check("L14", z4, "4x still shows the preview's region: " + z4Info);
+
+        controller.SetZoom(2);
+        await controller.DebugStallAsync();
+        await TickUntil(() => controller.State == CameraState.Restarting, 5);
+        bool rebuilt = await TickUntil(() => controller.State == CameraState.Live, 15);
+        bool kept = controller.ZoomFactor == 2;
+        var (z2Again, z2AgainInfo) = await ZoomShot(2);
+        Check("L15", rebuilt && kept && z2Again, "after a rebuilt session the zoom is still 2x and applies to the next still: " + z2AgainInfo);
+
+        controller.SetZoom(3);
+        await controller.CloseAsync();
+        await Task.Delay(1500);
+        await controller.OpenAsync();
+        bool reopenedLive = await TickUntil(() => controller.State == CameraState.Live, 15);
+        var atOne = await controller.CaptureAsync(1);
+        Check("L16", reopenedLive && controller.ZoomFactor == 1 && atOne.Still?.Width == fullW && atOne.Still?.Height == fullH,
+            $"opened again at 1x: still {atOne.Still?.Width}x{atOne.Still?.Height}");
+
         await controller.CloseAsync();
         await Task.Delay(2500);
         Check("L11", controller.State == CameraState.Closed && !WebcamInUse(), "close releases the camera");
         return Finish(outDir);
+    }
+
+    private static TaskCompletionSource<CameraPreviewFrame>? _frameWanted;
+
+    /// <summary>A copy of the next non-black preview frame (the backend reuses its buffers).</summary>
+    private static async Task<CameraPreviewFrame> NextFrameAsync()
+    {
+        var wanted = new TaskCompletionSource<CameraPreviewFrame>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Volatile.Write(ref _frameWanted, wanted);
+        var done = await Task.WhenAny(wanted.Task, Task.Delay(3000));
+        Volatile.Write(ref _frameWanted, null);
+        return done == wanted.Task ? wanted.Task.Result : new CameraPreviewFrame(0, 0, 0, null!, true);
+    }
+
+    /// <summary>The centred part of the picture with the given width/height ratio.</summary>
+    private static BitmapSource CenterToAspect(BitmapSource source, double aspect)
+    {
+        int w = source.PixelWidth, h = source.PixelHeight;
+        if (Math.Abs((double)w / h - aspect) < 0.01) return source;
+        int cw = Math.Min(w, (int)Math.Round(h * aspect)), ch = Math.Min(h, (int)Math.Round(w / aspect));
+        return new CroppedBitmap(source, new Int32Rect((w - cw) / 2, (h - ch) / 2, cw, ch));
+    }
+
+    /// <summary>The picture scaled to <paramref name="w"/> x <paramref name="h"/>, as BGRA, for a coarse comparison.</summary>
+    private static byte[] Small(BitmapSource source, int w, int h)
+    {
+        var scaled = new TransformedBitmap(source, new ScaleTransform((double)w / source.PixelWidth, (double)h / source.PixelHeight));
+        var bgra = new FormatConvertedBitmap(scaled, PixelFormats.Bgra32, null, 0);
+        var pixels = new byte[w * h * 4];
+        bgra.CopyPixels(pixels, w * 4, 0);
+        return pixels;
+    }
+
+    private static double MeanDifference(byte[] a, byte[] b)
+    {
+        if (a.Length != b.Length) return double.MaxValue;
+        long sum = 0;
+        for (int i = 0; i + 3 < a.Length; i += 4)
+            sum += Math.Abs(a[i] - b[i]) + Math.Abs(a[i + 1] - b[i + 1]) + Math.Abs(a[i + 2] - b[i + 2]);
+        return sum / (3.0 * (a.Length / 4));
     }
 
     private static int Finish(string outDir)

@@ -9,8 +9,8 @@ namespace RedCamera.Core
     /// <summary>
     /// F-027 capture session: owns the camera only while the capture screen is open and not held (C3), opens sessions
     /// (C4), watches the preview frames and rebuilds a dead session with bounded retries (C5), gates the shutter (C6),
-    /// and remembers the camera choice (C11). It holds no WinRT types so tests\CameraCaptureHarness can drive it with a
-    /// fake camera and clock.
+    /// remembers the camera choice (C11) and keeps the zoom (Z1-Z3). It holds no WinRT types so
+    /// tests\RedCameraCoreHarness can drive it with a fake camera, clock and cropper.
     /// Threading: every public member except the frame path is called on one thread (the capture window's UI thread),
     /// and <see cref="TickAsync"/> runs about every 250 ms. Frames and failures arrive on worker threads; they only
     /// record state here, and the next tick acts on it.
@@ -35,6 +35,7 @@ namespace RedCamera.Core
         private readonly CameraTimings _timings;
         private readonly Action<string> _log;
         private readonly Func<Func<Task>, Task> _runDetached;
+        private readonly ICameraStillCropper _cropper;
 
         private readonly HashSet<CameraHold> _holds = new();
         private readonly List<DateTime> _recoveries = new();
@@ -63,10 +64,20 @@ namespace RedCamera.Core
         private CameraInfo? _scheduledCamera; // null = fresh start (enumerate, remembered camera)
         private bool _scheduledRecovering;
 
+        // F-027 Z1-Z3: the zoom asked for. It outlives a rebuilt session (watchdog, sleep/wake) and is applied again to the
+        // new one; opening the screen and switching camera set it back to 1x. The camera's own zoom is used when the
+        // session has one, otherwise the preview and the still are cropped.
+        private double _zoom = 1.0;
+        private ZoomCapabilities _zoomCaps = ZoomCapabilities.DigitalOnly;
+        private ICameraStream? _zoomAppliedTo;
+        private double _zoomApplied;
+        private bool _zoomPushing;
+
         private sealed record PendingFailure(int Generation, int HResult, string Reason);
 
         public CameraSessionController(ICameraBackend backend, ICameraPreferences preferences, Func<DateTime> clock,
-            CameraTimings? timings = null, Action<string>? log = null, Func<Func<Task>, Task>? runDetached = null)
+            CameraTimings? timings = null, Action<string>? log = null, Func<Func<Task>, Task>? runDetached = null,
+            ICameraStillCropper? cropper = null)
         {
             _backend = backend;
             _preferences = preferences;
@@ -74,6 +85,7 @@ namespace RedCamera.Core
             _timings = timings ?? new CameraTimings();
             _log = log ?? (_ => { });
             _runDetached = runDetached ?? (work => Task.Run(work));
+            _cropper = cropper ?? new JpegStillCropper();
         }
 
         public CameraState State { get; private set; } = CameraState.Closed;
@@ -90,6 +102,26 @@ namespace RedCamera.Core
 
         /// <summary>Raised on a worker thread for each preview frame of the current session.</summary>
         public event Action<CameraPreviewFrame>? PreviewFrame;
+
+        /// <summary>F-027 Z1: the zoom factor (1 = none).</summary>
+        public double ZoomFactor => _zoom;
+
+        /// <summary>F-027 Z1: always 1x.</summary>
+        public double ZoomMin => 1.0;
+
+        /// <summary>F-027 Z1: the camera's own maximum, or <see cref="CameraZoom.DigitalMax"/> for a digital zoom.</summary>
+        public double ZoomMax => _zoomCaps.Hardware ? _zoomCaps.Max : CameraZoom.DigitalMax;
+
+        /// <summary>F-027 Z1: true when the open session zooms in the camera itself.</summary>
+        public bool IsHardwareZoom => _zoomCaps.Hardware;
+
+        /// <summary>F-027 Z2: what the screen crops the preview by (<see cref="CameraPreviewRenderer.SetZoom"/>): the zoom
+        /// when it is digital, 1 when the camera zooms its own frames.</summary>
+        public double PreviewZoom => _zoomCaps.Hardware ? 1.0 : _zoom;
+
+        /// <summary>Raised on the controller's thread when <see cref="ZoomFactor"/>, <see cref="ZoomMax"/> or
+        /// <see cref="PreviewZoom"/> may have changed.</summary>
+        public event Action? ZoomChanged;
 
         public string StatusText => State switch
         {
@@ -155,6 +187,7 @@ namespace RedCamera.Core
             _open = true;
             _recoveries.Clear();
             _log("Camera screen opened.");
+            SetZoomFactor(1.0); // Z3: every opening starts at 1x
             if (_holds.Count > 0) { SetState(CameraState.Paused); return; }
             await BeginFreshAsync(recovering: false);
         }
@@ -223,8 +256,96 @@ namespace RedCamera.Core
             ClearSchedule();
             ReleaseStream("switch camera");
             _current = next;
+            SetZoomFactor(1.0); // Z3: another camera starts at 1x
             if (_holds.Count > 0) { SetState(CameraState.Paused); return; }
             StartAttempt(next, recovering: false);
+        }
+
+        // ------------------------------------------------------------------ zoom (F-027 Z1-Z3)
+
+        /// <summary>Zooms to <paramref name="factor"/>, kept within <see cref="ZoomMin"/>..<see cref="ZoomMax"/>. Cheap
+        /// enough to call for every step of a pinch: the camera's own zoom gets only the newest value.</summary>
+        public void SetZoom(double factor) => SetZoomFactor(CameraZoom.Clamp(factor, ZoomMax));
+
+        /// <summary>Back to 1x (double-tap or the readout).</summary>
+        public void ResetZoom()
+        {
+            if (_zoom != 1.0) _log("Camera zoom back to 1x.");
+            SetZoomFactor(1.0);
+        }
+
+        private void SetZoomFactor(double zoom)
+        {
+            if (zoom == _zoom) return;
+            _zoom = zoom;
+            ZoomChanged?.Invoke();
+            if (_zoomCaps.Hardware) _ = PushHardwareZoomAsync();
+        }
+
+        /// <summary>A new session: read what it can zoom and apply the kept zoom to it (Z3).</summary>
+        private void ApplyZoomToSession(ICameraStream stream)
+        {
+            ZoomCapabilities caps;
+            try { caps = stream.ZoomCapabilities ?? ZoomCapabilities.DigitalOnly; }
+            catch (Exception) { caps = ZoomCapabilities.DigitalOnly; }
+            _zoomCaps = caps;
+            _zoomAppliedTo = null; // the camera may still hold an older zoom: always set it
+            _zoom = CameraZoom.Clamp(_zoom, ZoomMax);
+            if (_zoom > 1.0) _log($"Camera zoom {_zoom:0.0}x applied again ({(caps.Hardware ? "camera" : "digital")}).");
+            ZoomChanged?.Invoke();
+            if (caps.Hardware) _ = PushHardwareZoomAsync();
+        }
+
+        /// <summary>Sends the newest zoom to the camera, one call at a time, until the camera has the current value.</summary>
+        private async Task PushHardwareZoomAsync()
+        {
+            if (_zoomPushing) return;
+            _zoomPushing = true;
+            try
+            {
+                while (true)
+                {
+                    var stream = _stream;
+                    if (stream == null || !_zoomCaps.Hardware) return;
+                    double target = _zoom;
+                    if (ReferenceEquals(stream, _zoomAppliedTo) && target == _zoomApplied) return;
+                    bool ok;
+                    try
+                    {
+                        var call = stream.SetHardwareZoomAsync(target);
+                        if (await Task.WhenAny(call, Task.Delay(_timings.ZoomTimeout)) != call)
+                        {
+                            // A hung driver must not block every later zoom: stop waiting; the next change sends again.
+                            _ = call.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                            _log("Camera zoom did not answer; it is sent again with the next change.");
+                            return;
+                        }
+                        ok = await call;
+                    }
+                    catch (Exception) { ok = false; }
+                    if (!ReferenceEquals(stream, _stream)) continue; // released meanwhile: serve the new session, if any
+                    if (!ok && ReferenceEquals(stream, _zoomAppliedTo))
+                    {
+                        // The camera already zooms by itself; cropping on top would multiply the zoom. Try again later.
+                        _log("Camera refused a zoom change; it is sent again with the next change.");
+                        return;
+                    }
+                    if (!ok)
+                    {
+                        _log("Camera refused its own zoom; zooming digitally instead.");
+                        _zoomCaps = ZoomCapabilities.DigitalOnly;
+                        _zoom = CameraZoom.Clamp(_zoom, ZoomMax);
+                        ZoomChanged?.Invoke();
+                        return;
+                    }
+                    _zoomAppliedTo = stream;
+                    _zoomApplied = target;
+                }
+            }
+            finally
+            {
+                _zoomPushing = false;
+            }
         }
 
         // ------------------------------------------------------------------ frames and failures (any thread)
@@ -346,6 +467,8 @@ namespace RedCamera.Core
             _capturing = true;
             var stream = _stream;
             int generation = _generation;
+            double zoom = _zoom; // Z2: the zoom shown at the press
+            bool digital = zoom > 1.0 && !_zoomCaps.Hardware;
             try
             {
                 using var cts = new CancellationTokenSource(_timings.CaptureTimeout);
@@ -358,7 +481,10 @@ namespace RedCamera.Core
                     return CaptureOutcome.NotTaken(CaptureFailedText);
                 }
                 var still = await capture;
-                _log($"Camera still {still.Width}x{still.Height} via {still.Source}, orientation {still.ExifOrientation}.");
+                if (digital) still = await CropStillAsync(still, zoom);
+                else if (zoom > 1.0) still = still with { Zoom = zoom };
+                string zoomNote = still.Zoom > 1.0 ? $", zoom {still.Zoom:0.0}x {(digital ? "digital" : "camera")}" : string.Empty;
+                _log($"Camera still {still.Width}x{still.Height} via {still.Source}, orientation {still.ExifOrientation}{zoomNote}.");
                 return CaptureOutcome.Taken(still);
             }
             catch (Exception ex)
@@ -395,6 +521,25 @@ namespace RedCamera.Core
                 _log($"Camera still not written ({ex.GetType().Name}).");
                 return (CaptureOutcome.NotTaken("The photo was taken but could not be saved."), null);
             }
+        }
+
+        /// <summary>Z2: the still cropped to the preview's region. A crop that fails keeps the full photo: it was taken, and
+        /// the camera is fine, so this never counts as a camera failure.</summary>
+        private async Task<CapturedStill> CropStillAsync(CapturedStill still, double zoom)
+        {
+            try
+            {
+                var crop = _cropper.CropAsync(still, zoom);
+                var finished = await Task.WhenAny(crop, Task.Delay(_timings.CaptureTimeout));
+                if (finished == crop) return await crop;
+                _ = crop.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                _log("Camera zoom crop took too long; the full photo is kept.");
+            }
+            catch (Exception ex)
+            {
+                _log($"Camera zoom crop failed ({ex.GetType().Name}); the full photo is kept.");
+            }
+            return still;
         }
 
         /// <summary>Test and dev tools only (A-027-16): stop the real preview frames underneath the watchdog.</summary>
@@ -509,6 +654,7 @@ namespace RedCamera.Core
             stream.FrameArrived += frame => OnFrame(generation, frame);
             stream.Failed += (hr, reason) => OnStreamFailed(generation, hr, reason);
             _log($"Camera opened {Describe(camera)}{(stream.Shared ? " in shared mode" : string.Empty)}.");
+            ApplyZoomToSession(stream);
             StateChanged?.Invoke();
         }
 

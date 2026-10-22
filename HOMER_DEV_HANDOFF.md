@@ -4,6 +4,36 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-21 — RED 2.3.7 — Pinch to zoom in RED's camera (F-027 Z1-Z5)
+
+- **Base:** 2.3.6 (`a196dd9`). Built in `Dropbox\P\PL` by the F-027 camera session. Released on the owner's word ("Yes.
+  Release pinch-to-zoom in both RED and RED Camera once it's vetted, with the usual checks."). The 13 files were copied
+  from PL with CRLF; before the change they were identical to this tree. Program: `Dropbox/ios-port/program` F-027 SPEC
+  §3 Z, ACCEPTANCE A-027-21 to -28, CHANGELOG 2026-10-21.
+- **Files:**
+  - `RedCamera.Core`: new `CameraZoom.cs` and `JpegStillCropper.cs`; changed `CameraModels.cs`, `WinRtCameraBackend.cs`,
+    `CameraSessionController.cs`, `CameraPreviewRenderer.cs`, `README.md`, and `RedCamera.Core.csproj` (library
+    1.1.1).
+  - `CameraCaptureWindow.xaml(.cs)`.
+  - `tests/RedCameraCoreHarness`, `tests/CameraCaptureHarness`, `tests/CameraLiveCheck`.
+  - Version 2.3.7 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:**
+  - Pinch on the preview, the mouse wheel or a touchpad pinch zooms. A "2.0×" readout button and a double-tap or
+    double-click reset to 1x. No popups.
+  - The camera's own `ZoomControl` is used when it zooms by a factor from 1x. Otherwise there is a digital zoom to 4x:
+    the preview shows the centred crop, and the still is cropped to the same region at the crop's own size, before
+    F-023.
+  - The zoom is kept through the watchdog rebuild and sleep/wake. It is 1x on opening the camera and on switching
+    camera.
+  - A code review found and fixed: a hung zoom call (3 s timeout); a refusal after zooming multiplying the zoom; the
+    wheel near 1x.
+- **Verification:**
+  - PL (before the port): all 37 harnesses; webcam check 17/17 (stills at 2x/4x match the preview's region, about 2
+    levels apart against 23); in-app driver 18/18 in six runs (wheel, a two-finger pinch through WPF's touch pipeline,
+    readout, double-tap, a zoomed photo into the item, 1x on reopen); Python as before.
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged). Real fingers on the tablet are the owner's check.
+- **Deployment:** pending.
 ### 2026-10-21 — RED 2.3.6 — Submit works like INSPECT (owner, tablet test of 2.3.5)
 
 - **Base:** 2.3.5 (`290b834`). Built in `Dropbox\P\PL`; released by the owner ("Yes: delete the editing safety copies at

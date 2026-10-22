@@ -29,15 +29,44 @@
         </DockPanel>
 
         <Grid Grid.Row="1" Background="Black" ClipToBounds="True">
-            <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality">
-                <Image.LayoutTransform>
-                    <TransformGroup>
-                        <ScaleTransform x:Name="PreviewMirror" ScaleX="1"/>
-                        <RotateTransform x:Name="PreviewRotation" Angle="0"/>
-                    </TransformGroup>
-                </Image.LayoutTransform>
-            </Image>
+            <!-- F-027 Z4: pinch, mouse wheel and double-tap zoom on the whole preview area. Only this surface takes the
+                 touch manipulation, so the buttons on top (readout, failure panel) keep ordinary taps. -->
+            <Border x:Name="PreviewSurface" Background="Transparent" IsManipulationEnabled="True"
+                    ManipulationStarting="PreviewSurface_ManipulationStarting" ManipulationDelta="PreviewSurface_ManipulationDelta"
+                    ManipulationCompleted="PreviewSurface_ManipulationCompleted" MouseWheel="PreviewSurface_MouseWheel"
+                    MouseLeftButtonDown="PreviewSurface_MouseLeftButtonDown" TouchDown="PreviewSurface_TouchDown"
+                    TouchUp="PreviewSurface_TouchUp" AutomationProperties.AutomationId="CameraPreviewSurface">
+                <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality">
+                    <Image.LayoutTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="PreviewMirror" ScaleX="1"/>
+                            <RotateTransform x:Name="PreviewRotation" Angle="0"/>
+                        </TransformGroup>
+                    </Image.LayoutTransform>
+                </Image>
+            </Border>
             <Border x:Name="FlashOverlay" Background="White" Opacity="0" IsHitTestVisible="False"/>
+
+            <!-- F-027 Z5: the zoom while zoomed in; a tap goes back to 1x. -->
+            <Button x:Name="ZoomReadoutButton" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12,0,0"
+                    MinWidth="72" MinHeight="44" Padding="14,4" Focusable="False" Cursor="Hand" Visibility="Collapsed"
+                    Click="ZoomReadoutButton_Click" AutomationProperties.AutomationId="ZoomReadoutButton"
+                    AutomationProperties.Name="Zoom. Tap for 1x">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Pill" Background="#B0000000" BorderBrush="#80FFFFFF" BorderThickness="1" CornerRadius="22"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="White"
+                                              TextElement.FontSize="17" TextElement.FontWeight="SemiBold"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Pill" Property="Background" Value="#E0303030"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
 
             <Border x:Name="StatusOverlay" Background="#B0000000" CornerRadius="8" Padding="22,14"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">

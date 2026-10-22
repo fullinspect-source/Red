@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -40,8 +41,8 @@ namespace InspectionEditor
 
     /// <summary>
     /// F-027 capture screen: holds the camera only while open and usable (C3), shows the live preview, an always-visible
-    /// shutter (C6), the "Restarting camera…" and failure texts (C5, C8), camera switching (C11) and the explicit
-    /// device reset (C10). The engine (session, holds, watchdog, preview, orientation) is the RedCamera.Core library;
+    /// shutter (C6), the "Restarting camera…" and failure texts (C5, C8), camera switching (C11), the explicit
+    /// device reset (C10) and pinch/wheel zoom with its readout (Z4, Z5). The engine (session, holds, watchdog, preview, orientation) is the RedCamera.Core library;
     /// this window holds only RED's screen and the hand-off to the item.
     /// </summary>
     public partial class CameraCaptureWindow : Window
@@ -53,6 +54,12 @@ namespace InspectionEditor
         private readonly CameraOrientationProvider _orientation = new();
         private readonly DispatcherTimer _timer;
         private readonly DispatcherTimer _noteTimer;
+        private readonly ZoomGesture _pinch = new();
+        private readonly HashSet<int> _touchIds = new();
+        private double _pinchStartZoom = 1.0;
+        private bool _multiTouch, _hasLastTap;
+        private int _touchDownAt, _lastTapAt; // touch event timestamps (ms), not the time the UI thread got to them
+        private Point _touchDownPoint, _lastTapPoint;
         private int _photoCount;
         private bool _devSuspended, _devDisplayOff, _devLocked;
 
@@ -70,6 +77,7 @@ namespace InspectionEditor
             _controller = new CameraSessionController(new WinRtCameraBackend(Log), new CameraSettingsService(),
                 () => DateTime.UtcNow, log: Log);
             _controller.StateChanged += OnControllerStateChanged;
+            _controller.ZoomChanged += OnZoomChanged;
             _renderer = new CameraPreviewRenderer(PreviewImage, Log);
             _controller.PreviewFrame += _renderer.Push;
             _holds = new CameraHoldWatcher(Dispatcher, (hold, on) => _controller.SetHold(hold, on), Log);
@@ -116,6 +124,7 @@ namespace InspectionEditor
                 _holds.TrackWindow(this); // H1: this window or RED's main window minimized
                 _timer.Start();
                 UpdateUi();
+                UpdateZoomUi();
                 _ = CameraRollCopy.PurgeOldInBackground(); // F-027 C9: backups older than 2 x Archive retention
                 await _controller.OpenAsync();
             }
@@ -228,6 +237,108 @@ namespace InspectionEditor
             PreviewRotation.Angle = rotation;
             PreviewMirror.ScaleX = mirror ? -1 : 1;
         }
+
+        // ------------------------------------------------------------------ zoom (F-027 Z1-Z5)
+
+        private void OnZoomChanged()
+        {
+            if (Dispatcher.CheckAccess()) UpdateZoomUi();
+            else Dispatcher.BeginInvoke((Action)UpdateZoomUi);
+        }
+
+        private void UpdateZoomUi()
+        {
+            _renderer.SetZoom(_controller.PreviewZoom);
+            string readout = CameraZoom.Readout(_controller.ZoomFactor);
+            ZoomReadoutButton.Content = readout;
+            ZoomReadoutButton.Visibility = readout.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Z4: a two-finger pinch anywhere on the preview zooms smoothly; moving the fingers does nothing else.
+        private void PreviewSurface_ManipulationStarting(object? sender, ManipulationStartingEventArgs e)
+        {
+            e.ManipulationContainer = PreviewSurface;
+            e.Mode = ManipulationModes.Scale;
+            _pinchStartZoom = _controller.ZoomFactor;
+            _pinch.Begin(_pinchStartZoom);
+            e.Handled = true;
+        }
+
+        private void PreviewSurface_ManipulationDelta(object? sender, ManipulationDeltaEventArgs e)
+        {
+            e.Handled = true;
+            if (e.IsInertial)
+            {
+                e.Complete(); // no coasting after the fingers lift
+                return;
+            }
+            var scale = e.DeltaManipulation.Scale;
+            _controller.SetZoom(_pinch.Update((scale.X + scale.Y) / 2, _controller.ZoomMax));
+        }
+
+        private void PreviewSurface_ManipulationCompleted(object? sender, ManipulationCompletedEventArgs e)
+        {
+            e.Handled = true;
+            double zoom = ZoomGesture.End(_controller.ZoomFactor);
+            if (zoom != _controller.ZoomFactor) _controller.SetZoom(zoom); // a pinch that ends near 1x is 1x
+            if (_controller.ZoomFactor != _pinchStartZoom) Log($"zoom {_controller.ZoomFactor:0.0}x after a pinch.");
+        }
+
+        // Z4: the mouse wheel zooms; a touchpad pinch arrives as Ctrl+wheel and zooms the same way.
+        private void PreviewSurface_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            e.Handled = true;
+            _controller.SetZoom(CameraZoom.AfterWheel(_controller.ZoomFactor, e.Delta, _controller.ZoomMax));
+        }
+
+        // Z5: a double-click (mouse or pen) or a double-tap (touch) on the preview goes back to 1x.
+        private void PreviewSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2) return;
+            e.Handled = true;
+            _controller.ResetZoom();
+        }
+
+        private void PreviewSurface_TouchDown(object? sender, TouchEventArgs e)
+        {
+            _touchIds.RemoveWhere(id => !PreviewSurface.TouchesOver.Any(t => t.Id == id)); // fingers whose lift was missed
+            _touchIds.Add(e.TouchDevice.Id);
+            if (_touchIds.Count == 1)
+            {
+                _multiTouch = false;
+                _touchDownAt = e.Timestamp;
+                _touchDownPoint = e.GetTouchPoint(PreviewSurface).Position;
+            }
+            else
+            {
+                _multiTouch = true; // a pinch, never a tap
+            }
+        }
+
+        private void PreviewSurface_TouchUp(object? sender, TouchEventArgs e)
+        {
+            _touchIds.Remove(e.TouchDevice.Id);
+            if (_touchIds.Count > 0 || _multiTouch) return;
+            int now = e.Timestamp;
+            var point = e.GetTouchPoint(PreviewSurface).Position;
+            bool tap = unchecked(now - _touchDownAt) is >= 0 and < 350 && (point - _touchDownPoint).Length < 24;
+            if (!tap)
+            {
+                _hasLastTap = false;
+                return;
+            }
+            if (_hasLastTap && unchecked(now - _lastTapAt) is >= 0 and < 450 && (point - _lastTapPoint).Length < 48)
+            {
+                _hasLastTap = false;
+                _controller.ResetZoom();
+                return;
+            }
+            _hasLastTap = true;
+            _lastTapAt = now;
+            _lastTapPoint = point;
+        }
+
+        private void ZoomReadoutButton_Click(object sender, RoutedEventArgs e) => _controller.ResetZoom();
 
         // ------------------------------------------------------------------ shutter (F-027 C6, C7, C9)
 

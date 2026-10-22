@@ -1,5 +1,15 @@
 # RED 2.0 Release Notes
 
+## 2.3.7 — Pinch to zoom in RED's camera
+
+- **Pinch to zoom:** in RED's camera screen, spread two fingers on the live picture to zoom in, pinch them together to
+  zoom out. A mouse wheel or a touchpad pinch zooms too.
+- **The photo shows what the screen showed:** when you press the shutter while zoomed in, the photo is the zoomed part,
+  not the whole wide picture.
+- **A small "2.0×" label** at the top shows the zoom. Tap it, or double-tap the picture, to go back to normal.
+- The zoom stays when the tablet sleeps and wakes or the camera restarts by itself. It starts at normal (1×) each time
+  you open the camera or switch cameras.
+
 ## 2.3.6 — Submit works like INSPECT: no extra questions, no Dropbox warning
 
 - **No "first live Submit / is the owner present?" questions** before or after Submit (or Sync).

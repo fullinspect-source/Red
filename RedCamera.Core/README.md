@@ -1,7 +1,8 @@
 # RedCamera.Core
 
 RED's reusable camera engine (program feature F-027). RED (`InspectionEditor.csproj`) and the RED Camera companion app both
-use it, so a fix lands in both. Spec: `ios-port\program\features\F-027-reliable-camera\SPEC.md` (§3 C3-C11, O1-O3, §6).
+use it, so a fix lands in both. Spec: `ios-port\program\features\F-027-reliable-camera\SPEC.md` (§3 C3-C11, O1-O3, Z1-Z5,
+§6).
 
 ## Boundary
 
@@ -14,6 +15,7 @@ use it, so a fix lands in both. Spec: `ios-port\program\features\F-027-reliable-
 - hung-driver detection and the failure texts (C8);
 - the explicit, elevated device reset (C10);
 - orientation (O1-O3);
+- zoom (Z1-Z3): the factor, the camera's own zoom or a digital crop of the preview and the still, and the gesture rules;
 - INSPECT 2026's camera-roll location (F-023 T3);
 - a WPF preview renderer.
 
@@ -77,25 +79,53 @@ if (roll != null)
 timer.Stop(); holds.Dispose(); controller.PreviewFrame -= renderer.Push; await controller.CloseAsync();
 ```
 
+### Zoom (1.1.0)
+
+```csharp
+controller.ZoomChanged += () =>                                       // controller thread (the UI thread)
+{
+    renderer.SetZoom(controller.PreviewZoom);                          // digital: the centred crop; camera's own: 1
+    readout.Text = CameraZoom.Readout(controller.ZoomFactor);          // "2.0×", empty at 1x
+};
+// Pinch (WPF manipulation on the preview area only, Mode = Scale):
+//   ManipulationStarting: gesture.Begin(controller.ZoomFactor)
+//   ManipulationDelta:    controller.SetZoom(gesture.Update(scaleDelta, controller.ZoomMax))   (complete if IsInertial)
+//   ManipulationCompleted: controller.SetZoom(ZoomGesture.End(controller.ZoomFactor))
+// Mouse wheel (a touchpad pinch arrives as Ctrl+wheel):
+//   controller.SetZoom(CameraZoom.AfterWheel(controller.ZoomFactor, e.Delta, controller.ZoomMax))
+// Double-tap, double-click or a tap on the readout: controller.ResetZoom()
+```
+
+`CaptureAsync` and `CaptureToFileAsync` crop a digital zoom's still to the region the preview shows, at the crop's own
+size. The zoom is kept through a rebuilt session and sleep/wake, and is 1x after `OpenAsync` and `SwitchCamera`. RED's
+`CameraCaptureWindow` is the reference screen (its taps are timed by the touch events' timestamps).
+
 ## API summary
 
 **`CameraSessionController`**
 - Methods:
   - `OpenAsync`, `CloseAsync`, `SetHold(CameraHold, bool)`, `TickAsync`;
   - `CaptureAsync(exif)`, `CaptureToFileAsync(path, exif)`;
-  - `SwitchCamera`, `RetryAsync`, `DebugStallAsync` (tests only).
+  - `SwitchCamera`, `RetryAsync`, `DebugStallAsync` (tests only);
+  - `SetZoom(factor)`, `ResetZoom()` (1.1.0).
 - Properties: `State`, `StatusText`, `FailureKind`, `LastHResult`, `CurrentCamera`, `Cameras`, `IsShared`, `Holds`,
-  `IsCapturing`.
-- Events: `StateChanged`, `PreviewFrame`.
+  `IsCapturing`; zoom (1.1.0): `ZoomFactor`, `ZoomMin`, `ZoomMax`, `IsHardwareZoom`, `PreviewZoom`.
+- Events: `StateChanged`, `PreviewFrame`, `ZoomChanged` (1.1.0).
+- Constructor: an optional `ICameraStillCropper` (1.1.0; default `JpegStillCropper`), for tests.
 - Static: `FailureTitle`, `FailureDetail`, `Classify(hresult)`, `PickPreferred`, and the status texts.
 
 **Backend:** `WinRtCameraBackend : ICameraBackend`, with `IsSupported()` and `GetInstanceIdAsync(camera)`. Its
-sessions are `ICameraStream`s.
+sessions are `ICameraStream`s. `ICameraStream.ZoomCapabilities` and `SetHardwareZoomAsync` (1.1.0) have default
+implementations (digital only), so other implementations still compile.
+
+**Zoom (1.1.0):** `CameraZoom` (`DigitalMax` 4, `Clamp`, `CropFor`, `Readout`, `AfterWheel`), `ZoomGesture` (one pinch),
+`ZoomCapabilities`, `ZoomCrop`, `ICameraStillCropper` and `JpegStillCropper`. `CapturedStill.Zoom` is the zoom a photo
+was taken at.
 
 **Holds:** `CameraHoldWatcher`, with `Attach`, `TrackWindow`, `Handle`, `Raise*` (to simulate signals) and `Dispose`.
 
 **Preview and orientation:**
-- `CameraPreviewRenderer`;
+- `CameraPreviewRenderer`, with `SetZoom(factor)` (1.1.0) for the digital crop;
 - `CameraOrientationProvider`, with `Preview(camera)` and `StillExifOrientation(camera)`;
 - `CameraOrientation` (the pure rules).
 
@@ -128,10 +158,28 @@ Sources: `ios-port\program\research\R-red-camera-companion.md` §3-§5, and F-02
   - a fake camera and clock (A-027-02..14, -17, -19);
   - files, preferences and the hold watcher;
   - INSPECT's two folder rules;
-  - real FileSystemWatchers set up like INSPECT2026 and Inspect2022, which must each see a saved still once, as Created.
+  - real FileSystemWatchers set up like INSPECT2026 and Inspect2022, which must each see a saved still once, as Created;
+  - zoom (A-027-21..26): the rules, the controller with a fake cropper, and the real JPEG crop against the real WPF
+    preview in a window.
+- `tests\CameraLiveCheck`: the real camera on this PC (A-027-16, A-027-28 zoom). Not in the automatic suite.
 
 ## Changes
 
+- 1.1.1 (2026-10-21, released with RED 2.3.7): fixes from the zoom review, no API removed:
+  - a call to the camera's own zoom that does not answer within `CameraTimings.ZoomTimeout` (new, 3 s) is given up, so
+    a hung driver no longer blocks every later zoom change;
+  - a camera that refuses one change after it has already zoomed keeps its own zoom (no digital crop on top) and gets
+    the next change; only a camera that never accepted a zoom falls back to the digital zoom;
+  - `CameraZoom.AfterWheel`: zooming out to below 1.05x gives exactly 1x (touchpad pinches send many small steps).
+- 1.1.0 (2026-10-21): zoom (F-027 Z1-Z3), added API only:
+  - the controller's zoom (`SetZoom`, `ResetZoom`, `ZoomFactor`, `ZoomMax`, `PreviewZoom`, `IsHardwareZoom`,
+    `ZoomChanged`); kept through a rebuilt session and sleep/wake, 1x on open and on switching camera;
+  - the camera's own `ZoomControl` when it zooms by a factor from 1x; otherwise a digital zoom to 4x that crops the
+    preview (`CameraPreviewRenderer.SetZoom`) and the still to the same centred region, never scaled up;
+  - `CameraZoom`, `ZoomGesture`, `ZoomCapabilities`, `ZoomCrop`, `ICameraStillCropper`, `JpegStillCropper`,
+    `CapturedStill.Zoom`;
+  - `ICameraStream` gained `ZoomCapabilities` and `SetHardwareZoomAsync`, with defaults;
+  - the controller's constructor gained an optional `cropper` (source-compatible; recompile against 1.1.0).
 - 1.0.0 (2026-10-20): released with RED 2.3.2; the same code as 1.0.0-preview.2.
 - 1.0.0-preview.2 (2026-10-20):
   - camera-roll rules follow INSPECT's IL (the first root with a match wins, by last-write time);
@@ -140,4 +188,3 @@ Sources: `ios-port\program\research\R-red-camera-companion.md` §3-§5, and F-02
   - stills are staged outside the folder and moved in (a Created event, which Inspect2022 needs);
   - `createFolder` and `stagingFolder` parameters added.
 - 1.0.0-preview.1 (2026-10-20): first cut, the engine moved out of RED.
-- `tests\CameraLiveCheck`: the real camera on this PC (A-027-16). Not in the automatic suite.

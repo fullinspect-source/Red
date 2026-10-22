@@ -1,9 +1,11 @@
 // RedCamera.Core harness (F-027): drives the camera engine with a fake camera and a fake clock (ACCEPTANCE A-027-02..14,
-// -17, -19, the W3 probe) and checks its file, preference and hold-signal helpers. It references only RedCamera.Core, so any
-// app that uses the engine can run it. Exit 0 = all passed.
+// -17, -19, -21..-26, the W3 probe) and checks its file, preference, hold-signal and zoom helpers. It references only
+// RedCamera.Core, so any app that uses the engine can run it. Exit 0 = all passed.
 using System.IO;
 using System.Runtime.InteropServices;
 using RedCamera.Core;
+using WpfImaging = System.Windows.Media.Imaging;
+using WpfMedia = System.Windows.Media;
 
 return await CameraHarness.RunAsync(args);
 
@@ -23,15 +25,32 @@ static class CameraHarness
 
     private sealed class FakeStream : ICameraStream
     {
-        public FakeStream(CameraInfo camera, int number) { Camera = camera; Number = number; }
+        public FakeStream(CameraInfo camera, int number, ZoomCapabilities? zoom = null)
+        {
+            Camera = camera;
+            Number = number;
+            ZoomCapabilities = zoom ?? ZoomCapabilities.DigitalOnly;
+        }
         public CameraInfo Camera { get; }
         public int Number { get; }
         public bool Shared => false;
         public bool Disposed { get; private set; }
         public int CaptureCalls { get; private set; }
         public TaskCompletionSource<CapturedStill>? PendingCapture { get; set; }
+        public ZoomCapabilities ZoomCapabilities { get; }
+        public List<double> HardwareZooms { get; } = new();
+        public TaskCompletionSource<bool>? PendingZoom { get; set; }
+        public bool RefuseZoom { get; set; }
         public event Action<CameraPreviewFrame>? FrameArrived;
         public event Action<int, string>? Failed;
+
+        public Task<bool> SetHardwareZoomAsync(double factor)
+        {
+            HardwareZooms.Add(factor);
+            var pending = PendingZoom;
+            PendingZoom = null;
+            return pending?.Task ?? Task.FromResult(!RefuseZoom);
+        }
 
         public void Frame(bool black = false) =>
             FrameArrived?.Invoke(new CameraPreviewFrame(4, 4, 16, new byte[64], black));
@@ -55,6 +74,8 @@ static class CameraHarness
         public List<CameraInfo> Opened { get; } = new();
         public int FindCalls { get; private set; }
         public Func<CameraInfo, int, (Plan Plan, int HResult)> PlanFor { get; set; } = (_, _) => (Plan.Stream, 0);
+        public Func<CameraInfo, ZoomCapabilities?> ZoomFor { get; set; } = _ => null;
+        public bool RefuseZoom { get; set; }
         public TaskCompletionSource<ICameraStream>? Hung { get; private set; }
 
         public Task<IReadOnlyList<CameraInfo>> FindCamerasAsync()
@@ -76,7 +97,7 @@ static class CameraHarness
                     Hung = new TaskCompletionSource<ICameraStream>();
                     return Hung.Task;
                 default:
-                    var stream = new FakeStream(camera, Streams.Count + 1);
+                    var stream = new FakeStream(camera, Streams.Count + 1, ZoomFor(camera)) { RefuseZoom = RefuseZoom };
                     Streams.Add(stream);
                     return Task.FromResult<ICameraStream>(stream);
             }
@@ -98,18 +119,35 @@ static class CameraHarness
         public void Remember(CameraInfo camera) { DeviceId = camera.Id; Panel = camera.Panel; Saves++; }
     }
 
+    /// <summary>Records each crop and returns a still of the crop's size (the real JPEG crop is tested separately).</summary>
+    private sealed class FakeCropper : ICameraStillCropper
+    {
+        public List<double> Factors { get; } = new();
+        public bool Throw { get; set; }
+
+        public Task<CapturedStill> CropAsync(CapturedStill still, double factor)
+        {
+            Factors.Add(factor);
+            if (Throw) return Task.FromException<CapturedStill>(new InvalidOperationException("fake crop failure"));
+            var crop = CameraZoom.CropFor(still.Width, still.Height, factor);
+            return Task.FromResult(still with { Jpeg = new byte[512], Width = crop.Width, Height = crop.Height, Zoom = factor });
+        }
+    }
+
     private sealed class Rig
     {
         public DateTime Now = new(2026, 10, 19, 12, 0, 0, DateTimeKind.Utc);
         public FakeBackend Backend { get; } = new();
         public MemoryPreferences Prefs { get; } = new();
+        public FakeCropper Cropper { get; } = new();
         public CameraSessionController Controller { get; }
         public List<string> Log { get; } = new();
 
         public Rig(params CameraInfo[] cameras)
         {
             Backend.Cameras.AddRange(cameras);
-            Controller = new CameraSessionController(Backend, Prefs, () => Now, log: Log.Add, runDetached: work => work());
+            Controller = new CameraSessionController(Backend, Prefs, () => Now, log: Log.Add, runDetached: work => work(),
+                cropper: Cropper);
         }
 
         public FakeStream? Current => Backend.Streams.LastOrDefault(s => !s.Disposed);
@@ -168,6 +206,13 @@ static class CameraHarness
             Preferences();
             await CaptureToFile();
             HoldWatcherMessages();
+            ZoomRules();
+            await DigitalZoomSession();
+            await ZoomKeptAcrossRebuilds();
+            await ZoomResets();
+            await CameraOwnZoom();
+            await CropFailureKeepsPhoto();
+            StillMatchesPreview();
         }
         catch (Exception ex)
         {
@@ -791,5 +836,386 @@ static class CameraHarness
         Check("H-watcher", error == null && handle != IntPtr.Zero
             && got == "Suspended:on Suspended:off DisplayOff:on DisplayOff:off Locked:on Locked:off",
             $"the watcher's hidden window turns real suspend/resume messages, display and lock signals into holds ({got}{error?.Message})");
+    }
+
+    // ------------------------------------------------------------------ zoom (F-027 Z1-Z5)
+
+    private static bool Near(double a, double b, double tolerance = 1e-9) => Math.Abs(a - b) <= tolerance;
+
+    private static void ZoomRules()
+    {
+        bool clamp = CameraZoom.Clamp(0.5, 4) == 1 && CameraZoom.Clamp(5, 4) == 4 && CameraZoom.Clamp(double.NaN, 4) == 1
+            && CameraZoom.Clamp(1.004, 4) == 1 && CameraZoom.Clamp(2.5, 4) == 2.5 && CameraZoom.Clamp(3, 2) == 2
+            && CameraZoom.Clamp(2, 0.5) == 1;
+        bool crops = CameraZoom.CropFor(1280, 720, 1) == new ZoomCrop(0, 0, 1280, 720)
+            && CameraZoom.CropFor(1280, 720, 2) == new ZoomCrop(320, 180, 640, 360)
+            && CameraZoom.CropFor(1280, 720, 4) == new ZoomCrop(480, 270, 320, 180)
+            && CameraZoom.CropFor(4000, 3000, 3) == new ZoomCrop(1333, 1000, 1333, 1000)
+            && CameraZoom.CropFor(1, 1, 4) == new ZoomCrop(0, 0, 1, 1);
+        // The same part of the picture at the preview's size and the still's: within one preview pixel.
+        var sameRegion = new List<string>();
+        foreach (double z in new[] { 1.3, 2.0, 2.7, 4.0 })
+        {
+            foreach (var (sw, sh) in new[] { (3840, 2160), (1280, 720), (4000, 2250) })
+            {
+                var p = CameraZoom.CropFor(1280, 720, z);
+                var s = CameraZoom.CropFor(sw, sh, z);
+                double tol = 1.0 / 1280;
+                if (!Near((double)p.X / 1280, (double)s.X / sw, tol) || !Near((double)p.Y / 720, (double)s.Y / sh, 1.0 / 720)
+                    || !Near((double)p.Width / 1280, (double)s.Width / sw, tol) || !Near((double)p.Height / 720, (double)s.Height / sh, 1.0 / 720))
+                    sameRegion.Add($"{z}x@{sw}x{sh}");
+            }
+        }
+        bool readout = CameraZoom.Readout(1) == string.Empty && CameraZoom.Readout(2) == "2.0×" && CameraZoom.Readout(3.96) == "4.0×";
+        bool wheel = Near(CameraZoom.AfterWheel(1, 120, 4), 1.1) && CameraZoom.AfterWheel(1, -120, 4) == 1
+            && CameraZoom.AfterWheel(3.9, 240, 4) == 4 && CameraZoom.AfterWheel(CameraZoom.AfterWheel(1, 120, 4), -120, 4) == 1
+            && CameraZoom.AfterWheel(1.05, -10, 4) == 1 && CameraZoom.AfterWheel(1.1, -10, 4) > 1.05
+            && CameraZoom.AfterWheel(1, 10, 4) > 1;
+        var gesture = new ZoomGesture();
+        gesture.Begin(1);
+        double slow = 1;
+        for (int i = 0; i < 50; i++) slow = gesture.Update(1.003, 4);
+        gesture.Begin(4);
+        double atMax = gesture.Update(1.5, 4);
+        double backIn = gesture.Update(0.9, 4);
+        bool pinch = slow > 1.1 && atMax == 4 && Near(backIn, 3.6) && ZoomGesture.End(1.03) == 1 && ZoomGesture.End(1.2) == 1.2;
+        Check("A-027-21", clamp && crops && sameRegion.Count == 0 && readout && wheel && pinch,
+            "zoom stays within 1x..max (4x digital); the crop is the centred 1/zoom, the same region at any image size; "
+            + "readout \"2.0×\"; wheel ±10% a notch, small touchpad steps leave 1x and zooming out near 1x snaps to 1x; "
+            + "a slow pinch leaves 1x, no dead zone at the limit, ends near 1x snap to 1x"
+            + (sameRegion.Count == 0 ? string.Empty : " (region differs: " + string.Join(", ", sameRegion) + ")"));
+    }
+
+    private static async Task DigitalZoomSession()
+    {
+        var rig = new Rig(Back);
+        await rig.OpenLive();
+        int changes = 0;
+        rig.Controller.ZoomChanged += () => changes++;
+        rig.Controller.SetZoom(2.5);
+        bool zoomed = rig.Controller.ZoomFactor == 2.5 && rig.Controller.PreviewZoom == 2.5 && !rig.Controller.IsHardwareZoom
+            && rig.Controller.ZoomMax == CameraZoom.DigitalMax && changes == 1;
+        rig.Controller.SetZoom(9);
+        bool capped = rig.Controller.ZoomFactor == 4;
+        var shot = await rig.Controller.CaptureAsync(6);
+        bool cropped = rig.Cropper.Factors.SequenceEqual(new[] { 4.0 }) && shot.Still is { Width: 1000, Height: 750, Zoom: 4.0, ExifOrientation: 6 };
+        rig.Controller.SetZoom(0.3);
+        var plain = await rig.Controller.CaptureAsync(1);
+        Check("A-027-22a", zoomed && capped && cropped && rig.Controller.ZoomFactor == 1 && plain.Still is { Width: 4000, Zoom: 1.0 }
+            && rig.Cropper.Factors.Count == 1,
+            "digital zoom: the preview is cropped by the zoom, capped at 4x; the still is cropped to the same centred region "
+            + "(4000x3000 at 4x → 1000x750, orientation kept); at 1x nothing is cropped");
+    }
+
+    private static async Task ZoomKeptAcrossRebuilds()
+    {
+        var rig = new Rig(Back);
+        await rig.OpenLive();
+        rig.Controller.SetZoom(2);
+        var s1 = rig.Current!;
+        await rig.Run(2.1);                 // watchdog: no frames for 2 s
+        await rig.Run(0.6, frames: true);   // rebuilt
+        bool rebuilt = s1.Disposed && rig.Current != s1 && rig.Controller.State == CameraState.Live;
+        bool keptAfterStall = rig.Controller.ZoomFactor == 2 && rig.Controller.PreviewZoom == 2;
+        rig.Controller.SetHold(CameraHold.Suspended, true);
+        bool keptWhilePaused = rig.Controller.ZoomFactor == 2;
+        rig.Controller.SetHold(CameraHold.Suspended, false);
+        await rig.Run(1.6);
+        await rig.Run(0.3, frames: true);
+        var shot = await rig.Controller.CaptureAsync(1);
+
+        // The camera's own zoom is set again on the new session.
+        var hw = new Rig(Back);
+        hw.Backend.ZoomFor = _ => new ZoomCapabilities(true, 1, 3, 0);
+        await hw.OpenLive();
+        hw.Controller.SetZoom(2.2);
+        var h1 = hw.Current!;
+        await hw.Run(2.1);
+        await hw.Run(0.6, frames: true);
+        var h2 = hw.Current!;
+        hw.Controller.SetHold(CameraHold.DisplayOff, true);
+        hw.Controller.SetHold(CameraHold.DisplayOff, false);
+        await hw.Run(1.6);
+        await hw.Run(0.3, frames: true);
+        var h3 = hw.Current!;
+        Check("A-027-23", rebuilt && keptAfterStall && keptWhilePaused && rig.Controller.State == CameraState.Live
+            && shot.Still?.Zoom == 2 && rig.Cropper.Factors.SequenceEqual(new[] { 2.0 })
+            && h1 != h2 && h2 != h3 && h2.HardwareZooms.LastOrDefault() == 2.2 && h3.HardwareZooms.LastOrDefault() == 2.2
+            && hw.Controller.ZoomFactor == 2.2,
+            "the zoom survives the watchdog rebuild and sleep/wake: still 2x and the next still cropped; the camera's own "
+            + "zoom is set again on each new session");
+    }
+
+    private static async Task ZoomResets()
+    {
+        var hw = new Rig(Back);
+        hw.Backend.ZoomFor = _ => new ZoomCapabilities(true, 1, 3, 0);
+        await hw.OpenLive();
+        hw.Controller.SetZoom(3);
+        await hw.Controller.CloseAsync();
+        await hw.Controller.OpenAsync();
+        await hw.Run(0.3, frames: true);
+        bool reopened = hw.Controller.ZoomFactor == 1 && hw.Current!.HardwareZooms.SequenceEqual(new[] { 1.0 });
+
+        var rig = new Rig(Back, Front);
+        await rig.OpenLive();
+        rig.Controller.SetZoom(3);
+        rig.Controller.SwitchCamera();
+        bool resetAtOnce = rig.Controller.ZoomFactor == 1;
+        await rig.Run(0.3, frames: true);
+        var shot = await rig.Controller.CaptureAsync(1);
+
+        var readout = new Rig(Back);
+        await readout.OpenLive();
+        readout.Controller.SetZoom(2);
+        readout.Controller.ResetZoom();
+        Check("A-027-24", reopened && resetAtOnce && rig.Controller.CurrentCamera?.Id == Front.Id && rig.Controller.ZoomFactor == 1
+            && shot.Still?.Zoom == 1 && rig.Cropper.Factors.Count == 0 && readout.Controller.ZoomFactor == 1
+            && readout.Log.Contains("Camera zoom back to 1x."),
+            "opening the screen again and switching camera both start at 1x (the camera's own zoom is set back to 1x too); "
+            + "ResetZoom goes back to 1x");
+    }
+
+    private static async Task CameraOwnZoom()
+    {
+        var rig = new Rig(Back);
+        rig.Backend.ZoomFor = _ => new ZoomCapabilities(true, 1, 3, 0.1);
+        await rig.OpenLive();
+        var stream = rig.Current!;
+        bool hardware = rig.Controller.IsHardwareZoom && rig.Controller.ZoomMax == 3 && stream.HardwareZooms.SequenceEqual(new[] { 1.0 });
+        rig.Controller.SetZoom(5);
+        bool capped = rig.Controller.ZoomFactor == 3 && rig.Controller.PreviewZoom == 1;
+        // A pinch sends many values; while the camera is busy only the newest one is sent next.
+        stream.HardwareZooms.Clear();
+        var busy = new TaskCompletionSource<bool>();
+        stream.PendingZoom = busy;
+        rig.Controller.SetZoom(1.5);
+        rig.Controller.SetZoom(2.0);
+        rig.Controller.SetZoom(2.6);
+        bool waited = stream.HardwareZooms.SequenceEqual(new[] { 1.5 });
+        busy.SetResult(true);
+        var coalesced = stream.HardwareZooms.ToList();
+        var shot = await rig.Controller.CaptureAsync(1);
+        bool notCropped = rig.Cropper.Factors.Count == 0 && shot.Still is { Width: 4000, Zoom: 2.6 };
+
+        // A camera that refuses its own zoom from the start falls back to the digital zoom.
+        var refuse = new Rig(Back);
+        refuse.Backend.ZoomFor = _ => new ZoomCapabilities(true, 1, 3, 0);
+        refuse.Backend.RefuseZoom = true;
+        await refuse.OpenLive();
+        refuse.Controller.SetZoom(2);
+        var refusedShot = await refuse.Controller.CaptureAsync(1);
+
+        // A camera that has already zoomed and then refuses one change keeps its own zoom (a digital crop on top would
+        // multiply the zoom); the next change is sent again.
+        var later = new Rig(Back);
+        later.Backend.ZoomFor = _ => new ZoomCapabilities(true, 1, 3, 0);
+        await later.OpenLive();
+        later.Controller.SetZoom(2);
+        later.Current!.RefuseZoom = true;
+        later.Controller.SetZoom(2.4);
+        bool keptOwn = later.Controller.IsHardwareZoom && later.Controller.PreviewZoom == 1;
+        later.Current!.RefuseZoom = false;
+        later.Controller.SetZoom(2.6);
+        var laterShot = await later.Controller.CaptureAsync(1);
+        bool retried = keptOwn && later.Current!.HardwareZooms.SequenceEqual(new[] { 1.0, 2.0, 2.4, 2.6 })
+            && later.Cropper.Factors.Count == 0 && laterShot.Still is { Width: 4000, Zoom: 2.6 }
+            && later.Log.Contains("Camera refused a zoom change; it is sent again with the next change.");
+        // A zoom call that never answers (hung driver) is given up after ZoomTimeout; the next change is sent again.
+        var hungBackend = new FakeBackend();
+        hungBackend.Cameras.Add(Back);
+        hungBackend.ZoomFor = _ => new ZoomCapabilities(true, 1, 3, 0);
+        var hungLog = new List<string>();
+        var hungController = new CameraSessionController(hungBackend, new MemoryPreferences(), () => DateTime.UtcNow,
+            new CameraTimings { ZoomTimeout = TimeSpan.FromMilliseconds(100) }, hungLog.Add, work => work(), new FakeCropper());
+        await hungController.OpenAsync();
+        var hungStream = hungBackend.Streams.Last();
+        hungStream.PendingZoom = new TaskCompletionSource<bool>(); // never completes
+        hungController.SetZoom(2);
+        await Task.Delay(400);
+        hungController.SetZoom(2.5);
+        bool resent = hungStream.HardwareZooms.SequenceEqual(new[] { 1.0, 2.0, 2.5 }) && hungController.IsHardwareZoom
+            && hungLog.Any(l => l.Contains("did not answer"));
+
+        Check("A-027-25", hardware && capped && waited && coalesced.SequenceEqual(new[] { 1.5, 2.6 }) && notCropped && resent
+            && !refuse.Controller.IsHardwareZoom && refuse.Controller.PreviewZoom == 2 && refusedShot.Still?.Zoom == 2
+            && refuse.Cropper.Factors.SequenceEqual(new[] { 2.0 }) && retried,
+            $"a camera with its own zoom is used (1x..its max, preview not cropped, still not cropped); during a pinch only "
+            + $"the newest value follows a busy call ({string.Join(", ", coalesced)}); a call that never answers is given up "
+            + $"and the next change is sent ({string.Join(", ", hungStream.HardwareZooms)}); a camera refusing from the start "
+            + "switches to the digital zoom; one refusal after zooming keeps the camera's own zoom and retries");
+    }
+
+    private static async Task CropFailureKeepsPhoto()
+    {
+        var rig = new Rig(Back);
+        await rig.OpenLive();
+        rig.Cropper.Throw = true;
+        rig.Controller.SetZoom(2);
+        var shot = await rig.Controller.CaptureAsync(1);
+        await rig.Run(0.5, frames: true);
+        Check("A-027-26", shot.Still is { Width: 4000, Height: 3000 } && rig.Controller.State == CameraState.Live
+            && rig.Backend.Opened.Count == 1 && rig.Log.Any(l => l.Contains("zoom crop failed")),
+            "a crop that fails keeps the full photo and is not treated as a camera failure");
+    }
+
+    // ------------------------------------------------------------------ zoom: real JPEG crop and real WPF preview
+
+    /// <summary>A smooth test picture the same at every size: red across, green down, a gentle blue wave.</summary>
+    private static byte[] Pattern(int width, int height, bool inverted = false)
+    {
+        var pixels = new byte[width * height * 4];
+        for (int y = 0; y < height; y++)
+        {
+            double v = (y + 0.5) / height;
+            for (int x = 0; x < width; x++)
+            {
+                double u = (x + 0.5) / width;
+                int i = (y * width + x) * 4;
+                byte r = (byte)Math.Round(255 * u), g = (byte)Math.Round(255 * v);
+                byte b = (byte)Math.Round(128 + 90 * Math.Sin(2 * Math.PI * 3 * u) * Math.Cos(2 * Math.PI * 2 * v));
+                pixels[i] = inverted ? (byte)(255 - b) : b;
+                pixels[i + 1] = inverted ? (byte)(255 - g) : g;
+                pixels[i + 2] = inverted ? (byte)(255 - r) : r;
+                pixels[i + 3] = 255;
+            }
+        }
+        return pixels;
+    }
+
+    private static byte[] Jpeg(int width, int height)
+    {
+        var source = WpfImaging.BitmapSource.Create(width, height, 96, 96, WpfMedia.PixelFormats.Bgr32, null, Pattern(width, height), width * 4);
+        var encoder = new WpfImaging.JpegBitmapEncoder { QualityLevel = 95 };
+        encoder.Frames.Add(WpfImaging.BitmapFrame.Create(source));
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>The JPEG decoded and scaled to <paramref name="width"/> x <paramref name="height"/>, as BGRA.</summary>
+    private static (byte[] Pixels, int Width, int Height, object? Orientation) Decode(byte[] jpeg, int width, int height)
+    {
+        var frame = WpfImaging.BitmapDecoder.Create(new MemoryStream(jpeg), WpfImaging.BitmapCreateOptions.PreservePixelFormat,
+            WpfImaging.BitmapCacheOption.OnLoad).Frames[0];
+        object? orientation = null;
+        try { orientation = (frame.Metadata as WpfImaging.BitmapMetadata)?.GetQuery("System.Photo.Orientation"); } catch (Exception) { }
+        WpfImaging.BitmapSource scaled = frame.PixelWidth == width && frame.PixelHeight == height ? frame
+            : new WpfImaging.TransformedBitmap(frame, new WpfMedia.ScaleTransform((double)width / frame.PixelWidth, (double)height / frame.PixelHeight));
+        var bgra = new WpfImaging.FormatConvertedBitmap(scaled, WpfMedia.PixelFormats.Bgra32, null, 0);
+        var pixels = new byte[width * height * 4];
+        bgra.CopyPixels(pixels, width * 4, 0);
+        return (pixels, frame.PixelWidth, frame.PixelHeight, orientation);
+    }
+
+    private static double MeanDifference(byte[] a, byte[] b)
+    {
+        long sum = 0;
+        int n = 0;
+        for (int i = 0; i + 3 < Math.Min(a.Length, b.Length); i += 4, n++)
+            sum += Math.Abs(a[i] - b[i]) + Math.Abs(a[i + 1] - b[i + 1]) + Math.Abs(a[i + 2] - b[i + 2]);
+        return n == 0 ? double.MaxValue : sum / (3.0 * n);
+    }
+
+    private static void Pump()
+    {
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,
+            new Action(() => frame.Continue = false));
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+    }
+
+    /// <summary>
+    /// A-027-22: the real JPEG crop and the real WPF preview, side by side. A 2560x1440 still and a 1280x720 preview frame
+    /// of the same picture; at 2x and 4x the preview shown in a 640x360 image must equal the cropped still scaled to
+    /// 640x360. The crop is the crop's own size (never scaled up) and keeps the EXIF orientation.
+    /// </summary>
+    private static void StillMatchesPreview()
+    {
+        var lines = new List<string>();
+        bool ok = true;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            System.Windows.Window? window = null;
+            try
+            {
+                const int W = 640, H = 360;
+                var image = new System.Windows.Controls.Image { Stretch = WpfMedia.Stretch.Uniform };
+                WpfMedia.RenderOptions.SetBitmapScalingMode(image, WpfMedia.BitmapScalingMode.LowQuality);
+                var host = new System.Windows.Controls.Grid { Width = W, Height = H, Background = WpfMedia.Brushes.Black };
+                host.Children.Add(image);
+                window = new System.Windows.Window
+                {
+                    Content = host, SizeToContent = System.Windows.SizeToContent.WidthAndHeight,
+                    WindowStyle = System.Windows.WindowStyle.None, ResizeMode = System.Windows.ResizeMode.NoResize,
+                    ShowInTaskbar = false, ShowActivated = false, Left = -6000, Top = -6000,
+                };
+                window.Show();
+                Pump();
+
+                var renderer = new CameraPreviewRenderer(image);
+                var frame = new CameraPreviewFrame(1280, 720, 1280 * 4, Pattern(1280, 720), false);
+                renderer.Push(frame);
+                Pump();
+                byte[] Shot()
+                {
+                    var target = new WpfImaging.RenderTargetBitmap(W, H, 96, 96, WpfMedia.PixelFormats.Pbgra32);
+                    target.Render(host);
+                    var pixels = new byte[W * H * 4];
+                    target.CopyPixels(pixels, W * 4, 0);
+                    return pixels;
+                }
+
+                byte[] still = Jpeg(2560, 1440);
+                var cropper = new JpegStillCropper();
+                var fullStill = Decode(still, W, H);
+                foreach (double zoom in new[] { 2.0, 4.0 })
+                {
+                    renderer.SetZoom(zoom);
+                    Pump();
+                    byte[] preview = Shot();
+                    var cropped = cropper.CropAsync(new CapturedStill(still, 2560, 1440, "photo", 6), zoom).GetAwaiter().GetResult();
+                    var decoded = Decode(cropped.Jpeg, W, H);
+                    double match = MeanDifference(preview, decoded.Pixels);
+                    double control = MeanDifference(preview, fullStill.Pixels);
+                    double expectedRed = 255 * (0.5 - 0.5 / zoom);
+                    bool corner = Math.Abs(preview[2] - expectedRed) <= 6 && Math.Abs(decoded.Pixels[2] - expectedRed) <= 6;
+                    var size = CameraZoom.CropFor(2560, 1440, zoom);
+                    bool sized = cropped.Width == size.Width && cropped.Height == size.Height && decoded.Width == size.Width
+                        && decoded.Height == size.Height && cropped.Zoom == zoom;
+                    bool oriented = decoded.Orientation is ushort o && o == 6 && cropped.ExifOrientation == 6;
+                    bool pass = match <= 5 && control >= 20 && corner && sized && oriented;
+                    ok &= pass;
+                    lines.Add($"{zoom}x: still {cropped.Width}x{cropped.Height}, difference to preview {match:0.0} (unzoomed {control:0.0}), "
+                        + $"left edge red {preview[2]}/{decoded.Pixels[2]} (expected {expectedRed:0}), orientation {decoded.Orientation}");
+                }
+
+                // Frames written after zooming show at once in the cropped preview.
+                renderer.SetZoom(2);
+                Pump();
+                byte[] before = Shot();
+                renderer.Push(new CameraPreviewFrame(1280, 720, 1280 * 4, Pattern(1280, 720, inverted: true), false));
+                Pump();
+                double changed = MeanDifference(before, Shot());
+                renderer.SetZoom(1);
+                Pump();
+                bool whole = Math.Abs(Shot()[2] - 255 * (1 - 0.5 / W)) <= 6; // inverted red at the left edge ≈ 255
+                ok &= changed > 50 && whole;
+                lines.Add($"new frame while zoomed changes the preview by {changed:0} levels; back at 1x the whole frame shows ({whole})");
+
+                // A still at the preview's own size is cropped, never scaled up.
+                var small = cropper.CropAsync(new CapturedStill(Jpeg(1280, 720), 1280, 720, "frame", 1), 4).GetAwaiter().GetResult();
+                ok &= small.Width == 320 && small.Height == 180;
+                lines.Add($"1280x720 still at 4x → {small.Width}x{small.Height}");
+            }
+            catch (Exception ex) { error = ex; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Check("A-027-22", ok && error == null,
+            "at 2x and 4x the cropped still shows exactly what the zoomed preview shows: " + string.Join("; ", lines) + (error == null ? string.Empty : " " + error));
     }
 }

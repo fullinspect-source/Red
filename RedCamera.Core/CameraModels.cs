@@ -23,7 +23,11 @@ namespace RedCamera.Core
     public sealed record CameraPreviewFrame(int Width, int Height, int Stride, byte[] Pixels, bool AllBlack);
 
     /// <summary>A still as captured (before F-023 processing). Width/Height are the stored pixel size.</summary>
-    public sealed record CapturedStill(byte[] Jpeg, int Width, int Height, string Source, int ExifOrientation);
+    public sealed record CapturedStill(byte[] Jpeg, int Width, int Height, string Source, int ExifOrientation)
+    {
+        /// <summary>F-027 Z2: the zoom the photo was taken at (1 = none). A digital zoom is already cropped into the photo.</summary>
+        public double Zoom { get; init; } = 1.0;
+    }
 
     public interface ICameraBackend
     {
@@ -50,6 +54,14 @@ namespace RedCamera.Core
 
         /// <summary>Dev builds only: stops the preview frames underneath the controller (simulated stall, A-027-16).</summary>
         Task DebugStopFramesAsync();
+
+        /// <summary>F-027 Z1: the camera's own zoom, or <see cref="ZoomCapabilities.DigitalOnly"/> (then the engine crops
+        /// the preview and the still). Read once the session is open.</summary>
+        ZoomCapabilities ZoomCapabilities => ZoomCapabilities.DigitalOnly;
+
+        /// <summary>F-027 Z1: sets the camera's own zoom; called only when <see cref="ZoomCapabilities"/> is hardware.
+        /// False when the camera refused it (the engine then zooms digitally).</summary>
+        Task<bool> SetHardwareZoomAsync(double factor) => Task.FromResult(false);
     }
 
     /// <summary>The remembered camera (F-027 C11).</summary>
@@ -69,6 +81,8 @@ namespace RedCamera.Core
         public TimeSpan BlackTimeout { get; init; } = TimeSpan.FromSeconds(3);
         public TimeSpan OpenTimeout { get; init; } = TimeSpan.FromSeconds(10);
         public TimeSpan CaptureTimeout { get; init; } = TimeSpan.FromSeconds(8);
+        /// <summary>F-027 Z1: how long one call to the camera's own zoom may take before RED stops waiting for it.</summary>
+        public TimeSpan ZoomTimeout { get; init; } = TimeSpan.FromSeconds(3);
         public TimeSpan[] SameCameraRetryDelays { get; init; } =
             { TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(3) };
         public TimeSpan OtherCameraDelay { get; init; } = TimeSpan.FromSeconds(0.5);

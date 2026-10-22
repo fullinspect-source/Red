@@ -148,6 +148,26 @@ static class CameraHarness
             && closingBody.Contains("WindowState.Minimized"),
             "closing the camera brings the report back in front (owner tablet test 2026-10-20: it stayed behind the list)");
 
+        // F-027 Z4/Z5: pinch, wheel and double-tap act on the preview surface only; the readout is a 44 px button; no popup.
+        int surface = xaml.IndexOf("x:Name=\"PreviewSurface\"", StringComparison.Ordinal);
+        string surfaceTag = surface < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', surface)..xaml.IndexOf('>', surface)];
+        int surfaceEnd = surface < 0 ? -1 : xaml.IndexOf("</Border>", surface, StringComparison.Ordinal);
+        string surfaceBlock = surfaceEnd < 0 ? string.Empty : xaml[surface..surfaceEnd];
+        int readout = xaml.IndexOf("x:Name=\"ZoomReadoutButton\"", StringComparison.Ordinal);
+        string readoutTag = readout < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', readout)..xaml.IndexOf('>', readout)];
+        int zoomStart = code.IndexOf("// ------------------------------------------------------------------ zoom", StringComparison.Ordinal);
+        int zoomEnd = code.IndexOf("// ------------------------------------------------------------------ shutter", StringComparison.Ordinal);
+        string zoomCode = zoomStart < 0 || zoomEnd < zoomStart ? string.Empty : code[zoomStart..zoomEnd];
+        Check("A-027-27", surfaceTag.Contains("IsManipulationEnabled=\"True\"") && surfaceTag.Contains("ManipulationDelta=")
+            && surfaceTag.Contains("MouseWheel=") && surfaceTag.Contains("TouchUp=") && surfaceBlock.Contains("x:Name=\"PreviewImage\"")
+            && !surfaceBlock.Contains("<Button") && shutter > surfaceEnd
+            && readoutTag.Contains("MinHeight=\"44\"") && readoutTag.Contains("MinWidth=\"72\"") && readoutTag.Contains("Click=")
+            && zoomCode.Split("_controller.ResetZoom()").Length == 4
+            && zoomCode.Contains("_renderer.SetZoom(_controller.PreviewZoom)") && code.Contains("_controller.ZoomChanged += OnZoomChanged;")
+            && !zoomCode.Contains("MessageBox") && !zoomCode.Contains("Popup") && !readoutTag.Contains("ToolTip"),
+            "zoom: pinch, wheel and double-tap only on the preview surface (no button inside it, shutter outside); the readout "
+            + "is a 44 px button that resets to 1x, as do double-click and double-tap; no popup");
+
         // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.
         string coreFolder = Path.Combine(root, "RedCamera.Core");
         var coreSources = Directory.Exists(coreFolder)

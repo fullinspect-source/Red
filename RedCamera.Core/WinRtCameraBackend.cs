@@ -154,6 +154,7 @@ namespace RedCamera.Core
         private readonly byte[][] _ring = new byte[3][];
         private MediaFrameSource? _source;
         private MediaFrameReader? _reader;
+        private ZoomControl? _zoomControl;
         private int _ringIndex;
         private int _disposed;
         private int _frameErrorLogged;
@@ -168,6 +169,7 @@ namespace RedCamera.Core
 
         public CameraInfo Camera { get; }
         public bool Shared { get; }
+        public ZoomCapabilities ZoomCapabilities { get; private set; } = ZoomCapabilities.DigitalOnly;
         public event Action<CameraPreviewFrame>? FrameArrived;
         public event Action<int, string>? Failed;
 
@@ -201,7 +203,51 @@ namespace RedCamera.Core
             }
             _log($"Camera stream {format?.Width}x{format?.Height} {_source.CurrentFormat?.Subtype}, preview {size.Width}x{size.Height}, "
                 + $"characteristic {_capture.MediaCaptureSettings.VideoDeviceCharacteristic}.");
+            if (!Shared) ZoomCapabilities = ReadZoomCapabilities();
+            _log(ZoomCapabilities.Hardware
+                ? $"Camera zoom: the camera's own, {ZoomCapabilities.Min:0.##}-{ZoomCapabilities.Max:0.##}x (step {ZoomCapabilities.Step:0.###})."
+                : $"Camera zoom: digital, 1-{CameraZoom.DigitalMax:0}x.");
         }
+
+        /// <summary>F-027 Z1: the camera's ZoomControl, used only when it zooms by a factor starting at 1x.</summary>
+        private ZoomCapabilities ReadZoomCapabilities()
+        {
+            try
+            {
+                var zoom = _capture.VideoDeviceController.ZoomControl;
+                if (zoom.Supported && zoom.Min >= 0.99f && zoom.Min <= 1.01f && zoom.Max >= zoom.Min + 0.1f)
+                {
+                    _zoomControl = zoom;
+                    return new ZoomCapabilities(true, 1.0, zoom.Max, Math.Max(0f, zoom.Step));
+                }
+                if (zoom.Supported) _log($"Camera zoom control not used (range {zoom.Min}-{zoom.Max}).");
+            }
+            catch (Exception ex)
+            {
+                _log($"Camera zoom control not read: {ex.GetType().Name} 0x{ex.HResult:X8}");
+            }
+            return ZoomCapabilities.DigitalOnly;
+        }
+
+        public Task<bool> SetHardwareZoomAsync(double factor) => Task.Run(() =>
+        {
+            var zoom = _zoomControl;
+            if (zoom == null || Volatile.Read(ref _disposed) == 1) return false;
+            try
+            {
+                var caps = ZoomCapabilities;
+                double value = factor;
+                if (caps.Step > 0) value = caps.Min + Math.Round((value - caps.Min) / caps.Step) * caps.Step;
+                value = Math.Clamp(value, caps.Min, caps.Max);
+                zoom.Configure(new ZoomSettings { Mode = ZoomTransitionMode.Auto, Value = (float)value });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _log($"Camera zoom not set: {ex.GetType().Name} 0x{ex.HResult:X8}");
+                return false;
+            }
+        });
 
         /// <summary>F-027 C7: the largest still the camera offers.</summary>
         private async Task ChooseStillSizeAsync(MediaFrameSource source)
@@ -418,7 +464,7 @@ namespace RedCamera.Core
             }
         }
 
-        private static async Task<byte[]> ReadAllAsync(IRandomAccessStream stream)
+        internal static async Task<byte[]> ReadAllAsync(IRandomAccessStream stream)
         {
             uint size = (uint)stream.Size;
             var bytes = new byte[size];
