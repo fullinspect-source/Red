@@ -41,10 +41,13 @@ This file is the concise cross-session source of development context for work pe
   - Webcam 19/19: the tap's exposure region is applied and released on the real webcam, which supports exposure
     regions without locking.
   - In-app driver 22/22 in three runs in a row (shutter place, small window, tap mark, keys).
-  - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged).
+  - This tree (`c8e7f4e`): Debug build `--no-incremental` 0 errors; the 37-harness suite plus CommentSnippet 53,
+    AppUpdate 34 and PdfCleanup 52, all exit 0 (RedCameraCore 49, CameraCapture 12, TabletUi 24); Python 36/46, the
+    known 10.
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real
+    profile).
   - Owner checks on the tablet: tap focus with fingers, the shutter's reach, a Bluetooth remote, a second camera.
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-22: GitHub v2.3.8 (fullinspect-source/Red), Latest since 22:07 UTC; release commit `c8e7f4e`. `releases/latest` = v2.3.8; Red-v2.3.8.zip 93,867,372 bytes (503 entries, sha256 `d1db7b3f52063939ca724768920eb3a5fd18b7533a982f693580d1aa66457f03`) answers HEAD 200 and downloads byte-identical; update_red.bat attached and its latest link answers 200. RedCamera.Core 1.2.0 packed from `c8e7f4e` (`..\packages\RedCamera.Core.1.2.0.nupkg`, sha256 `a0f90ffadb903f49e2fd35a46d700e9721912fa0c54fbd8a9c6a6fedd29f1485`).
 ### 2026-10-21 — RED 2.3.7 — Pinch to zoom in RED's camera (F-027 Z1-Z5)
 
 - **Base:** 2.3.6 (`a196dd9`). Built in `Dropbox\P\PL` by the F-027 camera session. Released on the owner's word ("Yes.
