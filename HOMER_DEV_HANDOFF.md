@@ -32,8 +32,11 @@ This file is the concise cross-session source of development context for work pe
     levels apart against 23); in-app driver 18/18 in six runs (wheel, a two-finger pinch through WPF's touch pipeline,
     readout, double-tap, a zoomed photo into the item, 1x on reopen); Python as before.
   - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged). Real fingers on the tablet are the owner's check.
-- **Deployment:** pending.
+  - This tree (`c2cd5fc`): Debug build `--no-incremental` 0 errors, 28 warnings; the 37-harness suite plus CommentSnippet 53,
+    AppUpdate 34 and PdfCleanup 52, all exit 0 (RedCameraCore 41, CameraCapture 11); Python 36/46, the known 10.
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real
+    profile). Real fingers on the tablet are the owner's check.
+- **Deployment:** released 2026-10-21: GitHub v2.3.7 (fullinspect-source/Red), Latest since 03:23 UTC 2026-10-22; release commit `c2cd5fc`. `releases/latest` = v2.3.7; Red-v2.3.7.zip 93,858,339 bytes (503 entries, sha256 `ba2668cf2a8240fd02fd11b6bfaf87bc65f6a8325326effcd2f59ce99aa7c31c`) answers HEAD 200 and downloads byte-identical; update_red.bat attached. RedCamera.Core 1.1.1 packed from `c2cd5fc` (`..\packages\RedCamera.Core.1.1.1.nupkg`, sha256 `e96d24cc7c374eaa656de25784449db9cb2c931f357bd820ac8de26b7a29c022`).
 ### 2026-10-21 — RED 2.3.6 — Submit works like INSPECT (owner, tablet test of 2.3.5)
 
 - **Base:** 2.3.5 (`290b834`). Built in `Dropbox\P\PL`; released by the owner ("Yes: delete the editing safety copies at
