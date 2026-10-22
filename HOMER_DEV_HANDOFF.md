@@ -74,7 +74,7 @@ This file is the concise cross-session source of development context for work pe
   - Not run: the corpus round trip (save code unchanged: no change to AtomicInspectionWriter, SurgicalSaveService or
     FailedSaveRecoveryService); the packaged-exe smoke start (a release build would use the real profile and now also
     clean it).
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-22: GitHub v2.3.9 (fullinspect-source/Red), Latest since 22:37 UTC; release commit `c5a1764`. `releases/latest` = v2.3.9; Red-v2.3.9.zip 93,874,631 bytes (503 entries, sha256 `e91066190e2216bdafc6504a4c11f474f825dcfa738f28cf18ccee79dec41a22`) answers HEAD 200 and downloads byte-identical; update_red.bat attached (CRLF, answers 200). Assembly `2.3.9+c5a1764`.
 
 ### 2026-10-22 — RED 2.3.8 — RED's camera: tap to focus, right-side shutter, every camera, camera remotes (F-027 T, K, C6, C11)
 
