@@ -263,7 +263,14 @@ finally
 {
     // Remove each link itself first: a recursive delete reports unmounting a junction as access denied.
     foreach (string link in directoryLinks) if (Directory.Exists(link)) Directory.Delete(link);
-    Directory.Delete(sandbox, true);
+    // Audit S-28: the sandbox always goes. A sync client or virus scanner (this folder is inside Dropbox when the harness
+    // runs from PL) can hold a file for a moment, so retry briefly; never turn a passed run into a crash.
+    for (int attempt = 0; attempt < 50 && Directory.Exists(sandbox); attempt++)
+    {
+        try { Directory.Delete(sandbox, true); }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Thread.Sleep(200); }
+    }
+    if (Directory.Exists(sandbox)) Console.WriteLine("NOTE sandbox still held by another program; it was left for a later run: " + sandbox);
 }
 
 static class Reparse

@@ -12,9 +12,13 @@ using InspectionEditor.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-if (args.Length >= 2 && args[0] == "--corpus")
-    return Corpus.Run(args[1], args.Length > 2 ? args[2] : null);
-return Fixtures.Run();
+try
+{
+    if (args.Length >= 2 && args[0] == "--corpus")
+        return Corpus.Run(args[1], args.Length > 2 ? args[2] : null);
+    return Fixtures.Run();
+}
+finally { InspectionEditor.AppIdentity.DeleteSandbox(); } // audit S-28: the run's app-data sandbox (recovery copies, verified saves) goes
 
 static class Json
 {

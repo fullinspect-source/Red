@@ -28,31 +28,35 @@ cls
 set "INSTALL_DIR=C:\Red"
 set "DOWNLOAD_ZIP=%TEMP%\red2_update.zip"
 set "EXTRACT_DIR=%TEMP%\red2_extract"
+:: The backup goes into the Windows account that approved the Administrator prompt (its %LOCALAPPDATA%).
 set "BACKUP_ROOT=%LOCALAPPDATA%\RED_Backups"
+set "BACKUPS_KEPT=3"
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "STAMP=%%I"
 set "BACKUP_DIR=%BACKUP_ROOT%\before-red2-%STAMP%"
 set "LOG_FILE=%BACKUP_DIR%\update-red2.log"
-
-mkdir "%BACKUP_DIR%" >nul 2>&1
-call :log "Starting RED 2.0 updater"
-call :log "Install dir: %INSTALL_DIR%"
-call :log "Backup dir: %BACKUP_DIR%"
 
 echo.
 echo  =====================================================
 echo    RED Updater
 echo  =====================================================
 echo.
-echo  This will close RED, back up your RED files, download
-echo  the latest RED release, install it, repair the
-echo  Desktop shortcut, and launch RED.
+echo  This will close RED, back up your RED license, settings
+echo  and user data, download the latest RED release, install
+echo  it, repair the Desktop shortcut, and launch RED.
 echo.
-echo  Backup/log folder:
+echo  Backup/log folder, in the Windows account that approved
+echo  the Administrator prompt (the newest %BACKUPS_KEPT% are kept):
 echo  %BACKUP_DIR%
 echo.
 echo  Close any open inspection work first. Press any key to continue.
-echo  Close this window now to cancel.
+echo  Close this window now to cancel. Nothing has been changed yet.
 pause >nul
+
+:: Storage audit F3: nothing is written before this point, so a cancelled run leaves nothing behind.
+mkdir "%BACKUP_DIR%" >nul 2>&1
+call :log "Starting RED 2.0 updater"
+call :log "Install dir: %INSTALL_DIR%"
+call :log "Backup dir: %BACKUP_DIR%"
 
 call :log "Closing running RED processes"
 echo.
@@ -64,10 +68,8 @@ timeout /t 2 /nobreak >nul
 echo          Done.
 
 echo  [2 of 7] Backing up licenses, settings, and user data...
-call :backup_dir "%INSTALL_DIR%" "InstallFolder-C-Red"
-call :backup_dir "%LOCALAPPDATA%\RED" "LocalAppData-RED"
-call :backup_dir "%LOCALAPPDATA%\InspectionEditor" "LocalAppData-InspectionEditor-Legacy"
-call :backup_dir "%LOCALAPPDATA%\RED-2.0-Dev" "LocalAppData-RED-2.0-Dev"
+call :backup_preserved
+call :prune_backups
 call :log "Backup complete"
 echo          Backup complete.
 
@@ -100,6 +102,7 @@ if exist "%INSTALL_DIR%\InspectionEditor.exe" del /f /q "%INSTALL_DIR%\Inspectio
 if exist "%INSTALL_DIR%\Red2Dev.exe" del /f /q "%INSTALL_DIR%\Red2Dev.exe" >>"%LOG_FILE%" 2>&1
 if not exist "%INSTALL_DIR%\Red.exe" goto :install_failed
 call :restore_preserved_files
+call :cleanup_download
 echo          Installed.
 
 echo  [6 of 7] Repairing Desktop shortcut...
@@ -122,17 +125,51 @@ echo.
 timeout /t 8 /nobreak >nul
 exit /b 0
 
-:backup_dir
-set "SRC=%~1"
-set "NAME=%~2"
-if exist "%SRC%" (
-    call :log "Backing up %SRC%"
-    mkdir "%BACKUP_DIR%\%NAME%" >nul 2>&1
-    robocopy "%SRC%" "%BACKUP_DIR%\%NAME%" /E /R:1 /W:1 /XD "%SRC%\bin" "%SRC%\obj" >>"%LOG_FILE%" 2>&1
-    if !errorlevel! GEQ 8 call :log "WARNING: backup had errors for %SRC%"
-) else (
-    call :log "Not found, skipped backup: %SRC%"
+:backup_preserved
+:: Storage audit F3: only what :restore_preserved_files puts back, plus RED's own small settings files, signature and
+:: user data; not the whole program folder, nor RED's recovery copies, PDFs, caches or logs (those were ~220 MB a run).
+set "SAVED=%BACKUP_DIR%\InstallFolder-C-Red"
+mkdir "%SAVED%" >nul 2>&1
+for %%F in (license.lic preferences.txt notify_custom_message.txt settings.txt) do (
+    if exist "%INSTALL_DIR%\%%F" copy /Y "%INSTALL_DIR%\%%F" "%SAVED%\%%F" >>"%LOG_FILE%" 2>&1
 )
+if exist "%INSTALL_DIR%\userdata" call :copy_tree "%INSTALL_DIR%\userdata" "%SAVED%\userdata" /E
+set "SAVED=%BACKUP_DIR%\LocalAppData-RED"
+if exist "%LOCALAPPDATA%\RED" (
+    call :log "Backing up the top-level files, userdata and Signature of %LOCALAPPDATA%\RED"
+    call :copy_tree "%LOCALAPPDATA%\RED" "%SAVED%"
+    if exist "%LOCALAPPDATA%\RED\userdata" call :copy_tree "%LOCALAPPDATA%\RED\userdata" "%SAVED%\userdata" /E
+    if exist "%LOCALAPPDATA%\RED\Signature" call :copy_tree "%LOCALAPPDATA%\RED\Signature" "%SAVED%\Signature" /E
+) else (
+    call :log "Not found, skipped backup: %LOCALAPPDATA%\RED"
+)
+exit /b 0
+
+:copy_tree
+robocopy "%~1" "%~2" %3 /R:1 /W:1 >>"%LOG_FILE%" 2>&1
+if !errorlevel! GEQ 8 call :log "WARNING: backup had errors for %~1"
+exit /b 0
+
+:prune_backups
+:: Storage audit F3: keep the newest %BACKUPS_KEPT% backup folders made by this updater; older ones are deleted. Only
+:: folders named before-red2-yyyyMMdd-HHmmss, never a link.
+set /a FOUND=0
+for /f "delims=" %%D in ('dir /b /a:d-l /o-n "%BACKUP_ROOT%\before-red2-*" 2^>nul') do (
+    echo %%D| findstr /r /x "before-red2-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]" >nul
+    if not errorlevel 1 (
+        set /a FOUND+=1
+        if !FOUND! GTR %BACKUPS_KEPT% (
+            call :log "Removing old backup %%D"
+            rd /s /q "%BACKUP_ROOT%\%%D" >>"%LOG_FILE%" 2>&1
+        )
+    )
+)
+exit /b 0
+
+:cleanup_download
+:: Storage audit F3: the downloaded zip and its unpacked copy (about 315 MB) are deleted, whether the update worked or not.
+if exist "%DOWNLOAD_ZIP%" del /f /q "%DOWNLOAD_ZIP%" >>"%LOG_FILE%" 2>&1
+if exist "%EXTRACT_DIR%" rd /s /q "%EXTRACT_DIR%" >>"%LOG_FILE%" 2>&1
 exit /b 0
 
 :restore_preserved_files
@@ -178,6 +215,7 @@ echo  %BACKUP_DIR%
 goto :fail
 
 :fail
+call :cleanup_download
 echo.
 echo  Log file:
 echo  %LOG_FILE%

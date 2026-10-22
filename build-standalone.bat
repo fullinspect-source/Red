@@ -16,6 +16,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM Keep the build output out of Dropbox sync (a rebuilt bin or obj folder loses the mark)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\mark-dropbox-ignored.ps1" -Root "%~dp0." -Quiet
+
 echo.
 echo Creating ZIP on Desktop...
 set DATESTAMP=%date:~-4%-%date:~4,2%-%date:~7,2%

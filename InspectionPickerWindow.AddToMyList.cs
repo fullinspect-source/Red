@@ -142,6 +142,7 @@ namespace InspectionEditor
                 OrdersListView.UnselectAll();
             await LoadOrdersAsync();
             RefreshMyListIfShowing(inspectorFolder);
+            if (copied > 0) App.SweepMyListBackupsSoon(); // storage audit F2: a replaced My List copy leaves its old backups
 
             if (errors.Count > 0)
                 ShowOrdersMessage(string.Join(Environment.NewLine + Environment.NewLine, errors), "Add to My List", MessageBoxImage.Error);

@@ -326,6 +326,7 @@ namespace InspectionEditor
                 if (result.Outcome == MoveOutcome.Moved) moved++;
                 else if (result.Outcome != MoveOutcome.Cancelled && result.Message.Length > 0) problems.Add(result.Message);
             }
+            if (moved > 0) App.SweepMyListBackupsSoon(); // storage audit F2: old backups of reports gone from My List
             string text = FolderMoveService.Summary(moved, chosen.Count);
             if (problems.Count > 0) text += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, problems);
             MessageBox.Show(this, text, $"Move to {destCaption}", MessageBoxButton.OK, problems.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
@@ -489,6 +490,7 @@ namespace InspectionEditor
                 if (RemoveFromDeviceService.Remove(row.FilePath, root)) removed++;
                 else problems.Add($"{row.FileName} could not be removed.");
             }
+            if (removed > 0) App.SweepMyListBackupsSoon(); // storage audit F2: old backups of reports gone from My List
             string text = $"{removed} of {chosen.Count} inspections were removed.";
             if (problems.Count > 0) text += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, problems);
             MessageBox.Show(this, text, "Remove", MessageBoxButton.OK, problems.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);

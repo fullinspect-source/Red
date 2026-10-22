@@ -617,10 +617,15 @@ namespace InspectionEditor.Services
         // This also clears the editing copies that RED 2.3.x moved there. Returns how many were deleted.
         public const int SubmitBackupsRetentionDays = 30;
 
-        public static int PruneSubmitBackups(string? localRoot, DateTime now)
+        public static int PruneSubmitBackups(string? localRoot, DateTime now) =>
+            PruneSubmitBackups(localRoot, now, new CleanupTally());
+
+        // Storage audit F4: run by LocalHousekeeping at each start (also with no Inspections folder); a file another
+        // program has open is skipped.
+        public static int PruneSubmitBackups(string? localRoot, DateTime now, CleanupTally tally)
         {
             string folder = Path.Combine(localRoot ?? AppIdentity.LocalAppDataPath, SubmitBackupsFolder);
-            int deleted = 0;
+            int before = tally.Files;
             try
             {
                 if (!Directory.Exists(folder)) return 0;
@@ -628,12 +633,11 @@ namespace InspectionEditor.Services
                 foreach (var file in new DirectoryInfo(folder).GetFiles())
                 {
                     if ((file.Attributes & FileAttributes.ReparsePoint) != 0 || file.LastWriteTime >= cutoff) continue;
-                    try { file.Delete(); deleted++; }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    SafeDelete.File(file, tally);
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            return deleted;
+            return tally.Files - before;
         }
 
         private static byte[] ReadBack(string path)

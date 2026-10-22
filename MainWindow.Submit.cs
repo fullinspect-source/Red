@@ -234,6 +234,7 @@ namespace InspectionEditor
                     // F-014 S1: remember what RED submitted, for the waiting / processed / not-returned notes.
                     if (result.OutboxPath != null)
                         SubmittedTracker.Record(Path.GetFileNameWithoutExtension(result.OutboxPath), inspections, profile.Kind, DateTime.Now);
+                    App.SweepMyListBackupsSoon(); // storage audit F2: old backups of other reports gone from My List
                     foreach (var entry in _pdfSessions.Where(e => ReferenceEquals(e.Owner, _currentInspection)).ToArray())
                     {
                         try { entry.Monitor.Cleanup(); _pdfSessions.Remove(entry); } catch { }

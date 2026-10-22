@@ -185,4 +185,16 @@ try
     OrientationControlFlow.OrientationUiProbe.Run(root, Check);
     Console.WriteLine($"{passed} orientation/attachment backend checks passed");
 }
-finally { Directory.Delete(root,true); }
+finally
+{
+    // Audit S-28: the sandbox always goes; a PDF probe can hold a file for a moment, and read-only copies need their flag cleared.
+    for (int attempt = 0; attempt < 20 && Directory.Exists(root); attempt++)
+    {
+        try
+        {
+            foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal);
+            Directory.Delete(root, true);
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Thread.Sleep(100); }
+    }
+}

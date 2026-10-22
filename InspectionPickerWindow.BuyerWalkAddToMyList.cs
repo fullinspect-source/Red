@@ -86,7 +86,10 @@ namespace InspectionEditor
                 return copied;
             RefreshMyListIfShowing(profile.Folder);
             if (copied > 0)
+            {
+                App.SweepMyListBackupsSoon(); // storage audit F2: a replaced My List copy leaves its old backups
                 Alert(owner, BuyerWalkAdder.Summary(copied), MessageBoxImage.Information);
+            }
             return copied;
         }
 

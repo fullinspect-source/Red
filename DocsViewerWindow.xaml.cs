@@ -500,7 +500,9 @@ namespace InspectionEditor
         // A throwaway read-only copy under %TEMP%, so a PDF app can never save over the shared job file.
         internal static void OpenReadOnlyCopy(string filePath)
         {
-            string folder = Path.Combine(Path.GetTempPath(), "RED-JobFiles", Guid.NewGuid().ToString("N"));
+            // Storage audit F5: earlier copies more than 30 days old go first (in the background; open ones are skipped).
+            System.Threading.Tasks.Task.Run(() => LocalHousekeeping.SweepPlanCopies(DateTime.Now));
+            string folder = Path.Combine(Path.GetTempPath(), LocalHousekeeping.PlanCopiesFolderName, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(folder);
             string copy = Path.Combine(folder, Path.GetFileName(filePath));
             File.Copy(filePath, copy);

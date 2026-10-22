@@ -4,6 +4,78 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-22 — RED 2.3.9 — Storage cleanup (audit R-storage-debris-audit fixes F1-F5, F7, S-28)
+
+- **Base:** 2.3.8 (`dc43d25`). Owner-approved fixes from `Dropbox/ios-port/program/research/R-storage-debris-audit.md`;
+  release on the owner's word ("bump build and deploy after testing it comes back clean please"). Built in a private
+  copy of 2.3.7, then ported file by file into `Dropbox\P\PL` and this tree; every touched file was still identical to
+  2.3.7 there. Program: audit report (fixed-in lines), CHANGELOG and BOARD 2026-10-22, F-027 SPEC C9.
+- **Files:**
+  - New: `Services/SafeDelete.cs` (one guarded delete: exact paths given by the caller, no links, skips a file another
+    program has open by a delete-access open that reads no data), `Services/LocalHousekeeping.cs`,
+    `Services/MyListBackupCleanup.cs`, `tools/mark-dropbox-ignored.ps1`, `tests/run-harnesses.ps1`, and the harnesses
+    `tests/MyListBackupHarness`, `tests/LocalHousekeepingHarness`, `tests/CameraBackupHarness`,
+    `tests/UpdateScriptHarness`.
+  - Changed: `Services/AppUpdateService.cs`, `Services/UpdateUiCoordinator.cs` (see Behavior, F1),
+    `Services/Camera/CameraRollCopy.cs`, `Services/SubmitService.cs`
+    (`PruneSubmitBackups` overload only), `App.Housekeeping.cs`, `DocsViewerWindow.xaml.cs`,
+    `InspectionPickerWindow.{FolderViews,AddToMyList,BuyerWalkAddToMyList}.cs`, `MainWindow.Submit.cs` (one call each),
+    `scripts/update_red.bat`, `build-and-run.bat`, `build-standalone.bat`, `tests/run_pdf_attachment_verification.py`;
+    tests `AppUpdateHarness`, `SubmitHarness` (A-013-54 source check), the `AppIdentity.cs` of SaveLoss, InsRoundTrip,
+    ItemControls, ItemGroupGrid and ChecklistVisibility, `SaveLossHarness`, `InsRoundTripHarness`,
+    `OrientationPdfHarness` and `PdfCleanupHarness` (sandbox deleted in a finally, retried briefly when a virus scan
+    or Dropbox holds a file; PdfCleanup's final delete used to crash a passed run when run from PL).
+  - Version 2.3.9 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:**
+  - F1 in-app updater: the zip is deleted once unpacked; the `%TEMP%\RedUpdate\{guid}` folder is deleted when
+    preparation fails, when the installer cannot start, and by the hand-off .bat after its copy (also on a failed copy).
+    `SweepTemp` removes `{guid}` folders and the pre-2.2 `extracted`/`Red-v*.zip` more than 1 hour old and
+    `red_update_{guid}.bat` more than 1 day old, at each start and before each download. A failed preparation's
+    folder is retried for 0.5 s, then in the background for up to 30 s. `UpdateUiCoordinator.RunPreparationAsync`
+    used to dispose its deadline source right after `CancelAsync()`, which could drop the cancellation: a timed-out
+    download attempt then never stopped and kept its `.partial` (AppUpdateHarness failed about 1 run in 15). The source
+    is now disposed after the cancel has run; AppUpdateHarness 30/30, UpdateUiHarness 19/19.
+  - F2 My List: at start (after the Archive cleanup, same gates: installed RED or RED_DEV_HOUSEKEEPING=1, the Archive
+    switch on, housekeeping.json readable) and in the background after Submit, Remove, Move, Add or Buyer Walk,
+    `{report}.ins.red-save-backup-{32hex}.completed` at the top of My List is deleted when `{report}.ins` is not in My
+    List and the backup was last changed on or before the Archive cutoff (N + 1 days; 30 days when N <= 0). 200 per run.
+    Never Review, `.red-save-staging`, subfolders, unmarked or legacy backups.
+  - F3 update_red.bat: nothing written before the cancel prompt; backup = the 4 install-folder files and `userdata`,
+    plus `%LOCALAPPDATA%\RED` top-level files, `userdata` and `Signature`; the newest 3 `before-red2-*` kept (never a
+    link); the download zip and extract folder deleted after a successful install and at the start of `:fail`.
+  - F4/F5 `LocalHousekeeping.RunAtStart`, in the background at every start before the Inspections-folder check:
+    Recovery (failed-save, replaced-by-overwrite, paused-edits, job-files) 90 days, then oldest first above 1 GB (never
+    the last day); SyncBackups by folder date, MoveBackups, SubmitBackups, staging and state `.tmp` 30 days;
+    sync-sent-copies 30 days once Archive has the report, else 90; VerifiedSaves and framing-cache 90 days; the newest
+    10 INSPECT config copies; old SaveStaging and red_errors.log 30 days; `%TEMP%\RED-JobFiles` read-only plan copies
+    and `RED_PlanCheck_*.pdf` 30 days; `%TEMP%\RED-Reports` its existing 1 day; RED's own harness sandboxes in `%TEMP%`
+    30 days. A dev build cleans only its own app data unless RED_DEV_HOUSEKEEPING=1. One log line: counts and MB.
+  - F7 red-camera: 2 x Archive retention but at most 90 days (90 when N <= 0), then oldest first above 2 GB (never the
+    last day); RED's own interrupted `.RED_*.jpg.{guid}.tmp` writes in the camera roll after 1 day.
+  - Dev: `tools/mark-dropbox-ignored.ps1` re-applies `com.dropbox.ignored` to bin, obj, publish, Publish-current,
+    red-release-pre-sync-backups, work, artifacts, RedCamera.Core\bin|obj, tests\artifacts and every tests\*\bin|obj
+    (only adds the mark), called by the build scripts and the harness runners.
+  - Not done (left in the audit as open): F1 step 6 (dead MainWindow updater code), F2 steps 3-4 (unmarked/legacy
+    backups), F4 per-report trims of paused-edits and failed-save copies, `cleanup_{guid}.bat` (name not unique to RED),
+    F6, F7 steps 3-4, F8-F12.
+- **Verification:**
+  - New harnesses: MyListBackup 20, LocalHousekeeping 25, CameraBackup 12, UpdateScript 13; AppUpdate 39 (was 34).
+  - PL: builds 0 errors (28 warnings); all 49 harnesses pass (`tests/run-harnesses.ps1`). AppUpdate 30/30 runs after
+    the `UpdateUiCoordinator` fix; PdfCleanup 3/3 after its final-delete retry.
+  - This tree (before the commit): Debug build `--no-incremental` 0 errors, 28 warnings; `tests/run-harnesses.ps1`:
+    49 harnesses, all exit 0 (the 37-harness suite, CommentSnippet 53, AppUpdate 39, PdfCleanup 52, UpdateUi 19,
+    FeeToken, InspectUserType, and the 4 new ones); Python 36/46, the known 10.
+  - Isolated dev build (own app data, sandbox Inspections, TEMP and camera roll, dead proxy): every seeded item was
+    deleted or kept as intended, and the log lines have counts only.
+  - Incident during testing: an earlier dev-build start whose test profile had not been written imported INSPECT's
+    settings and ran its housekeeping on the real `Dropbox\Inspections` (200 old My List backups, 5 orphaned job
+    folders and one emptied, today's Dropbox log copy overwritten). Reported to the owner; the test script now refuses
+    to start without a sandbox profile.
+  - Not run: the corpus round trip (save code unchanged: no change to AtomicInspectionWriter, SurgicalSaveService or
+    FailedSaveRecoveryService); the packaged-exe smoke start (a release build would use the real profile and now also
+    clean it).
+- **Deployment:** pending.
+
 ### 2026-10-22 — RED 2.3.8 — RED's camera: tap to focus, right-side shutter, every camera, camera remotes (F-027 T, K, C6, C11)
 
 - **Base:** 2.3.7 (`25c58d4`). Built in `Dropbox\P\PL` by the F-027 camera session. Owner request of 2026-10-22, relayed

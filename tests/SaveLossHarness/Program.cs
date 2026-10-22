@@ -2,8 +2,12 @@ using InspectionEditor.Models;
 using InspectionEditor.Services;
 using Newtonsoft.Json.Linq;
 
-LifecycleControlFlow.LifecycleProbe.Run();
-AtomicRetryProbe.Run();
+try
+{
+    LifecycleControlFlow.LifecycleProbe.Run();
+    AtomicRetryProbe.Run();
+}
+catch { InspectionEditor.AppIdentity.DeleteSandbox(); throw; } // audit S-28: no sandbox left behind by a failed probe
 int passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception(name); Console.WriteLine("PASS " + name); passed++; }
 void Throws(Action action, string name) { try { action(); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Check(true, name); return; } throw new Exception("Expected IOException: " + name); }
@@ -67,4 +71,4 @@ try
     Check(save.FilePath == fresh && JObject.Parse(File.ReadAllText(fresh))["StatusId"]!.Value<int>() == 4, "new Save As succeeds");
     Console.WriteLine($"{passed} behavioral checks passed");
 }
-finally { Directory.Delete(dir, recursive: true); }
+finally { Directory.Delete(dir, recursive: true); InspectionEditor.AppIdentity.DeleteSandbox(); }

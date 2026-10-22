@@ -21,7 +21,7 @@ namespace InspectionEditor.Services
         internal static async Task<T> RunPreparationAsync<T>(Func<CancellationToken, Task<T>> prepare,
             TimeSpan budget, CancellationToken cancellationToken = default)
         {
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(budget);
             var token = deadline.Token;
             var task = Task.Run(() => prepare(token), token);
@@ -36,7 +36,13 @@ namespace InspectionEditor.Services
             {
                 // Observe late failures, but never wait forever for non-cooperative work.
                 Observe(task);
-                Observe(deadline.CancelAsync());
+                // The abandoned work is told to stop, and the source is disposed only once that request has run:
+                // disposing it at once could drop the request, so a stalled download never stopped and kept its
+                // partial file (storage audit F1).
+                var stopping = deadline.CancelAsync();
+                Observe(stopping);
+                _ = stopping.ContinueWith(_ => deadline.Dispose(), CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
         }
 

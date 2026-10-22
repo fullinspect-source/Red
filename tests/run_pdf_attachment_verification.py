@@ -81,7 +81,16 @@ def main():
             print('\n'.join(text.splitlines()[-20:]), flush=True)
     failures = [c['name'] for c in result['commands'] if c['exit_code']]
     print(f'Verified {len(commands)} commands; failures: {failures}; evidence: {output / "results.json"}')
+    mark_dropbox_ignored()
     return bool(failures)
+
+
+def mark_dropbox_ignored():
+    """Storage audit: the build output (work, bin, obj, ...) stays marked as ignored by Dropbox after a rebuild."""
+    script = ROOT / 'tools' / 'mark-dropbox-ignored.ps1'
+    if os.name == 'nt' and script.exists():
+        subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script),
+                        '-Root', str(ROOT), '-Quiet'], check=False)
 
 
 if __name__ == '__main__':

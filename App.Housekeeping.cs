@@ -61,18 +61,34 @@ namespace InspectionEditor
                     DiagnosticLogService.Info("Dev build: job folder purge skipped (set RED_DEV_HOUSEKEEPING=1 to run it).");
             }
             catch (Exception ex) { DiagnosticLogService.Log("Job folder purge failed", ex); }
-            // F-027 C9 (owner Q-59): RED's own backup photos in Camera Roll\red-camera older than 2 x Archive retention.
-            // Local copies only, so not behind the shared-folder gate above.
-            try { Services.Camera.CameraRollCopy.PurgeOld(DateTime.Now, InspectLiveSettings.ReadArchiveRetention(folder)); }
-            catch (Exception ex) { DiagnosticLogService.Log("Camera backup photo cleanup failed", ex); }
-            // Owner 2026-10-21: RED's local SubmitBackups folder keeps 30 days (it is outside Dropbox and RED's own).
+            // The backup-photo purge (F-027 C9) and the SubmitBackups prune now run in LocalHousekeeping at every start,
+            // also on a device with no Inspections folder (storage audit F4).
+        });
+
+        // Storage audit F2 (owner 2026-10-22): after RED takes a report out of My List (Submit, Remove, a replace by Add or
+        // Buyer Walk, a Move), the old backups of reports no longer in My List are swept again in the background, by the
+        // same rule and gate as at start. One sweep at a time; never on the caller's thread.
+        internal static void SweepMyListBackupsSoon() => Task.Run(() => SweepMyListBackups("after a report left My List", null));
+
+        private static int _myListBackupSweepRunning;
+
+        private static void SweepMyListBackups(string when, HousekeepingSettings? settings)
+        {
+            if (Interlocked.Exchange(ref _myListBackupSweepRunning, 1) == 1) return;
             try
             {
-                int removed = SubmitService.PruneSubmitBackups(null, DateTime.Now);
-                if (removed > 0) DiagnosticLogService.Info($"SubmitBackups: {removed} file(s) older than {SubmitService.SubmitBackupsRetentionDays} days deleted");
+                string? folder = InspectorProfileService.Load()?.InspectionsFolder;
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return;
+                if (!MyListBackupCleanup.Allowed(settings ?? HousekeepingSettings.Load(), ArchiveCleanupAllowed))
+                {
+                    DiagnosticLogService.Info($"My List backups ({when}): not cleaned (Archive cleanup is off for this launch).");
+                    return;
+                }
+                DiagnosticLogService.Info(MyListBackupCleanup.Describe(MyListBackupCleanup.Run(folder, DateTime.Now), when));
             }
-            catch (Exception ex) { DiagnosticLogService.Log("SubmitBackups cleanup failed", ex); }
-        });
+            catch (Exception ex) { DiagnosticLogService.Log("My List backup cleanup failed", ex); }
+            finally { Volatile.Write(ref _myListBackupSweepRunning, 0); }
+        }
 
         // F-020 R2 (owner 2026-10-20): every offline cache at each start, silently, once more 10 s later for any that
         // failed; a later sign-in refreshes the stale ones. A dev build makes no website
@@ -147,6 +163,14 @@ namespace InspectionEditor
         private static async Task RunLaunchHousekeepingAsync()
         {
             DiagnosticLogService.PruneOld(DateTime.Now); // F-019 L8: RED-only day files older than 30 days
+            // Storage audit F4/F5 (owner 2026-10-22): RED's local safety copies and temp files, in the background, on
+            // every device (also with no Inspections folder). A dev build cleans its own app data; %TEMP% only with
+            // RED_DEV_HOUSEKEEPING=1.
+            _ = Task.Run(() =>
+            {
+                try { LocalHousekeeping.RunAtStart(DateTime.Now, AppIdentity.IsDevBuild, DevHousekeepingRequested); }
+                catch (Exception ex) { DiagnosticLogService.Log("Local cleanup failed", ex); }
+            });
             if (PendingDeletesAllowed)
             {
                 try
@@ -182,6 +206,9 @@ namespace InspectionEditor
             {
                 DiagnosticLogService.Log("Archive cleanup failed", ex);
             }
+            // Storage audit F2: then the old backups of reports no longer in My List (same N + 1 days rule and gate),
+            // in the background so the lists are not held up.
+            _ = Task.Run(() => SweepMyListBackups("at start", settings));
         }
     }
 }

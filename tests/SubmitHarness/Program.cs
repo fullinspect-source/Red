@@ -440,7 +440,9 @@ static class Harness
             int pruned = SubmitService.PruneSubmitBackups(box.Local, now);
             Check("A-013-54", pruned == 1 && !File.Exists(old) && File.Exists(boundary) && File.Exists(recent) && File.Exists(nested) &&
                               SubmitService.SubmitBackupsRetentionDays == 30 &&
-                              File.ReadAllText(Path.Combine("..", "..", "App.Housekeeping.cs")).Contains("SubmitService.PruneSubmitBackups(null, DateTime.Now)"),
+                              // Storage audit F4 (2026-10-22): the prune runs in RED's start-up cleanup of local copies.
+                              File.ReadAllText(Path.Combine("..", "..", "Services", "LocalHousekeeping.cs")).Contains("SubmitService.PruneSubmitBackups(lad, now, ") &&
+                              File.ReadAllText(Path.Combine("..", "..", "App.Housekeeping.cs")).Contains("LocalHousekeeping.RunAtStart("),
                 "at each start RED deletes the files in SubmitBackups last changed more than 30 days ago (top level only); newer files and folders stay");
         }
 

@@ -1,5 +1,19 @@
 # RED 2.0 Release Notes
 
+## 2.3.9 — RED cleans up after itself: update downloads, old backups and temporary files
+
+- **Updates no longer leave copies behind.** Each update RED downloads (about 315 MB) is deleted once it is installed,
+  or once it has failed. Leftovers from earlier updates are removed when RED starts.
+- **Old backups in My List are removed.** RED keeps earlier versions of a report beside it in My List while you work.
+  Once the report has left My List (submitted, removed, replaced) and the backups are older than your Archive setting
+  plus one day, RED deletes them. Backups of reports still in My List are never touched, and nothing in Review is.
+- **RED's own safety copies and temporary files on the tablet are cleaned at start:** recovery copies after 90 days
+  (and at most 1 GB), other safety copies and temporary files (plan copies, Plan Check, print and e-mail files) after
+  30 days. Anything still open is left alone.
+- **Backup photos** in Camera Roll\red-camera are kept at most 90 days and 2 GB in total.
+- **The manual updater (update_red.bat)** backs up only your license, settings and user data (not the whole program),
+  keeps the 3 newest backups, and deletes its download when it finishes, whether it worked or not.
+
 ## 2.3.8 — RED's camera: tap to focus, shutter on the right, every camera, camera remotes
 
 - **Tap to focus and brighten:** tap the live picture and a small circle shows where you tapped. The camera focuses
