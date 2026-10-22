@@ -4,6 +4,47 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-22 — RED 2.3.8 — RED's camera: tap to focus, right-side shutter, every camera, camera remotes (F-027 T, K, C6, C11)
+
+- **Base:** 2.3.7 (`25c58d4`). Built in `Dropbox\P\PL` by the F-027 camera session. Owner request of 2026-10-22, relayed
+  by the parent session ("Red camera app should do the same ... that is a given for next update"); released as the next
+  version once vetted. The camera files were copied from PL with CRLF; before the change they were identical to this
+  tree. Program: `Dropbox/ios-port/program` F-027 SPEC §3 T, K, C6 and C11; ACCEPTANCE A-027-29 to -34 and the owner
+  checks; CHANGELOG 2026-10-22.
+- **Files:**
+  - `RedCamera.Core`: new `CameraFocus.cs` (tap mapping, region, `FocusCapabilities`, `ShutterKeyGate`); changed
+    `CameraSessionController.cs`, `WinRtCameraBackend.cs`, `CameraModels.cs`, `README.md`, and `RedCamera.Core.csproj`
+    (library 1.2.0).
+  - `CameraCaptureWindow.xaml(.cs)`.
+  - `tests/RedCameraCoreHarness`, `tests/CameraCaptureHarness`, `tests/CameraLiveCheck`.
+  - Version 2.3.8 and date 2026-10-22 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:**
+  - A tap or click on the live picture maps through the fit, rotation, mirroring and zoom crop to a frame point. The
+    camera meters an unlocked region of interest there (focus, exposure and white balance as supported), with a single
+    focus when the region drives focus. The region is held 10 s, then cleared, with continuous focus restored. A
+    crosshair fades in about 1.5 s. A camera without regions shows only the mark.
+  - The shutter (88 px) overlays the middle of the preview's right edge. Switch camera sits above it, or beside it on a
+    short preview.
+  - Switch goes through every camera Windows lists, read again at each press: frame-source colour cameras plus other
+    video devices, never infrared or depth sensors. A camera that does not start is skipped with a note. A camera is
+    remembered once it is live. An enumeration that was overtaken by a newer choice is dropped.
+  - Volume Up, Enter and Space, and the Volume Up app command, take one photo per press (no repeat, 400 ms debounce).
+  - A code review fixed five things before the release:
+    - the switch-versus-restart race;
+    - skipped cameras now come back;
+    - single focus without regions is not used;
+    - the small-window layout;
+    - the skip note is no longer overwritten.
+- **Verification:**
+  - PL: RedCameraCore 49/49, CameraCapture 12/12. The 37-harness suite passed except one TabletUi inertia check
+    (A-022-27), a timing flake under load in code not touched here; it passed 3 of 3 on rerun.
+  - Webcam 19/19: the tap's exposure region is applied and released on the real webcam, which supports exposure
+    regions without locking.
+  - In-app driver 22/22 in three runs in a row (shutter place, small window, tap mark, keys).
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged).
+  - Owner checks on the tablet: tap focus with fingers, the shutter's reach, a Bluetooth remote, a second camera.
+- **Deployment:** pending.
 ### 2026-10-21 — RED 2.3.7 — Pinch to zoom in RED's camera (F-027 Z1-Z5)
 
 - **Base:** 2.3.6 (`a196dd9`). Built in `Dropbox\P\PL` by the F-027 camera session. Released on the owner's word ("Yes.

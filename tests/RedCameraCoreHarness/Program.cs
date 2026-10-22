@@ -41,8 +41,27 @@ static class CameraHarness
         public List<double> HardwareZooms { get; } = new();
         public TaskCompletionSource<bool>? PendingZoom { get; set; }
         public bool RefuseZoom { get; set; }
+        public FocusCapabilities FocusCapabilities { get; set; } = FocusCapabilities.None;
+        public List<FocusRegion> FocusRegions { get; } = new();
+        public int FocusReleases { get; private set; }
+        public TaskCompletionSource<bool>? PendingFocus { get; set; }
+        public bool Silent { get; set; } // opens but never sends a frame
         public event Action<CameraPreviewFrame>? FrameArrived;
         public event Action<int, string>? Failed;
+
+        public Task<bool> FocusOnRegionAsync(FocusRegion region)
+        {
+            FocusRegions.Add(region);
+            var pending = PendingFocus;
+            PendingFocus = null;
+            return pending?.Task ?? Task.FromResult(true);
+        }
+
+        public Task<bool> ReleaseFocusAsync()
+        {
+            FocusReleases++;
+            return Task.FromResult(true);
+        }
 
         public Task<bool> SetHardwareZoomAsync(double factor)
         {
@@ -52,8 +71,10 @@ static class CameraHarness
             return pending?.Task ?? Task.FromResult(!RefuseZoom);
         }
 
-        public void Frame(bool black = false) =>
-            FrameArrived?.Invoke(new CameraPreviewFrame(4, 4, 16, new byte[64], black));
+        public void Frame(bool black = false)
+        {
+            if (!Silent) FrameArrived?.Invoke(new CameraPreviewFrame(16, 9, 64, new byte[576], black));
+        }
         public void Fail(int hr) => Failed?.Invoke(hr, "fake failure");
 
         public Task<CapturedStill> CaptureStillAsync(int exifOrientation, CancellationToken cancellationToken)
@@ -76,12 +97,27 @@ static class CameraHarness
         public Func<CameraInfo, int, (Plan Plan, int HResult)> PlanFor { get; set; } = (_, _) => (Plan.Stream, 0);
         public Func<CameraInfo, ZoomCapabilities?> ZoomFor { get; set; } = _ => null;
         public bool RefuseZoom { get; set; }
+        public FocusCapabilities Focus { get; set; } = FocusCapabilities.None;
+        public HashSet<string> Silent { get; } = new();
         public TaskCompletionSource<ICameraStream>? Hung { get; private set; }
+
+        /// <summary>When set, each camera list waits for its own gate (to order two enumerations by hand).</summary>
+        public bool HoldFinds { get; set; }
+        public List<TaskCompletionSource<bool>> FindGates { get; } = new();
 
         public Task<IReadOnlyList<CameraInfo>> FindCamerasAsync()
         {
             FindCalls++;
-            return Task.FromResult<IReadOnlyList<CameraInfo>>(Cameras.ToList());
+            if (!HoldFinds) return Task.FromResult<IReadOnlyList<CameraInfo>>(Cameras.ToList());
+            var gate = new TaskCompletionSource<bool>();
+            FindGates.Add(gate);
+            return AfterGate(gate);
+        }
+
+        private async Task<IReadOnlyList<CameraInfo>> AfterGate(TaskCompletionSource<bool> gate)
+        {
+            await gate.Task;
+            return Cameras.ToList();
         }
 
         public Task<ICameraStream> OpenAsync(CameraInfo camera, CancellationToken cancellationToken)
@@ -97,7 +133,10 @@ static class CameraHarness
                     Hung = new TaskCompletionSource<ICameraStream>();
                     return Hung.Task;
                 default:
-                    var stream = new FakeStream(camera, Streams.Count + 1, ZoomFor(camera)) { RefuseZoom = RefuseZoom };
+                    var stream = new FakeStream(camera, Streams.Count + 1, ZoomFor(camera))
+                    {
+                        RefuseZoom = RefuseZoom, FocusCapabilities = Focus, Silent = Silent.Contains(camera.Id),
+                    };
                     Streams.Add(stream);
                     return Task.FromResult<ICameraStream>(stream);
             }
@@ -175,6 +214,8 @@ static class CameraHarness
     private static readonly CameraInfo Back = new("cam-back", "Rear Camera", CameraPanelKind.Back, 0);
     private static readonly CameraInfo Front = new("cam-front", "Front Camera", CameraPanelKind.Front, 0);
     private static readonly CameraInfo Usb = new("cam-usb", "USB Camera", CameraPanelKind.External, 0);
+    private static readonly CameraInfo Phone = new("cam-phone", "Phone Camera", CameraPanelKind.External, 0);
+    private static readonly FocusCapabilities AllFocus = new(true, true, true, true, true, true);
 
     // ------------------------------------------------------------------ checks
 
@@ -213,6 +254,12 @@ static class CameraHarness
             await CameraOwnZoom();
             await CropFailureKeepsPhoto();
             StillMatchesPreview();
+            TapMapping();
+            TapMappingMatchesWpf();
+            await FocusHoldAndRelease();
+            await FocusFallback();
+            await CameraCycling();
+            ShutterKeys();
         }
         catch (Exception ex)
         {
@@ -1217,5 +1264,308 @@ static class CameraHarness
         thread.Join();
         Check("A-027-22", ok && error == null,
             "at 2x and 4x the cropped still shows exactly what the zoomed preview shows: " + string.Join("; ", lines) + (error == null ? string.Empty : " " + error));
+    }
+
+    // ------------------------------------------------------------------ tap to focus, cycling, shutter keys (F-027 T, C11, K)
+
+    private static bool NearPoint((double, double) a, (double, double) b, double tolerance = 1e-9) =>
+        Near(a.Item1, b.Item1, tolerance) && Near(a.Item2, b.Item2, tolerance);
+
+    private static void TapMapping()
+    {
+        // A tap at the top-left of the shown picture, for each way the picture can be turned and mirrored.
+        var rows = new (double Rotation, bool Mirror, (double, double) Source)[]
+        {
+            (0, false, (0, 0)),     // as delivered
+            (0, true, (1, 0)),      // mirrored front camera: the shown left is the frame's right
+            (90, false, (0, 1)),    // turned 90° clockwise: the frame's bottom-left is shown top-left
+            (180, false, (1, 1)),
+            (270, false, (1, 0)),
+            (90, true, (1, 1)),
+            (-90, false, (1, 0)),   // -90 is 270
+        };
+        var bad = rows.Where(r => !NearPoint(CameraFocus.DisplayToSource(0, 0, r.Rotation, r.Mirror), r.Source))
+            .Select(r => $"{r.Rotation}{(r.Mirror ? "m" : "")}").ToList();
+        bool centre = NearPoint(CameraFocus.TapToFrame(0.5, 0.5, 90, true, 4), (0.5, 0.5));
+        bool zoomed = NearPoint(CameraFocus.TapToFrame(0, 0, 0, false, 2), (0.25, 0.25))
+            && NearPoint(CameraFocus.TapToFrame(1, 1, 0, false, 4), (0.625, 0.625))
+            && NearPoint(CameraFocus.TapToFrame(0, 0, 0, true, 2), (0.75, 0.25));
+        var region = CameraFocus.RegionAround(0.5, 0.5, 1, 16.0 / 9);
+        var zoomedRegion = CameraFocus.RegionAround(0.5, 0.5, 2, 16.0 / 9);
+        var corner = CameraFocus.RegionAround(0, 1, 1, 16.0 / 9);
+        bool regions = Near(region.Height, 0.15) && Near(region.Width, 0.15 * 9 / 16) && Near(region.X + region.Width / 2, 0.5)
+            && Near(zoomedRegion.Width, region.Width / 2) && Near(zoomedRegion.Height, region.Height / 2)
+            && corner.X == 0 && Near(corner.Y + corner.Height, 1) && corner.Height > 0;
+        Check("A-027-29", bad.Count == 0 && centre && zoomed && regions,
+            "a tap on the shown picture maps to the frame through rotation, mirroring and the zoom crop; the metered region is "
+            + "15% of the visible picture's shorter side, square in pixels, smaller when zoomed, kept inside the frame"
+            + (bad.Count == 0 ? string.Empty : " (wrong: " + string.Join(", ", bad) + ")"));
+    }
+
+    /// <summary>A-027-29b: the mapping against WPF's own LayoutTransform (mirror, then rotation) in a real window.</summary>
+    private static void TapMappingMatchesWpf()
+    {
+        double worst = 0;
+        int cases = 0;
+        bool outsideRefused = true;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            System.Windows.Window? window = null;
+            try
+            {
+                var bitmap = WpfImaging.BitmapSource.Create(160, 90, 96, 96, WpfMedia.PixelFormats.Bgr32, null, Pattern(160, 90), 640);
+                var mirror = new WpfMedia.ScaleTransform(1, 1);
+                var rotation = new WpfMedia.RotateTransform(0);
+                var transform = new WpfMedia.TransformGroup();
+                transform.Children.Add(mirror);
+                transform.Children.Add(rotation);
+                var image = new System.Windows.Controls.Image { Source = bitmap, Stretch = WpfMedia.Stretch.Uniform, LayoutTransform = transform };
+                var surface = new System.Windows.Controls.Border { Width = 500, Height = 400, Background = WpfMedia.Brushes.Black, Child = image };
+                window = new System.Windows.Window
+                {
+                    Content = surface, SizeToContent = System.Windows.SizeToContent.WidthAndHeight,
+                    WindowStyle = System.Windows.WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -6000, Top = -6000,
+                };
+                window.Show();
+                foreach (double angle in new[] { 0.0, 90, 180, 270 })
+                {
+                    foreach (bool mirrored in new[] { false, true })
+                    {
+                        mirror.ScaleX = mirrored ? -1 : 1;
+                        rotation.Angle = angle;
+                        surface.UpdateLayout();
+                        Pump();
+                        var box = image.TransformToAncestor(surface).TransformBounds(new System.Windows.Rect(image.RenderSize));
+                        for (int i = 1; i < 10; i++)
+                        {
+                            for (int j = 1; j < 10; j++)
+                            {
+                                var p = new System.Windows.Point(box.X + box.Width * i / 10, box.Y + box.Height * j / 10);
+                                var local = surface.TranslatePoint(p, image); // WPF's own inverse of the layout transform
+                                double u = local.X / image.RenderSize.Width, v = local.Y / image.RenderSize.Height;
+                                if (!CameraFocus.TryMapTap(image, surface, p, angle, mirrored, 1, out double x, out double y)) { worst = double.MaxValue; continue; }
+                                worst = Math.Max(worst, Math.Max(Math.Abs(x - u), Math.Abs(y - v)));
+                                cases++;
+                            }
+                        }
+                        // The bars beside the picture are not the picture.
+                        var outside = new System.Windows.Point(box.Width < surface.ActualWidth - 2 ? box.X / 2 : box.X + box.Width / 2,
+                            box.Height < surface.ActualHeight - 2 ? box.Y / 2 : box.Y + box.Height / 2);
+                        if ((box.Width < surface.ActualWidth - 2 || box.Height < surface.ActualHeight - 2)
+                            && CameraFocus.TryMapTap(image, surface, outside, angle, mirrored, 1, out _, out _))
+                            outsideRefused = false;
+                    }
+                }
+            }
+            catch (Exception ex) { error = ex; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Check("A-027-29b", error == null && cases == 8 * 81 && worst < 0.002 && outsideRefused,
+            $"in a real WPF window, every rotation with and without mirroring maps {cases} taps exactly as WPF's own transform "
+            + $"does (largest difference {worst:0.0000}); taps on the bars beside the picture are ignored{(error == null ? "" : " " + error)}");
+    }
+
+    private static async Task FocusHoldAndRelease()
+    {
+        var rig = new Rig(Back);
+        rig.Backend.Focus = AllFocus;
+        await rig.OpenLive();
+        var stream = rig.Current!;
+        bool applied = rig.Controller.TapToFocus(0.3, 0.4) && rig.Controller.IsFocusHeld && stream.FocusRegions.Count == 1;
+        var r = stream.FocusRegions[0];
+        bool around = Near(r.X + r.Width / 2, 0.3, 1e-6) && Near(r.Y + r.Height / 2, 0.4, 1e-6);
+        await rig.Run(9.8, frames: true);
+        bool heldAt98 = stream.FocusReleases == 0 && rig.Controller.IsFocusHeld;
+        await rig.Run(0.3, frames: true);
+        bool releasedAt10 = stream.FocusReleases == 1 && !rig.Controller.IsFocusHeld;
+
+        // A new tap restarts the 10 s.
+        rig.Controller.TapToFocus(0.5, 0.5);
+        await rig.Run(5, frames: true);
+        rig.Controller.TapToFocus(0.6, 0.6);
+        await rig.Run(9.8, frames: true);
+        bool restarted = stream.FocusReleases == 1 && stream.FocusRegions.Count == 3;
+        await rig.Run(0.3, frames: true);
+        bool releasedAgain = stream.FocusReleases == 2;
+
+        // Zoomed in (digital), the region covers the same part of the screen: half the size at 2x.
+        rig.Controller.SetZoom(2);
+        rig.Controller.TapToFocus(0.5, 0.5);
+        bool smaller = Near(stream.FocusRegions[^1].Height, stream.FocusRegions[0].Height / 2, 1e-9);
+
+        // A rebuilt session ends the hold: nothing is applied again and nothing is released on the new session.
+        await rig.Run(2.1);                 // stall while held
+        await rig.Run(0.6, frames: true);   // new session
+        var next = rig.Current!;
+        await rig.Run(12, frames: true);
+        bool ended = next != stream && next.FocusRegions.Count == 0 && next.FocusReleases == 0 && !rig.Controller.IsFocusHeld;
+
+        // Not live: nothing.
+        rig.Controller.SetHold(CameraHold.Minimized, true);
+        bool notLive = !rig.Controller.TapToFocus(0.5, 0.5);
+
+        Check("A-027-30", applied && around && heldAt98 && releasedAt10 && restarted && releasedAgain && smaller && ended && notLive,
+            "a tap meters focus, exposure and white balance around the point and holds it 10 s, then the camera's own continuous "
+            + "focus and exposure return; a new tap restarts the 10 s; a zoomed tap meters a smaller area; a rebuilt session "
+            + "simply ends the hold; a tap while not live does nothing");
+    }
+
+    private static async Task FocusFallback()
+    {
+        var rig = new Rig(Back); // a camera without regions or focus control
+        await rig.OpenLive();
+        bool first = rig.Controller.TapToFocus(0.5, 0.5);
+        bool second = rig.Controller.TapToFocus(0.2, 0.2);
+        await rig.Run(12, frames: true);
+        var stream = rig.Current!;
+        int logged = rig.Log.Count(l => l.Contains("no tap focus"));
+
+        // A focus call that never answers is given up; the next tap is sent.
+        var hung = new FakeBackend { Focus = AllFocus };
+        hung.Cameras.Add(Back);
+        var now = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+        var log = new List<string>();
+        var controller = new CameraSessionController(hung, new MemoryPreferences(), () => now,
+            new CameraTimings { FocusTimeout = TimeSpan.FromMilliseconds(100) }, log.Add, work => work(), new FakeCropper());
+        await controller.OpenAsync();
+        var hs = hung.Streams.Last();
+        for (int i = 0; i < 3; i++) { now = now.AddMilliseconds(100); hs.Frame(); await controller.TickAsync(); }
+        hs.PendingFocus = new TaskCompletionSource<bool>(); // never answers
+        controller.TapToFocus(0.5, 0.5);
+        await Task.Delay(400);
+        controller.TapToFocus(0.7, 0.7);
+        bool resent = hs.FocusRegions.Count == 2 && log.Any(l => l.Contains("focus did not answer")) && controller.State == CameraState.Live;
+
+        Check("A-027-31", !first && !second && stream.FocusRegions.Count == 0 && stream.FocusReleases == 0 && logged == 1
+            && rig.Controller.State == CameraState.Live && rig.Backend.Opened.Count == 1 && resent,
+            "a camera that cannot focus or meter on a region: the tap reports false (the screen shows only its mark), nothing "
+            + "is sent, one log line, no error and no restart; a focus call that never answers is given up and the next tap is sent");
+    }
+
+    private static async Task CameraCycling()
+    {
+        var rig = new Rig(Back, Front, Usb, Phone);
+        rig.Backend.PlanFor = (camera, _) => camera.Id == Usb.Id ? (Plan.Fail, unchecked((int)0xC00DABE0)) : (Plan.Stream, 0);
+        var notices = new List<string>();
+        var switched = new List<string>();
+        rig.Controller.Notice += notices.Add;
+        rig.Controller.SwitchedTo += c => switched.Add(c.Name);
+        await rig.OpenLive();
+        var order = new List<string> { rig.Controller.CurrentCamera!.Name };
+        for (int i = 0; i < 5; i++)
+        {
+            await rig.Controller.SwitchCameraAsync();
+            await rig.Run(0.5, frames: true);
+            order.Add(rig.Controller.CurrentCamera!.Name + (rig.Controller.State == CameraState.Live ? "" : "?"));
+        }
+        // Back, Front, (USB fails) Phone, Back, Front, Phone: USB is skipped from then on.
+        bool cycled = string.Join(" > ", order) == "Rear Camera > Front Camera > Phone Camera > Rear Camera > Front Camera > Phone Camera"
+            && notices.SequenceEqual(new[] { "USB Camera did not start. Trying Phone Camera." })
+            && switched.SequenceEqual(new[] { "Front Camera", "Phone Camera", "Rear Camera", "Front Camera", "Phone Camera" })
+            && rig.Prefs.DeviceId == Phone.Id && rig.Backend.Opened.Count(c => c.Id == Usb.Id) == 1;
+
+        // A camera that opens but never sends a frame is skipped too; when every other camera fails, back to the one in use.
+        var silent = new Rig(Back, Front);
+        silent.Backend.Silent.Add(Front.Id);
+        var silentNotes = new List<string>();
+        silent.Controller.Notice += silentNotes.Add;
+        await silent.OpenLive();
+        await silent.Controller.SwitchCameraAsync();
+        await silent.Run(5.5, frames: true);
+        await silent.Run(0.5, frames: true);
+        bool backToRear = silent.Controller.CurrentCamera?.Id == Back.Id && silent.Controller.State == CameraState.Live
+            && silentNotes.SequenceEqual(new[] { "Front Camera did not start. Trying Rear Camera." }) && silent.Prefs.DeviceId == Back.Id;
+
+        // A camera plugged in while the screen is open joins the cycle, and the skipped ones are tried again.
+        rig.Backend.Cameras.Add(new CameraInfo("cam-usb2", "USB Camera 2", CameraPanelKind.External, 0));
+        rig.Backend.PlanFor = (_, _) => (Plan.Stream, 0);
+        await rig.Controller.SwitchCameraAsync(); // Phone > Rear (list order), then on round
+        await rig.Run(0.5, frames: true);
+        var seen = new List<string> { rig.Controller.CurrentCamera!.Name };
+        for (int i = 0; i < 4; i++)
+        {
+            await rig.Controller.SwitchCameraAsync();
+            await rig.Run(0.5, frames: true);
+            seen.Add(rig.Controller.CurrentCamera!.Name);
+        }
+        bool joined = seen.Contains("USB Camera 2") && seen.Contains("USB Camera");
+
+        // Only one camera: nothing happens.
+        var single = new Rig(Back);
+        await single.OpenLive();
+        await single.Controller.SwitchCameraAsync();
+        bool alone = single.Backend.Opened.Count == 1 && single.Controller.State == CameraState.Live;
+
+        // A skipped camera is tried again when every other camera was skipped, and after Try again.
+        var again = new Rig(Back, Front);
+        again.Backend.PlanFor = (camera, attempt) => camera.Id == Front.Id && attempt == 0 ? (Plan.Fail, unchecked((int)0xC00DABE0)) : (Plan.Stream, 0);
+        await again.OpenLive();
+        await again.Controller.SwitchCameraAsync();
+        await again.Run(0.5, frames: true);
+        bool firstSkipped = again.Controller.CurrentCamera?.Id == Back.Id;
+        await again.Controller.SwitchCameraAsync();
+        await again.Run(0.5, frames: true);
+        bool triedAgain = firstSkipped && again.Controller.CurrentCamera?.Id == Front.Id && again.Controller.State == CameraState.Live
+            && again.Prefs.DeviceId == Front.Id;
+
+        Check("A-027-32", cycled && backToRear && joined && alone && triedAgain,
+            $"Switch goes through every camera Windows lists ({string.Join(" > ", order)}); a camera that does not start (open "
+            + "fails or no frames) is skipped with a short note and the next one tried; the last working camera is remembered; "
+            + $"a new camera joins the cycle ({string.Join(" > ", seen)}); when every other camera was skipped a press tries them "
+            + "again; one camera: nothing happens");
+
+        // A-027-32b: a camera list that was already being read when Switch was pressed (a restart after a stall) must not
+        // open its camera over the user's choice, nor leave the switch pending.
+        var race = new Rig(Back, Front);
+        await race.OpenLive();
+        await race.Run(2.1);                         // stall: "Restarting", a retry on Back in 0.5 s
+        race.Backend.HoldFinds = true;
+        await race.Run(0.5);                         // the retry starts and waits for its camera list
+        var pressed = race.Controller.SwitchCameraAsync(); // the user presses Switch; its list waits too
+        bool twoLists = race.Backend.FindGates.Count == 2;
+        int opensBefore = race.Backend.Opened.Count;
+        race.Backend.FindGates[1].SetResult(true);   // the Switch's list arrives first: Front starts
+        await pressed;
+        race.Backend.FindGates[0].SetResult(true);   // then the old retry's list: it must not open Back
+        race.Backend.HoldFinds = false;
+        await race.Run(0.5, frames: true);
+        var opened = race.Backend.Opened.Skip(opensBefore).Select(c => c.Name).ToList();
+        bool raced = twoLists && opened.SequenceEqual(new[] { "Front Camera" }) && race.Controller.CurrentCamera?.Id == Front.Id
+            && race.Controller.State == CameraState.Live && race.Prefs.DeviceId == Front.Id;
+        await race.Controller.SwitchCameraAsync();
+        await race.Run(0.5, frames: true);
+        bool nextIsBack = race.Controller.CurrentCamera?.Id == Back.Id;
+        Check("A-027-32b", raced && nextIsBack,
+            $"a restart's camera list that arrives after Switch is dropped: only the chosen camera opens ({string.Join(", ", opened)}), "
+            + "it is remembered, and the next Switch goes on from it");
+
+        // Single focus alone focuses on the camera's own area, not the tap: not counted as tap focus.
+        bool caps = !new FocusCapabilities(false, false, false, false, true, true).Supported
+            && new FocusCapabilities(true, false, true, false, false, false) is { Supported: true, FocusOnTap: false }
+            && AllFocus.FocusOnTap;
+        Check("A-027-31b", caps,
+            "a camera with single focus but no regions only shows the mark (its focus would land on the centre, not the tap); "
+            + "exposure regions without focus meter the tap without a focus run");
+    }
+
+    private static void ShutterKeys()
+    {
+        var gate = new ShutterKeyGate();
+        bool first = gate.Press(false, 1000);
+        bool repeat = gate.Press(true, 1100);      // the key is held: auto-repeat
+        bool bounce = gate.Press(false, 1200);     // a second press 200 ms later (a remote's double signal)
+        bool later = gate.Press(false, 1500);
+        bool command = gate.Pulse(1600);           // an app command right after
+        bool commandLater = gate.Pulse(2000);
+        var wrap = new ShutterKeyGate();
+        wrap.Press(false, int.MaxValue - 100);
+        bool wrapBounce = wrap.Press(false, unchecked(int.MaxValue + 100)); // tick counter wrapped, 200 ms later
+        Check("A-027-33", first && !repeat && !bounce && later && !command && commandLater && !wrapBounce,
+            "a shutter key (Volume Up, Enter, Space) takes one photo per press: auto-repeat and a second signal within 400 ms "
+            + "take nothing, also across the tick counter wrapping");
     }
 }

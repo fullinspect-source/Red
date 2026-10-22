@@ -41,8 +41,9 @@ namespace InspectionEditor
 
     /// <summary>
     /// F-027 capture screen: holds the camera only while open and usable (C3), shows the live preview, an always-visible
-    /// shutter (C6), the "Restarting camera…" and failure texts (C5, C8), camera switching (C11), the explicit
-    /// device reset (C10) and pinch/wheel zoom with its readout (Z4, Z5). The engine (session, holds, watchdog, preview, orientation) is the RedCamera.Core library;
+    /// shutter on the right edge (C6), the "Restarting camera…" and failure texts (C5, C8), camera cycling (C11), the
+    /// explicit device reset (C10), pinch/wheel zoom with its readout (Z4, Z5), tap to focus (T1) and the hands-free
+    /// shutter keys (K1). The engine (session, holds, watchdog, preview, orientation) is the RedCamera.Core library;
     /// this window holds only RED's screen and the hand-off to the item.
     /// </summary>
     public partial class CameraCaptureWindow : Window
@@ -55,6 +56,8 @@ namespace InspectionEditor
         private readonly DispatcherTimer _timer;
         private readonly DispatcherTimer _noteTimer;
         private readonly ZoomGesture _pinch = new();
+        private readonly ShutterKeyGate _shutterKeys = new();
+        private DateTime _noticeShownAt = DateTime.MinValue;
         private readonly HashSet<int> _touchIds = new();
         private double _pinchStartZoom = 1.0;
         private bool _multiTouch, _hasLastTap;
@@ -78,6 +81,17 @@ namespace InspectionEditor
                 () => DateTime.UtcNow, log: Log);
             _controller.StateChanged += OnControllerStateChanged;
             _controller.ZoomChanged += OnZoomChanged;
+            // C11: the new camera's name, unless a note about a skipped camera (which names it) is still being read.
+            _controller.SwitchedTo += camera => OnUi(() =>
+            {
+                if (DateTime.UtcNow - _noticeShownAt > TimeSpan.FromSeconds(3)) ShowNote(camera.Name, seconds: 2.5);
+            });
+            _controller.Notice += text => OnUi(() =>
+            {
+                _noticeShownAt = DateTime.UtcNow;
+                ShowNote(text, seconds: 5);
+            });
+            PreviewArea.SizeChanged += (_, _) => PlaceSwitchButton();
             _renderer = new CameraPreviewRenderer(PreviewImage, Log);
             _controller.PreviewFrame += _renderer.Push;
             _holds = new CameraHoldWatcher(Dispatcher, (hold, on) => _controller.SetHold(hold, on), Log);
@@ -185,10 +199,12 @@ namespace InspectionEditor
             }
         }
 
-        private void OnControllerStateChanged()
+        private void OnControllerStateChanged() => OnUi(UpdateUi);
+
+        private void OnUi(Action action)
         {
-            if (Dispatcher.CheckAccess()) UpdateUi();
-            else Dispatcher.BeginInvoke((Action)UpdateUi);
+            if (Dispatcher.CheckAccess()) action();
+            else Dispatcher.BeginInvoke(action);
         }
 
         private void UpdateUi()
@@ -291,12 +307,14 @@ namespace InspectionEditor
             _controller.SetZoom(CameraZoom.AfterWheel(_controller.ZoomFactor, e.Delta, _controller.ZoomMax));
         }
 
-        // Z5: a double-click (mouse or pen) or a double-tap (touch) on the preview goes back to 1x.
+        // T1: a click (mouse or pen) focuses there; Z5: a double-click (mouse or pen) or a double-tap (touch) goes back to
+        // 1x. Touch arrives through TouchUp; a click Windows makes from a touch is ignored here so a tap counts once.
         private void PreviewSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount != 2) return;
+            if (e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Touch) return;
             e.Handled = true;
-            _controller.ResetZoom();
+            if (e.ClickCount == 2) _controller.ResetZoom();
+            else if (e.ClickCount == 1) FocusAt(e.GetPosition(PreviewSurface));
         }
 
         private void PreviewSurface_TouchDown(object? sender, TouchEventArgs e)
@@ -336,9 +354,44 @@ namespace InspectionEditor
             _hasLastTap = true;
             _lastTapAt = now;
             _lastTapPoint = point;
+            FocusAt(point); // T1: a single tap (never part of a pinch) focuses and exposes there
         }
 
         private void ZoomReadoutButton_Click(object sender, RoutedEventArgs e) => _controller.ResetZoom();
+
+        /// <summary>C6/C11: Switch camera sits above the shutter (from the XAML) when the preview is tall enough for both
+        /// (the shutter's half, a 16 px gap and the 56 px button above the centre); on a shorter preview it sits to the
+        /// shutter's left, at the same height, so it is never squeezed or over the shutter.</summary>
+        private void PlaceSwitchButton()
+        {
+            bool tall = PreviewArea.ActualHeight >= 2 * (44 + 16 + 56 + 8);
+            SwitchCameraButton.Margin = tall ? new Thickness(0, 0, 32, 176) : new Thickness(0, 0, 120, 0);
+        }
+
+        // ------------------------------------------------------------------ tap to focus (F-027 T1-T3)
+
+        /// <summary>A tap on the live picture: the camera focuses and exposes there for a while (when it can), and a mark
+        /// shows briefly at the tap either way. Taps on the bars around the picture do nothing.</summary>
+        private void FocusAt(Point onSurface)
+        {
+            if (_controller.State != CameraState.Live) return;
+            if (!CameraFocus.TryMapTap(PreviewImage, PreviewSurface, onSurface, PreviewRotation.Angle, PreviewMirror.ScaleX < 0,
+                    _controller.PreviewZoom, out double x, out double y))
+                return;
+            _controller.TapToFocus(x, y);
+            ShowFocusMark(PreviewSurface.TranslatePoint(onSurface, FocusLayer));
+        }
+
+        private void ShowFocusMark(Point at)
+        {
+            System.Windows.Controls.Canvas.SetLeft(FocusMark, at.X - FocusMark.Width / 2);
+            System.Windows.Controls.Canvas.SetTop(FocusMark, at.Y - FocusMark.Height / 2);
+            var fade = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(1500) };
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(800))));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1500))));
+            FocusMark.BeginAnimation(OpacityProperty, fade);
+        }
 
         // ------------------------------------------------------------------ shutter (F-027 C6, C7, C9)
 
@@ -410,15 +463,20 @@ namespace InspectionEditor
             }
         }
 
-        private void ShowNote(string text)
+        private void ShowNote(string text, double seconds = 4)
         {
             NoteText.Text = text;
             NoteBorder.Visibility = Visibility.Visible;
             _noteTimer.Stop();
+            _noteTimer.Interval = TimeSpan.FromSeconds(seconds);
             _noteTimer.Start();
         }
 
         // ------------------------------------------------------------------ buttons and keys
+
+        // K1 (owner 2026-10-22): Volume Up (a Bluetooth camera remote), Enter and Space take one photo per press while this
+        // window is in front. Handling the key keeps Volume Up from changing the volume here.
+        private static bool IsShutterKey(Key key) => key is Key.Space or Key.Enter or Key.VolumeUp;
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
@@ -433,11 +491,30 @@ namespace InspectionEditor
                 Close();
                 return;
             }
-            if ((e.Key == Key.Space || e.Key == Key.Enter) && FailurePanel.Visibility != Visibility.Visible)
+            if (IsShutterKey(e.Key) && FailurePanel.Visibility != Visibility.Visible)
             {
                 e.Handled = true;
-                _ = TakePhotoAsync();
+                if (_shutterKeys.Press(e.IsRepeat, e.Timestamp)) _ = TakePhotoAsync();
             }
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            (PresentationSource.FromVisual(this) as HwndSource)?.AddHook(WndProc);
+        }
+
+        private const int WmAppCommand = 0x0319, AppCommandVolumeUp = 10;
+
+        /// <summary>K1: a remote that sends the Volume Up app command (not a key) takes a photo too.</summary>
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg != WmAppCommand) return IntPtr.Zero;
+            int command = (int)((lParam.ToInt64() >> 16) & 0xFFFF) & ~0xF000;
+            if (command != AppCommandVolumeUp || FailurePanel.Visibility == Visibility.Visible) return IntPtr.Zero;
+            handled = true;
+            if (_shutterKeys.Pulse(Environment.TickCount)) _ = TakePhotoAsync();
+            return (IntPtr)1;
         }
 
         /// <summary>Dev builds only: raise the real hold handlers and stop the real frames (F-027 V2, A-027-16).</summary>

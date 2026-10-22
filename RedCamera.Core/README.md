@@ -16,6 +16,7 @@ use it, so a fix lands in both. Spec: `ios-port\program\features\F-027-reliable-
 - the explicit, elevated device reset (C10);
 - orientation (O1-O3);
 - zoom (Z1-Z3): the factor, the camera's own zoom or a digital crop of the preview and the still, and the gesture rules;
+- tap to focus and expose (T1-T3), camera cycling with skip-on-failure (C11), the shutter-key gate (K1);
 - INSPECT 2026's camera-roll location (F-023 T3);
 - a WPF preview renderer.
 
@@ -96,6 +97,27 @@ controller.ZoomChanged += () =>                                       // control
 // Double-tap, double-click or a tap on the readout: controller.ResetZoom()
 ```
 
+### Tap to focus, camera cycling, shutter keys (1.2.0)
+
+```csharp
+// A single tap or click on the preview (not part of a pinch, not the second tap of a double-tap):
+if (controller.State == CameraState.Live
+    && CameraFocus.TryMapTap(previewImage, previewSurface, pointOnSurface, rotation.Angle, mirror.ScaleX < 0,
+        controller.PreviewZoom, out double x, out double y))
+{
+    controller.TapToFocus(x, y);       // false = this camera can't; show the mark anyway
+    ShowFocusMark(pointOnSurface);     // a crosshair that fades in about 1.5 s; never takes input
+}
+// The 10 s hold and its release run in TickAsync. A new session simply ends the hold.
+
+controller.SwitchedTo += camera => ShowNote(camera.Name);  // after Switch, once the camera is live
+controller.Notice += ShowNote;                             // "USB Camera did not start. Trying Front Camera."
+await controller.SwitchCameraAsync();                      // every camera Windows lists, skipping ones that fail
+
+var keys = new ShutterKeyGate();                           // PreviewKeyDown: Space, Enter, VolumeUp
+if (keys.Press(e.IsRepeat, e.Timestamp)) await TakePhotoAsync();   // WM_APPCOMMAND volume up: keys.Pulse(tick)
+```
+
 `CaptureAsync` and `CaptureToFileAsync` crop a digital zoom's still to the region the preview shows, at the crop's own
 size. The zoom is kept through a rebuilt session and sleep/wake, and is 1x after `OpenAsync` and `SwitchCamera`. RED's
 `CameraCaptureWindow` is the reference screen (its taps are timed by the touch events' timestamps).
@@ -107,10 +129,12 @@ size. The zoom is kept through a rebuilt session and sleep/wake, and is 1x after
   - `OpenAsync`, `CloseAsync`, `SetHold(CameraHold, bool)`, `TickAsync`;
   - `CaptureAsync(exif)`, `CaptureToFileAsync(path, exif)`;
   - `SwitchCamera`, `RetryAsync`, `DebugStallAsync` (tests only);
-  - `SetZoom(factor)`, `ResetZoom()` (1.1.0).
+  - `SetZoom(factor)`, `ResetZoom()` (1.1.0);
+  - `TapToFocus(x, y)`, `SwitchCameraAsync()` (1.2.0).
 - Properties: `State`, `StatusText`, `FailureKind`, `LastHResult`, `CurrentCamera`, `Cameras`, `IsShared`, `Holds`,
   `IsCapturing`; zoom (1.1.0): `ZoomFactor`, `ZoomMin`, `ZoomMax`, `IsHardwareZoom`, `PreviewZoom`.
-- Events: `StateChanged`, `PreviewFrame`, `ZoomChanged` (1.1.0).
+- Events: `StateChanged`, `PreviewFrame`, `ZoomChanged` (1.1.0), `SwitchedTo` and `Notice` (1.2.0).
+- Properties (1.2.0): `FocusCapabilities`, `IsFocusHeld`.
 - Constructor: an optional `ICameraStillCropper` (1.1.0; default `JpegStillCropper`), for tests.
 - Static: `FailureTitle`, `FailureDetail`, `Classify(hresult)`, `PickPreferred`, and the status texts.
 
@@ -160,10 +184,25 @@ Sources: `ios-port\program\research\R-red-camera-companion.md` §3-§5, and F-02
   - INSPECT's two folder rules;
   - real FileSystemWatchers set up like INSPECT2026 and Inspect2022, which must each see a saved still once, as Created;
   - zoom (A-027-21..26): the rules, the controller with a fake cropper, and the real JPEG crop against the real WPF
-    preview in a window.
+    preview in a window;
+  - tap focus, cycling and keys (A-027-29..33): the mapping, also against WPF's own transforms in a window; the hold;
+    the fallback; skip-on-failure; the key gate.
 - `tests\CameraLiveCheck`: the real camera on this PC (A-027-16, A-027-28 zoom). Not in the automatic suite.
 
 ## Changes
+
+- 1.2.0 (2026-10-22, owner camera update, released with RED 2.3.8), added API only:
+  - tap to focus and expose (F-027 T1-T3): `CameraFocus` (`TryMapTap`, `TapToFrame`, `DisplayToSource`,
+    `SourceToFrame`, `RegionAround`), `FocusCapabilities`, `FocusRegion`; controller `TapToFocus(x, y)`,
+    `FocusCapabilities`, `IsFocusHeld`; `CameraTimings.FocusHold` (10 s) and `FocusTimeout` (3 s). The WinRT
+    stream sets an unlocked region of interest (focus, exposure, white balance as supported) and a single focus, and
+    clears them for continuous focus. `ICameraStream` gained `FocusCapabilities`, `FocusOnRegionAsync` and
+    `ReleaseFocusAsync`, with defaults;
+  - camera cycling (C11): `SwitchCameraAsync` enumerates again and goes through every camera; a camera is remembered
+    once it is live; one that does not start is skipped (`Notice`), and the screen shows the new camera's name
+    (`SwitchedTo`). The WinRT camera list now also includes video devices without a frame source group, still
+    without infrared or depth sensors;
+  - `ShutterKeyGate` (K1): one photo per key press, with no auto-repeat and a 400 ms debounce.
 
 - 1.1.1 (2026-10-21, released with RED 2.3.7): fixes from the zoom review, no API removed:
   - a call to the camera's own zoom that does not answer within `CameraTimings.ZoomTimeout` (new, 3 s) is given up, so

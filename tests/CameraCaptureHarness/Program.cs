@@ -168,6 +168,47 @@ static class CameraHarness
             "zoom: pinch, wheel and double-tap only on the preview surface (no button inside it, shutter outside); the readout "
             + "is a 44 px button that resets to 1x, as do double-click and double-tap; no popup");
 
+        // F-027 owner update 2026-10-22: the shutter overlays the middle of the preview's right edge (>= 64 px), the switch
+        // button sits above it, a tap focuses through CameraFocus with a mark that never takes input, and Volume Up, Enter and
+        // Space go through the one-photo-per-press gate (plus the Volume Up app command).
+        int area = xaml.IndexOf("x:Name=\"PreviewArea\"", StringComparison.Ordinal);
+        int areaEnd = area < 0 ? -1 : xaml.IndexOf("<Grid Grid.Row=\"2\"", area, StringComparison.Ordinal);
+        string areaBlock = areaEnd < 0 ? string.Empty : xaml[area..areaEnd];
+        int switchAt = xaml.IndexOf("x:Name=\"SwitchCameraButton\"", StringComparison.Ordinal);
+        string switchTag = switchAt < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', switchAt)..xaml.IndexOf('>', switchAt)];
+        int focusLayer = xaml.IndexOf("x:Name=\"FocusLayer\"", StringComparison.Ordinal);
+        string focusTag = focusLayer < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', focusLayer)..xaml.IndexOf('>', focusLayer)];
+        double Number(string tag, string attribute)
+        {
+            int at = tag.IndexOf(attribute + "=\"", StringComparison.Ordinal);
+            if (at < 0) return 0;
+            at += attribute.Length + 2;
+            return double.TryParse(tag[at..tag.IndexOf('"', at)], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double value) ? value : 0;
+        }
+        bool shutterRight = areaBlock.Contains("x:Name=\"ShutterButton\"") && shutterTag.Contains("HorizontalAlignment=\"Right\"")
+            && shutterTag.Contains("VerticalAlignment=\"Center\"") && Number(shutterTag, "Width") >= 64 && Number(shutterTag, "Height") >= 64;
+        // The switch button is centred on the shutter's column and lifted by its bottom margin (176 / 2 = 88) above the centre:
+        // its bottom edge (centre - 88 + 28) stays above the shutter's top (centre - 44) with a 16 px gap.
+        bool switchAbove = areaBlock.Contains("x:Name=\"SwitchCameraButton\"") && switchTag.Contains("Margin=\"0,0,32,176\"")
+            && switchTag.Contains("VerticalAlignment=\"Center\"") && Number(switchTag, "Height") == 56 && shutterTag.Contains("Margin=\"0,0,16,0\"");
+        string keysCode = code.Contains("private void Window_PreviewKeyDown(")
+            ? code[code.IndexOf("private void Window_PreviewKeyDown(", StringComparison.Ordinal)..] : string.Empty;
+        bool keys = code.Contains("Key.Space or Key.Enter or Key.VolumeUp") && keysCode.Contains("_shutterKeys.Press(e.IsRepeat, e.Timestamp)")
+            && code.Contains("AppCommandVolumeUp = 10") && code.Contains("_shutterKeys.Pulse(");
+        bool tapFocus = code.Contains("CameraFocus.TryMapTap(PreviewImage, PreviewSurface") && code.Contains("_controller.TapToFocus(x, y)")
+            && focusTag.Contains("IsHitTestVisible=\"False\"") && code.Contains("FocusAt(point)")
+            && code.Contains("TabletDeviceType.Touch") && !code.Contains("MessageBox.Show(this, \"Focus");
+        int failure = xaml.IndexOf("x:Name=\"FailurePanel\"", StringComparison.Ordinal);
+        string failureBlock = failure < 0 ? string.Empty : xaml[failure..xaml.IndexOf("</Border>", xaml.IndexOf("</ScrollViewer>", failure, StringComparison.Ordinal), StringComparison.Ordinal)];
+        bool small = code.Contains("private void PlaceSwitchButton()") && code.Contains("new Thickness(0, 0, 120, 0)")
+            && code.Contains("PreviewArea.SizeChanged += (_, _) => PlaceSwitchButton();")
+            && failureBlock.Contains("<Style TargetType=\"Button\">") && failureBlock.Contains("TextWrapping=\"Wrap\"");
+        Check("A-027-34", shutterRight && switchAbove && keys && tapFocus && small,
+            "the shutter overlays the middle of the preview's right edge (88 px) with Switch camera above it; a tap or click focuses "
+            + "through CameraFocus and shows a mark that takes no input; Volume Up, Enter and Space (and the Volume Up app command) "
+            + "take one photo per press; on a short preview Switch moves beside the shutter, and failure buttons wrap their text");
+
         // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.
         string coreFolder = Path.Combine(root, "RedCamera.Core");
         var coreSources = Directory.Exists(coreFolder)

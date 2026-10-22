@@ -18,9 +18,6 @@
         <DockPanel Grid.Row="0" Background="#1E1E1E" LastChildFill="True">
             <Button x:Name="CloseCameraButton" DockPanel.Dock="Right" Content="✕ Close" FontSize="16" MinWidth="96" MinHeight="44"
                     Margin="6" Padding="12,4" Click="CloseCameraButton_Click" AutomationProperties.AutomationId="CloseCameraButton"/>
-            <Button x:Name="SwitchCameraButton" DockPanel.Dock="Right" Content="🔄 Switch camera" FontSize="16" MinHeight="44"
-                    Margin="6" Padding="12,4" Click="SwitchCameraButton_Click" Visibility="Collapsed"
-                    AutomationProperties.AutomationId="SwitchCameraButton"/>
             <StackPanel VerticalAlignment="Center" Margin="12,6">
                 <TextBlock x:Name="TargetText" Foreground="White" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                            AutomationProperties.AutomationId="CameraTargetText"/>
@@ -28,9 +25,10 @@
             </StackPanel>
         </DockPanel>
 
-        <Grid Grid.Row="1" Background="Black" ClipToBounds="True">
-            <!-- F-027 Z4: pinch, mouse wheel and double-tap zoom on the whole preview area. Only this surface takes the
-                 touch manipulation, so the buttons on top (readout, failure panel) keep ordinary taps. -->
+        <Grid x:Name="PreviewArea" Grid.Row="1" Background="Black" ClipToBounds="True">
+            <!-- F-027 Z4/T1: pinch, mouse wheel, tap to focus and double-tap zoom reset on the whole preview area. Only this
+                 surface takes the touch manipulation, so the buttons on top (shutter, switch, readout, failure panel) keep
+                 ordinary taps. -->
             <Border x:Name="PreviewSurface" Background="Transparent" IsManipulationEnabled="True"
                     ManipulationStarting="PreviewSurface_ManipulationStarting" ManipulationDelta="PreviewSurface_ManipulationDelta"
                     ManipulationCompleted="PreviewSurface_ManipulationCompleted" MouseWheel="PreviewSurface_MouseWheel"
@@ -46,6 +44,18 @@
                 </Image>
             </Border>
             <Border x:Name="FlashOverlay" Background="White" Opacity="0" IsHitTestVisible="False"/>
+
+            <!-- F-027 T1: the mark at a tap, shown briefly while the camera focuses and exposes there. -->
+            <Canvas x:Name="FocusLayer" IsHitTestVisible="False">
+                <Grid x:Name="FocusMark" Width="76" Height="76" Opacity="0" AutomationProperties.AutomationId="FocusMark">
+                    <Ellipse Stroke="#99000000" StrokeThickness="5"/>
+                    <Ellipse Stroke="White" StrokeThickness="2"/>
+                    <Line X1="38" Y1="0" X2="38" Y2="14" Stroke="White" StrokeThickness="2"/>
+                    <Line X1="38" Y1="62" X2="38" Y2="76" Stroke="White" StrokeThickness="2"/>
+                    <Line X1="0" Y1="38" X2="14" Y2="38" Stroke="White" StrokeThickness="2"/>
+                    <Line X1="62" Y1="38" X2="76" Y2="38" Stroke="White" StrokeThickness="2"/>
+                </Grid>
+            </Canvas>
 
             <!-- F-027 Z5: the zoom while zoomed in; a tap goes back to 1x. -->
             <Button x:Name="ZoomReadoutButton" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12,0,0"
@@ -68,14 +78,27 @@
                 </Button.Template>
             </Button>
 
-            <Border x:Name="StatusOverlay" Background="#B0000000" CornerRadius="8" Padding="22,14"
+            <Border x:Name="StatusOverlay" Background="#B0000000" CornerRadius="8" Padding="22,14" Margin="16,0,120,0"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
                 <TextBlock x:Name="StatusText" Foreground="White" FontSize="22" TextAlignment="Center" TextWrapping="Wrap"
                            AutomationProperties.AutomationId="CameraStatusText"/>
             </Border>
 
             <Border x:Name="FailurePanel" Background="#F2202020" Visibility="Collapsed" Padding="24">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalAlignment="Center">
+                <Border.Resources>
+                    <!-- Button text wraps, so a narrow window (360 px) never cuts a button off. -->
+                    <Style TargetType="Button">
+                        <Setter Property="ContentTemplate">
+                            <Setter.Value>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                </DataTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Border.Resources>
+                <!-- The right margin keeps the buttons clear of the shutter on the right edge. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalAlignment="Center" Margin="0,0,104,0">
                     <StackPanel MaxWidth="560">
                         <TextBlock x:Name="FailureTitleText" Foreground="White" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"
                                    Margin="0,0,0,10" AutomationProperties.AutomationId="CameraFailureTitle"/>
@@ -105,22 +128,35 @@
             <TextBlock x:Name="DevHintText" Foreground="#80FFFFFF" FontSize="11" Margin="8" HorizontalAlignment="Left"
                        VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"
                        Text="Dev: Ctrl+Shift+F5 suspend/resume · F6 display off/on · F7 lock/unlock · F8 stall"/>
-        </Grid>
 
-        <Grid Grid.Row="2" Background="#1E1E1E" MinHeight="108">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0">
-                <Border Width="72" Height="72" Background="#2A2A2A" CornerRadius="4" ClipToBounds="True">
-                    <Image x:Name="LastPhotoImage" Stretch="UniformToFill"/>
-                </Border>
-                <TextBlock x:Name="CountText" Foreground="White" FontSize="15" VerticalAlignment="Center" Margin="10,0,0,0"
-                           AutomationProperties.AutomationId="CameraCountText"/>
-            </StackPanel>
-            <Button x:Name="ShutterButton" Panel.ZIndex="100" Width="88" Height="88" HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Margin="0,10" Click="ShutterButton_Click" Focusable="False" Cursor="Hand"
-                    AutomationProperties.AutomationId="ShutterButton" AutomationProperties.Name="Take photo" ToolTip="Take photo (Space)">
+            <!-- F-027 C11: switch camera, on the right edge just above the shutter, never over it. -->
+            <Button x:Name="SwitchCameraButton" Panel.ZIndex="100" Width="56" Height="56" HorizontalAlignment="Right"
+                    VerticalAlignment="Center" Margin="0,0,32,176" Click="SwitchCameraButton_Click" Visibility="Collapsed"
+                    Focusable="False" Cursor="Hand" AutomationProperties.AutomationId="SwitchCameraButton"
+                    AutomationProperties.Name="Switch camera">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Round" Background="#B0000000" BorderBrush="#80FFFFFF" BorderThickness="1" CornerRadius="28">
+                            <TextBlock Text="🔄" FontSize="24" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Round" Property="Background" Value="#E0303030"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
+            <!-- F-027 C6 (owner 2026-10-22): the shutter overlays the middle of the right edge, like the Windows Camera app,
+                 within thumb reach on a tablet; above every overlay, never hidden or disabled. -->
+            <Button x:Name="ShutterButton" Panel.ZIndex="100" Width="88" Height="88" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Margin="0,0,16,0" Click="ShutterButton_Click" Focusable="False" Cursor="Hand"
+                    AutomationProperties.AutomationId="ShutterButton" AutomationProperties.Name="Take photo">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Grid>
+                            <Ellipse Fill="#40000000"/>
                             <Ellipse x:Name="Ring" Stroke="White" StrokeThickness="5" Fill="Transparent"/>
                             <Ellipse x:Name="Core" Margin="10" Fill="White"/>
                         </Grid>
@@ -133,6 +169,16 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
+        </Grid>
+
+        <Grid Grid.Row="2" Background="#1E1E1E" MinHeight="88">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,8">
+                <Border Width="72" Height="72" Background="#2A2A2A" CornerRadius="4" ClipToBounds="True">
+                    <Image x:Name="LastPhotoImage" Stretch="UniformToFill"/>
+                </Border>
+                <TextBlock x:Name="CountText" Foreground="White" FontSize="15" VerticalAlignment="Center" Margin="10,0,0,0"
+                           AutomationProperties.AutomationId="CameraCountText"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

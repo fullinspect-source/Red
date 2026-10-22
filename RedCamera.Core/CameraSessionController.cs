@@ -9,7 +9,8 @@ namespace RedCamera.Core
     /// <summary>
     /// F-027 capture session: owns the camera only while the capture screen is open and not held (C3), opens sessions
     /// (C4), watches the preview frames and rebuilds a dead session with bounded retries (C5), gates the shutter (C6),
-    /// remembers the camera choice (C11) and keeps the zoom (Z1-Z3). It holds no WinRT types so
+    /// remembers and cycles the camera choice (C11), keeps the zoom (Z1-Z3) and holds a tap's focus and exposure
+    /// (T1-T3). It holds no WinRT types so
     /// tests\RedCameraCoreHarness can drive it with a fake camera, clock and cropper.
     /// Threading: every public member except the frame path is called on one thread (the capture window's UI thread),
     /// and <see cref="TickAsync"/> runs about every 250 ms. Frames and failures arrive on worker threads; they only
@@ -73,6 +74,25 @@ namespace RedCamera.Core
         private double _zoomApplied;
         private bool _zoomPushing;
 
+        // F-027 T1-T3: a tap's focus and exposure region, held until _focusHeldUntil. A released session simply ends the
+        // hold: nothing is applied again to the next one.
+        private FocusCapabilities _focusCaps = FocusCapabilities.None;
+        private DateTime? _focusHeldUntil;
+        private FocusRegion? _focusWanted; // null = the camera's own focus and exposure
+        private int _focusWantedVersion, _focusAppliedVersion;
+        private bool _focusPushing, _focusFallbackLogged;
+        private int _frameWidth, _frameHeight;
+
+        // F-027 C11 cycling: the camera the user switched to, until it is live (then it is remembered). A camera that does
+        // not start is skipped for this screen until the camera list changes.
+        private CameraInfo? _switchTarget;
+        private readonly HashSet<string> _skipped = new(StringComparer.OrdinalIgnoreCase);
+
+        // Raised by every user or system decision about which session should run (open, close, holds, Try again,
+        // Switch). An enumeration that was already running when one came in drops its result instead of opening an
+        // outdated camera over the newer choice.
+        private int _intent;
+
         private sealed record PendingFailure(int Generation, int HResult, string Reason);
 
         public CameraSessionController(ICameraBackend backend, ICameraPreferences preferences, Func<DateTime> clock,
@@ -122,6 +142,19 @@ namespace RedCamera.Core
         /// <summary>Raised on the controller's thread when <see cref="ZoomFactor"/>, <see cref="ZoomMax"/> or
         /// <see cref="PreviewZoom"/> may have changed.</summary>
         public event Action? ZoomChanged;
+
+        /// <summary>F-027 T1: what the open session's camera can do with a tap.</summary>
+        public FocusCapabilities FocusCapabilities => _focusCaps;
+
+        /// <summary>F-027 T3: true while a tap's focus and exposure are held.</summary>
+        public bool IsFocusHeld => _focusHeldUntil != null;
+
+        /// <summary>F-027 C11: raised on the controller's thread when a camera the user switched to is live (show its
+        /// name).</summary>
+        public event Action<CameraInfo>? SwitchedTo;
+
+        /// <summary>F-027 C11: a short note for the screen, for example "USB Camera did not start. Trying Front Camera."</summary>
+        public event Action<string>? Notice;
 
         public string StatusText => State switch
         {
@@ -185,7 +218,10 @@ namespace RedCamera.Core
         {
             if (_open) return;
             _open = true;
+            _intent++;
             _recoveries.Clear();
+            _skipped.Clear();
+            _switchTarget = null;
             _log("Camera screen opened.");
             SetZoomFactor(1.0); // Z3: every opening starts at 1x
             if (_holds.Count > 0) { SetState(CameraState.Paused); return; }
@@ -197,6 +233,8 @@ namespace RedCamera.Core
         {
             if (!_open) return _lastDispose;
             _open = false;
+            _intent++;
+            _switchTarget = null;
             ClearSchedule();
             _retryQueue = null;
             ReleaseStream("screen closed");
@@ -210,6 +248,7 @@ namespace RedCamera.Core
         {
             bool changed = on ? _holds.Add(hold) : _holds.Remove(hold);
             if (!changed) return;
+            _intent++;
             _log($"Camera hold {hold} {(on ? "on" : "off")}.");
             if (!_open) return;
             if (on)
@@ -235,22 +274,49 @@ namespace RedCamera.Core
         public async Task RetryAsync()
         {
             if (!_open) return;
+            _intent++;
             _recoveries.Clear();
             _retryQueue = null;
+            _switchTarget = null;
+            _skipped.Clear(); // Try again tries every camera again
             ClearSchedule();
             ReleaseStream("try again");
             if (_holds.Count > 0) { SetState(CameraState.Paused); return; }
             await BeginFreshAsync(recovering: false);
         }
 
-        /// <summary>F-027 C11: the next camera in the list, remembered at once.</summary>
-        public void SwitchCamera()
+        /// <summary>F-027 C11: the next camera Windows lists (front, back, USB, phone...), enumerated again first.</summary>
+        public void SwitchCamera() => _ = SwitchCameraAsync();
+
+        /// <summary>
+        /// F-027 C11: switch to the next camera in Windows' list, after enumerating again (a USB or phone camera may have
+        /// come or gone). It is remembered once it is live (<see cref="SwitchedTo"/>). One that does not start is skipped
+        /// with a <see cref="Notice"/> and the next one is tried; a second press during a switch moves on from the camera
+        /// being tried.
+        /// </summary>
+        public async Task SwitchCameraAsync()
         {
-            if (!_open || _cameras.Count < 2) return;
-            int index = _current == null ? -1 : IndexOf(_current);
-            var next = _cameras[(index + 1) % _cameras.Count];
-            _preferences.Remember(next);
+            if (!_open) return;
+            int intent = ++_intent;
+            var cameras = await FindCamerasSafeAsync();
+            if (!_open || intent != _intent) return; // another press, a hold or Close came first
+            if (cameras is { Count: > 0 })
+            {
+                if (!cameras.Select(c => c.Id).OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                        .SequenceEqual(_cameras.Select(c => c.Id).OrderBy(id => id, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+                    _skipped.Clear(); // the camera list changed: try every camera again
+                _cameras = cameras;
+            }
+            var from = _switchTarget ?? _current;
+            var next = from == null ? _cameras.FirstOrDefault(c => !_skipped.Contains(c.Id)) : NextCamera(from);
+            if (next == null && _skipped.Count > 0)
+            {
+                _skipped.Clear(); // every other camera was skipped: a press tries them again
+                next = from == null ? _cameras.FirstOrDefault() : NextCamera(from);
+            }
+            if (next == null) return; // only one camera
             _log($"Camera switched to {Describe(next)}.");
+            _switchTarget = next;
             _retryQueue = null;
             _recoveries.Clear();
             ClearSchedule();
@@ -259,6 +325,117 @@ namespace RedCamera.Core
             SetZoomFactor(1.0); // Z3: another camera starts at 1x
             if (_holds.Count > 0) { SetState(CameraState.Paused); return; }
             StartAttempt(next, recovering: false);
+        }
+
+        /// <summary>The camera after <paramref name="from"/> in the list, wrapping round, skipping cameras that did not
+        /// start; null when there is no other.</summary>
+        private CameraInfo? NextCamera(CameraInfo from)
+        {
+            int count = _cameras.Count;
+            int start = IndexOf(from);
+            for (int step = 1; step <= count; step++)
+            {
+                var camera = _cameras[(start + step + count) % count];
+                if (SameCamera(camera, from) || _skipped.Contains(camera.Id)) continue;
+                return camera;
+            }
+            return null;
+        }
+
+        /// <summary>A camera the user switched to did not start: note it, skip it and try the next (C11).</summary>
+        private bool SkipFailedSwitch(CameraInfo failed)
+        {
+            _skipped.Add(failed.Id);
+            var next = NextCamera(failed);
+            _log($"Camera switch: {Describe(failed)} did not start; {(next == null ? "no other camera to try" : "trying " + Describe(next))}.");
+            Notice?.Invoke(next == null ? $"{failed.Name} did not start." : $"{failed.Name} did not start. Trying {next.Name}.");
+            if (next == null)
+            {
+                _switchTarget = null;
+                return false;
+            }
+            _switchTarget = next;
+            _retryQueue = null;
+            ClearSchedule();
+            _current = next;
+            StartAttempt(next, recovering: false);
+            return true;
+        }
+
+        private static bool SameCamera(CameraInfo a, CameraInfo b) => string.Equals(a.Id, b.Id, StringComparison.OrdinalIgnoreCase);
+
+        // ------------------------------------------------------------------ tap to focus (F-027 T1-T3)
+
+        /// <summary>
+        /// F-027 T1: meter focus and exposure on the area around a point of the full frame (0..1; from
+        /// <see cref="CameraFocus.TryMapTap"/>) and hold it for <see cref="CameraTimings.FocusHold"/>; a new tap starts the
+        /// hold again. False when the camera is not live or cannot do it: the screen then only shows its mark. Never an
+        /// error or a camera failure.
+        /// </summary>
+        public bool TapToFocus(double x, double y)
+        {
+            if (State != CameraState.Live || _stream == null) return false;
+            if (!_focusCaps.Supported)
+            {
+                if (!_focusFallbackLogged) _log("Camera has no tap focus or exposure control; a tap only shows the mark.");
+                _focusFallbackLogged = true;
+                return false;
+            }
+            int w = Volatile.Read(ref _frameWidth), h = Volatile.Read(ref _frameHeight);
+            var region = CameraFocus.RegionAround(Math.Clamp(x, 0, 1), Math.Clamp(y, 0, 1), PreviewZoom,
+                w > 0 && h > 0 ? (double)w / h : 16.0 / 9.0);
+            _focusHeldUntil = _clock() + _timings.FocusHold;
+            _focusWanted = region;
+            _focusWantedVersion++;
+            _log($"Camera tap focus at ({x:0.00}, {y:0.00}), held {_timings.FocusHold.TotalSeconds:0} s.");
+            _ = PushFocusAsync();
+            return true;
+        }
+
+        /// <summary>Ends a hold without asking the camera for anything (its session is gone).</summary>
+        private void EndFocusHold()
+        {
+            _focusHeldUntil = null;
+            _focusWanted = null;
+            _focusAppliedVersion = ++_focusWantedVersion;
+        }
+
+        /// <summary>Sends the newest focus request (a region, or the release) to the camera, one call at a time.</summary>
+        private async Task PushFocusAsync()
+        {
+            if (_focusPushing) return;
+            _focusPushing = true;
+            try
+            {
+                while (true)
+                {
+                    var stream = _stream;
+                    int version = _focusWantedVersion;
+                    if (stream == null || version == _focusAppliedVersion) return;
+                    var region = _focusWanted;
+                    bool ok;
+                    try
+                    {
+                        var call = region is { } r ? stream.FocusOnRegionAsync(r) : stream.ReleaseFocusAsync();
+                        if (await Task.WhenAny(call, Task.Delay(_timings.FocusTimeout)) != call)
+                        {
+                            _ = call.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                            _log("Camera focus did not answer; the next tap is sent again.");
+                            if (ReferenceEquals(stream, _stream) && version == _focusWantedVersion) _focusAppliedVersion = version;
+                            continue;
+                        }
+                        ok = await call;
+                    }
+                    catch (Exception) { ok = false; }
+                    if (!ReferenceEquals(stream, _stream)) continue; // released meanwhile: its hold ended with it
+                    if (version == _focusWantedVersion) _focusAppliedVersion = version;
+                    if (!ok) _log(region != null ? "Camera did not take the tap focus." : "Camera did not go back to its own focus.");
+                }
+            }
+            finally
+            {
+                _focusPushing = false;
+            }
         }
 
         // ------------------------------------------------------------------ zoom (F-027 Z1-Z3)
@@ -354,6 +531,8 @@ namespace RedCamera.Core
         {
             if (generation != Volatile.Read(ref _generation)) return;
             long now = _clock().Ticks;
+            Volatile.Write(ref _frameWidth, frame.Width);
+            Volatile.Write(ref _frameHeight, frame.Height);
             Interlocked.Exchange(ref _lastFrameTicks, now);
             if (!frame.AllBlack) Interlocked.Exchange(ref _lastNonBlackTicks, now);
             else Interlocked.CompareExchange(ref _lastNonBlackTicks, now, 0); // start of a black run
@@ -424,12 +603,33 @@ namespace RedCamera.Core
                             _liveSince = now;
                             _log($"Camera live: {Describe(_current)}{(IsShared ? " (shared)" : string.Empty)}.");
                             SetState(CameraState.Live);
+                            if (_switchTarget is { } target && _current != null)
+                            {
+                                // C11: a camera the user switched to is remembered once it works; another camera going
+                                // live ends the switch.
+                                _switchTarget = null;
+                                if (SameCamera(_current, target))
+                                {
+                                    _preferences.Remember(_current);
+                                    SwitchedTo?.Invoke(_current);
+                                }
+                            }
                         }
                         else if (_retryQueue != null && now - _liveSince >= _timings.HealthyReset)
                         {
                             _retryQueue = null; // F-027 C5: healthy for 30 s resets the attempts
                         }
                     }
+                }
+
+                if (_focusHeldUntil is { } until && now >= until)
+                {
+                    // T3: the hold ends; the camera goes back to its own continuous focus and exposure.
+                    _focusHeldUntil = null;
+                    _focusWanted = null;
+                    _focusWantedVersion++;
+                    _log("Camera tap focus released.");
+                    _ = PushFocusAsync();
                 }
 
                 if (_scheduledAt is { } at && now >= at && _holds.Count == 0)
@@ -550,8 +750,9 @@ namespace RedCamera.Core
         private async Task BeginFreshAsync(bool recovering)
         {
             SetState(recovering ? CameraState.Restarting : CameraState.Starting);
+            int intent = _intent;
             var cameras = await FindCamerasSafeAsync();
-            if (!_open || _holds.Count > 0) return;
+            if (!_open || _holds.Count > 0 || intent != _intent) return;
             if (cameras == null)
             {
                 LastHResult = TimeoutCode;
@@ -559,7 +760,9 @@ namespace RedCamera.Core
                 return;
             }
             _cameras = cameras;
-            var pick = PickPreferred(cameras, _preferences.DeviceId, _preferences.Panel);
+            // A switch the user started (C11) is not remembered until it works, so it wins over the remembered camera.
+            var pick = (_switchTarget is { } target ? cameras.FirstOrDefault(c => SameCamera(c, target)) : null)
+                ?? PickPreferred(cameras, _preferences.DeviceId, _preferences.Panel);
             if (pick == null)
             {
                 GiveUp(CameraFailureKind.NoCamera, "no camera found");
@@ -572,8 +775,9 @@ namespace RedCamera.Core
         private async Task RunScheduledAttemptAsync(CameraInfo queued, bool recovering)
         {
             // The camera may have been re-enumerated (F-027 C3): resolve the queued one again by id, then by panel and name.
+            int intent = _intent;
             var cameras = await FindCamerasSafeAsync();
-            if (!_open || _holds.Count > 0) return;
+            if (!_open || _holds.Count > 0 || intent != _intent) return; // e.g. the user pressed Switch meanwhile
             CameraInfo target = queued;
             if (cameras is { Count: > 0 })
             {
@@ -655,6 +859,9 @@ namespace RedCamera.Core
             stream.Failed += (hr, reason) => OnStreamFailed(generation, hr, reason);
             _log($"Camera opened {Describe(camera)}{(stream.Shared ? " in shared mode" : string.Empty)}.");
             ApplyZoomToSession(stream);
+            try { _focusCaps = stream.FocusCapabilities ?? FocusCapabilities.None; }
+            catch (Exception) { _focusCaps = FocusCapabilities.None; }
+            _focusFallbackLogged = false;
             StateChanged?.Invoke();
         }
 
@@ -666,6 +873,10 @@ namespace RedCamera.Core
             _log($"Camera failure ({kind}, 0x{hresult:X8}): {reason}.");
             ReleaseStream(reason);
             if (!_open || _holds.Count > 0) return;
+
+            // C11: a camera the user switched to that does not start is skipped, whatever the cause.
+            if (_switchTarget is { } target && failedCamera != null && SameCamera(failedCamera, target) && SkipFailedSwitch(failedCamera))
+                return;
 
             if (kind is CameraFailureKind.AccessDenied or CameraFailureKind.Blocked)
             {
@@ -721,6 +932,8 @@ namespace RedCamera.Core
             var stream = _stream;
             _stream = null;
             ResetFrameStats();
+            EndFocusHold(); // T3: a new session starts with the camera's own focus and exposure
+            _focusCaps = FocusCapabilities.None;
             if (stream != null)
             {
                 _log($"Camera released ({reason}).");

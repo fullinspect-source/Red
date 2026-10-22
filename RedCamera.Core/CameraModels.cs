@@ -62,6 +62,16 @@ namespace RedCamera.Core
         /// <summary>F-027 Z1: sets the camera's own zoom; called only when <see cref="ZoomCapabilities"/> is hardware.
         /// False when the camera refused it (the engine then zooms digitally).</summary>
         Task<bool> SetHardwareZoomAsync(double factor) => Task.FromResult(false);
+
+        /// <summary>F-027 T1: what the camera can do with a tap (read once the session is open).</summary>
+        FocusCapabilities FocusCapabilities => FocusCapabilities.None;
+
+        /// <summary>F-027 T1: meter focus, exposure and white balance on <paramref name="region"/> and focus once there.
+        /// False when the camera did none of it.</summary>
+        Task<bool> FocusOnRegionAsync(FocusRegion region) => Task.FromResult(false);
+
+        /// <summary>F-027 T3: clear the region and go back to continuous auto-focus and auto-exposure.</summary>
+        Task<bool> ReleaseFocusAsync() => Task.FromResult(false);
     }
 
     /// <summary>The remembered camera (F-027 C11).</summary>
@@ -83,6 +93,10 @@ namespace RedCamera.Core
         public TimeSpan CaptureTimeout { get; init; } = TimeSpan.FromSeconds(8);
         /// <summary>F-027 Z1: how long one call to the camera's own zoom may take before RED stops waiting for it.</summary>
         public TimeSpan ZoomTimeout { get; init; } = TimeSpan.FromSeconds(3);
+        /// <summary>F-027 T3: how long a tap's focus and exposure are held before the camera goes back to its own.</summary>
+        public TimeSpan FocusHold { get; init; } = TimeSpan.FromSeconds(10);
+        /// <summary>F-027 T1: how long one focus call may take before RED stops waiting for it.</summary>
+        public TimeSpan FocusTimeout { get; init; } = TimeSpan.FromSeconds(3);
         public TimeSpan[] SameCameraRetryDelays { get; init; } =
             { TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(3) };
         public TimeSpan OtherCameraDelay { get; init; } = TimeSpan.FromSeconds(0.5);

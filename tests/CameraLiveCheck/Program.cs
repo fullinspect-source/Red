@@ -62,7 +62,9 @@ static class LiveCheck
         foreach (var c in cameras) Console.WriteLine($"  {c.Name} panel={c.Panel} mount={c.MountRotationClockwise}");
         if (cameras.Count == 0) { Console.WriteLine("SKIP no camera"); return 3; }
 
-        var controller = new CameraSessionController(backend, new MemoryPreferences(), () => DateTime.UtcNow, log: Write);
+        // A 2 s tap-focus hold (instead of 10 s) keeps L18 short; every other timing is the real one.
+        var controller = new CameraSessionController(backend, new MemoryPreferences(), () => DateTime.UtcNow,
+            new CameraTimings { FocusHold = TimeSpan.FromSeconds(2) }, log: Write);
         int frames = 0;
         controller.PreviewFrame += _ => Interlocked.Increment(ref frames);
         controller.PreviewFrame += frame =>
@@ -190,6 +192,29 @@ static class LiveCheck
         bool kept = controller.ZoomFactor == 2;
         var (z2Again, z2AgainInfo) = await ZoomShot(2);
         Check("L15", rebuilt && kept && z2Again, "after a rebuilt session the zoom is still 2x and applies to the next still: " + z2AgainInfo);
+
+        // F-027 C11: every camera Windows lists, once each (no infrared or depth sensor).
+        var ids = cameras.Select(c => c.Id).ToList();
+        Check("L17", ids.Count == ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() && cameras.Count >= 1,
+            $"camera list: {string.Join(", ", cameras.Select(c => $"{c.Name} ({c.Panel})"))}");
+
+        // F-027 T1-T3 on the real camera: a tap meters there (when the camera can), the hold ends by itself, the camera
+        // stays live and a still still works.
+        var focusCaps = controller.FocusCapabilities;
+        bool tapped = controller.TapToFocus(0.3, 0.6);
+        bool heldNow = controller.IsFocusHeld;
+        frames = 0;
+        await TickUntil(() => false, 2.6);
+        bool releasedHold = !controller.IsFocusHeld;
+        bool stillLive = controller.State == CameraState.Live && frames >= 20;
+        var afterFocus = await controller.CaptureAsync(1);
+        bool logged;
+        lock (Log) logged = focusCaps.Supported
+            ? Log.Any(l => l.Contains("tap focus at")) && Log.Any(l => l.Contains("tap focus released")) && !Log.Any(l => l.Contains("focus region not set"))
+            : Log.Any(l => l.Contains("no tap focus"));
+        Check("L18", tapped == focusCaps.Supported && heldNow == focusCaps.Supported && releasedHold && stillLive && afterFocus.Still != null && logged,
+            $"tap focus on this camera: {(focusCaps.Supported ? "applied" : "not supported, mark only")} ({focusCaps}); hold ended after 2 s; "
+            + "live throughout and a still afterwards");
 
         controller.SetZoom(3);
         await controller.CloseAsync();

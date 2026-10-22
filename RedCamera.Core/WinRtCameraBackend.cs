@@ -44,22 +44,25 @@ namespace RedCamera.Core
         {
             var cameras = new List<CameraInfo>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sensorsOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             // Colour sources only (F-027 C11: infrared and depth sensors are never offered).
             foreach (var group in await MediaFrameSourceGroup.FindAllAsync())
             {
                 foreach (var info in group.SourceInfos)
                 {
-                    if (info.SourceKind != MediaFrameSourceKind.Color) continue;
-                    if (info.MediaStreamType != MediaStreamType.VideoPreview && info.MediaStreamType != MediaStreamType.VideoRecord) continue;
                     var device = info.DeviceInformation;
-                    if (device == null || !seen.Add(device.Id)) continue;
-                    cameras.Add(ToCameraInfo(device));
+                    if (device == null) continue;
+                    bool colour = info.SourceKind == MediaFrameSourceKind.Color
+                        && (info.MediaStreamType == MediaStreamType.VideoPreview || info.MediaStreamType == MediaStreamType.VideoRecord);
+                    if (!colour) { sensorsOnly.Add(device.Id); continue; }
+                    if (seen.Add(device.Id)) cameras.Add(ToCameraInfo(device));
                 }
             }
-            if (cameras.Count == 0)
+            // Every other camera Windows lists (C11 cycling: some USB and phone cameras show no frame source group), except
+            // the infrared and depth sensors found above.
+            foreach (var device in await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture))
             {
-                foreach (var device in await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture))
-                    if (seen.Add(device.Id)) cameras.Add(ToCameraInfo(device));
+                if (device.IsEnabled && !sensorsOnly.Contains(device.Id) && seen.Add(device.Id)) cameras.Add(ToCameraInfo(device));
             }
             return cameras;
         }
@@ -170,6 +173,7 @@ namespace RedCamera.Core
         public CameraInfo Camera { get; }
         public bool Shared { get; }
         public ZoomCapabilities ZoomCapabilities { get; private set; } = ZoomCapabilities.DigitalOnly;
+        public FocusCapabilities FocusCapabilities { get; private set; } = FocusCapabilities.None;
         public event Action<CameraPreviewFrame>? FrameArrived;
         public event Action<int, string>? Failed;
 
@@ -207,7 +211,113 @@ namespace RedCamera.Core
             _log(ZoomCapabilities.Hardware
                 ? $"Camera zoom: the camera's own, {ZoomCapabilities.Min:0.##}-{ZoomCapabilities.Max:0.##}x (step {ZoomCapabilities.Step:0.###})."
                 : $"Camera zoom: digital, 1-{CameraZoom.DigitalMax:0}x.");
+            if (!Shared) FocusCapabilities = ReadFocusCapabilities();
+            var f = FocusCapabilities;
+            _log(f.Supported
+                ? $"Camera tap focus: regions {f.Regions} (focus {f.Focus}, exposure {f.Exposure}, white balance {f.WhiteBalance}), "
+                  + $"single focus {f.SingleFocus}, continuous focus {f.ContinuousFocus}."
+                : $"Camera tap focus: not supported, no regions (single focus {f.SingleFocus}); a tap only shows the mark.");
         }
+
+        /// <summary>F-027 T1: regions of interest (focus, exposure, white balance) and single/continuous focus.</summary>
+        private FocusCapabilities ReadFocusCapabilities()
+        {
+            try
+            {
+                var controller = _capture.VideoDeviceController;
+                var roi = controller.RegionsOfInterestControl;
+                bool regions = roi.MaxRegions > 0 && (roi.AutoFocusSupported || roi.AutoExposureSupported);
+                var focus = controller.FocusControl;
+                bool single = focus.Supported && focus.SupportedFocusModes.Contains(FocusMode.Single);
+                bool continuous = focus.Supported && focus.SupportedFocusModes.Contains(FocusMode.Continuous);
+                return new FocusCapabilities(regions, regions && roi.AutoFocusSupported, regions && roi.AutoExposureSupported,
+                    regions && roi.AutoWhiteBalanceSupported, single, continuous);
+            }
+            catch (Exception ex)
+            {
+                _log($"Camera focus controls not read: {ex.GetType().Name} 0x{ex.HResult:X8}");
+                return FocusCapabilities.None;
+            }
+        }
+
+        private AutoFocusRange FocusRange()
+        {
+            var ranges = _capture.VideoDeviceController.FocusControl.SupportedFocusRanges;
+            return ranges.Contains(AutoFocusRange.FullRange) || ranges.Count == 0 ? AutoFocusRange.FullRange : ranges[0];
+        }
+
+        public Task<bool> FocusOnRegionAsync(FocusRegion region) => Task.Run(async () =>
+        {
+            if (Volatile.Read(ref _disposed) == 1) return false;
+            var caps = FocusCapabilities;
+            var controller = _capture.VideoDeviceController;
+            bool done = false;
+            if (caps.Regions)
+            {
+                try
+                {
+                    var roi = new RegionOfInterest
+                    {
+                        AutoFocusEnabled = caps.Focus,
+                        AutoExposureEnabled = caps.Exposure,
+                        AutoWhiteBalanceEnabled = caps.WhiteBalance,
+                        Bounds = new Rect(region.X, region.Y, region.Width, region.Height),
+                        BoundsNormalized = true,
+                        Type = RegionOfInterestType.Unknown,
+                        Weight = 100,
+                    };
+                    // Not locked: the camera keeps metering this region while it is set (the hold), and many webcams
+                    // refuse a lock (this PC's: exposure regions yes, AutoExposureLock no, 2026-10-22).
+                    await controller.RegionsOfInterestControl.SetRegionsAsync(new[] { roi }, false);
+                    done = true;
+                }
+                catch (Exception ex)
+                {
+                    _log($"Camera focus region not set: {ex.GetType().Name} 0x{ex.HResult:X8}");
+                }
+            }
+            if (caps.FocusOnTap && done)
+            {
+                try
+                {
+                    controller.FocusControl.Configure(new FocusSettings { Mode = FocusMode.Single, AutoFocusRange = FocusRange() });
+                    await controller.FocusControl.FocusAsync();
+                    done = true;
+                }
+                catch (Exception ex)
+                {
+                    _log($"Camera single focus failed: {ex.GetType().Name} 0x{ex.HResult:X8}");
+                }
+            }
+            return done;
+        });
+
+        public Task<bool> ReleaseFocusAsync() => Task.Run(async () =>
+        {
+            if (Volatile.Read(ref _disposed) == 1) return false;
+            var caps = FocusCapabilities;
+            var controller = _capture.VideoDeviceController;
+            bool done = false;
+            if (caps.Regions)
+            {
+                try { await controller.RegionsOfInterestControl.ClearRegionsAsync(); done = true; }
+                catch (Exception ex) { _log($"Camera focus region not cleared: {ex.GetType().Name} 0x{ex.HResult:X8}"); }
+            }
+            if (caps.FocusOnTap && caps.ContinuousFocus) // only a tap's single focus changed the focus mode
+            {
+                try
+                {
+                    controller.FocusControl.Configure(new FocusSettings { Mode = FocusMode.Continuous, AutoFocusRange = FocusRange() });
+                    await controller.FocusControl.FocusAsync();
+                    done = true;
+                }
+                catch (Exception ex)
+                {
+                    _log($"Camera continuous focus not restored: {ex.GetType().Name} 0x{ex.HResult:X8}");
+                }
+            }
+            return done;
+        });
 
         /// <summary>F-027 Z1: the camera's ZoomControl, used only when it zooms by a factor starting at 1x.</summary>
         private ZoomCapabilities ReadZoomCapabilities()

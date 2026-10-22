@@ -1,5 +1,18 @@
 # RED 2.0 Release Notes
 
+## 2.3.8 — RED's camera: tap to focus, shutter on the right, every camera, camera remotes
+
+- **Tap to focus and brighten:** tap the live picture and a small circle shows where you tapped. The camera focuses
+  and sets its brightness for that spot (as far as the camera can), keeps it for about 10 seconds, then goes back
+  to its normal automatic setting. Tap again to choose another spot.
+- **The shutter is on the right side**, in the middle of the picture, where your thumb reaches it on a tablet. The
+  switch-camera button sits just above it.
+- **Switch camera goes through every camera** Windows has: front, back, a USB camera, or a phone used as a webcam. The
+  camera's name shows briefly. One that doesn't start is skipped with a short note, and RED remembers the last camera
+  you used.
+- **Camera remotes:** a Bluetooth camera remote that sends Volume Up takes a photo, one per press, as do Enter and
+  Space while the camera screen is in front.
+
 ## 2.3.7 — Pinch to zoom in RED's camera
 
 - **Pinch to zoom:** in RED's camera screen, spread two fingers on the live picture to zoom in, pinch them together to
