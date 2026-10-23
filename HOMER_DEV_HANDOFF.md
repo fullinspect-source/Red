@@ -38,10 +38,13 @@ This file is the concise cross-session source of development context for work pe
 - **Verification:**
   - PL: all 49 harnesses (RedCameraCore 52, CameraCapture 14); webcam 20/20 (L19: EXIF 6 → 405x720); in-app driver
     23/23 in four runs (sandbox profile, housekeeping off).
-  - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged).
+  - This tree (`ed1aecb`): Debug build `--no-incremental` 0 errors; `tests\run-harnesses.ps1` 49 of 49 pass; Python
+    36/46, the known 10.
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real
+    profile).
+  - The updater compares versions numerically (`System.Version`), so 2.3.9 installs take 2.3.10.
   - Owner check on the tablet: held upright, the dark bands, the dashed box and a wide photo.
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-22: GitHub v2.3.10 (fullinspect-source/Red), Latest since 01:53 UTC 2026-10-23; release commit `ed1aecb`. `releases/latest` = v2.3.10; Red-v2.3.10.zip 93,877,835 bytes (503 entries, sha256 `9606949f11e7ab5248cccc86318e72c6bd324e0dd19b3ab36d6b20fd96137e59`) answers HEAD 200 and downloads byte-identical; update_red.bat attached and its latest link answers 200. RedCamera.Core 1.3.0 packed from `ed1aecb` (`..\packages\RedCamera.Core.1.3.0.nupkg`, sha256 `05f523c4e35f3b69b5a72f40d8a8dcf418a686b052ad8f39076c27922eaa2e88`).
 ### 2026-10-22 — RED 2.3.9 — Storage cleanup (audit R-storage-debris-audit fixes F1-F5, F7, S-28)
 
 - **Base:** 2.3.8 (`dc43d25`). Owner-approved fixes from `Dropbox/ios-port/program/research/R-storage-debris-audit.md`;
