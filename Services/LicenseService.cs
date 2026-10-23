@@ -302,6 +302,22 @@ del /f /q ""%~f0""
         }
 
         /// <summary>
+        /// Owner policy (2026-10-23): two calendar years for Trent, Ronnie and Sam;
+        /// six calendar months for everyone else. Device labels retain the holder.
+        /// Existing shorter signed licenses remain valid until their own expiration.
+        /// </summary>
+        public static DateTime MaximumAuthorizedExpiration(string issuedTo, DateTime today)
+        {
+            var person = System.Text.RegularExpressions.Regex.Replace(
+                issuedTo ?? "", @"\s*\([^()]*\)\s*$", "");
+            person = string.Join(" ", person.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            bool twoYears = string.Equals(person, "Trent Fuller", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(person, "Ronnie Shorthose", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(person, "Sam Melton", StringComparison.OrdinalIgnoreCase);
+            return twoYears ? today.Date.AddYears(2) : today.Date.AddMonths(6);
+        }
+
+        /// <summary>
         /// Validates the license and returns detailed result
         /// </summary>
         public static LicenseValidationResult ValidateLicense()
@@ -398,13 +414,12 @@ del /f /q ""%~f0""
                     return result;
                 }
 
-                // Enforce maximum license duration of 90 days
-                // If license spans more than 90 days from today, it's unauthorized
+                // Enforce the signed holder's current calendar-based license policy.
                 var daysRemaining = (expDate.Date - DateTime.Today).Days;
-                if (daysRemaining > 90)
+                if (expDate.Date > MaximumAuthorizedExpiration(license.IssuedTo, DateTime.Today))
                 {
                     result.IsValid = false;
-                    result.Message = "License duration exceeds maximum allowed (90 days). Please contact your administrator for a valid license.";
+                    result.Message = "License duration exceeds the authorized term for this license holder. Please contact your administrator for a valid license.";
                     return result;
                 }
 
