@@ -31,9 +31,11 @@ This file is the concise cross-session source of development context for work pe
   - PL in-app measurement (isolated Red2Dev, sandbox report, 1280x800 and 1920x1040): 8/8. It reads the drawn lines,
     so every break falls at a space.
   - PL: 49/49 harnesses. PdfCleanup flaked once on timing, then passed 3 of 3.
-  - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged).
-- **Deployment:** pending.
+  - This tree (`5b922bd`): Debug build `--no-incremental` 0 errors; `tests\run-harnesses.ps1` 49 of 49 pass; Python
+    36/46, the known 10.
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real
+    profile).
+- **Deployment:** released 2026-10-23: GitHub v2.3.13 (fullinspect-source/Red), Latest since 21:51 UTC; release commit `5b922bd`. `releases/latest` = v2.3.13; Red-v2.3.13.zip 93,878,066 bytes (503 entries, sha256 `45551c58d7fbe23951b9fb3a7d5059d186f25809b3e15d13e966a0b496c14d8a`) answers HEAD 200 and downloads byte-identical; update_red.bat attached and its latest link answers 200. RedCamera.Core unchanged (1.3.0).
 
 ### 2026-10-22 — RED 2.3.12 — taller File / Camera / Delete photo buttons
 
