@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.3.11 — RED's camera: clearer landscape setting
+
+- **The switch at the top of the camera screen now says "Landscape only"** (the normal setting: every photo is saved
+  wide, the right way up, whichever way the tablet is held, even with rotation lock on) or, when tapped, **"Allow all
+  orientations"** (photos follow the way the tablet is held).
+
 ## 2.3.10 — RED's camera: photos always landscape, bigger Close button
 
 - **Photos are always landscape:** hold the tablet upright or sideways, and the saved photo is a wide (landscape)

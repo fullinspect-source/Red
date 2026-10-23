@@ -20,9 +20,16 @@
             <Button x:Name="CloseCameraButton" DockPanel.Dock="Right" Content="✕ Close" FontSize="16" MinWidth="96" MinHeight="88"
                     Margin="6" Padding="12,4" Click="CloseCameraButton_Click" AutomationProperties.AutomationId="CloseCameraButton"/>
             <!-- F-027 L1 (owner 2026-10-22): every photo saved landscape, whichever way the tablet is held; on by default. -->
-            <ToggleButton x:Name="LandscapeToggle" DockPanel.Dock="Right" FontSize="16" MinWidth="130" MinHeight="88" Margin="6"
-                          Padding="12,4" Focusable="False" Checked="LandscapeToggle_Changed" Unchecked="LandscapeToggle_Changed"
-                          AutomationProperties.AutomationId="LandscapeToggle" AutomationProperties.Name="Always save landscape photos"/>
+            <!-- The text wraps (two lines at most) so "Allow all orientations" fits the 88 px bar without widening it. -->
+            <ToggleButton x:Name="LandscapeToggle" DockPanel.Dock="Right" FontSize="16" MinWidth="130" MaxWidth="150" MinHeight="88"
+                          Margin="6" Padding="12,4" Focusable="False" Checked="LandscapeToggle_Changed" Unchecked="LandscapeToggle_Changed"
+                          AutomationProperties.AutomationId="LandscapeToggle" AutomationProperties.Name="Landscape only, or allow all orientations">
+                <ToggleButton.ContentTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
+                    </DataTemplate>
+                </ToggleButton.ContentTemplate>
+            </ToggleButton>
             <StackPanel VerticalAlignment="Center" Margin="12,6">
                 <!-- Wraps (up to three lines in the 88 px bar) so a narrow window still shows which item gets the photo. -->
                 <TextBlock x:Name="TargetText" Foreground="White" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"

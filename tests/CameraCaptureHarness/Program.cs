@@ -235,9 +235,11 @@ static class CameraHarness
             && guideTag.Contains("IsHitTestVisible=\"False\"")
             && code.Contains("_controller.AlwaysLandscape = _cameraSettings.AlwaysLandscape")
             && code.Contains("_cameraSettings.SetAlwaysLandscape(on)") && code.Contains("CameraLandscape.KeptOnScreen(")
+            && code.Contains("? \"Landscape only\" : \"Allow all orientations\"") && toggleTag.Contains("MaxWidth=\"150\"")
             && code.Contains("NextExifOrientation(), frame.Width") && code.Contains("int exif = NextExifOrientation();")
             && code.Contains("_devUpright ? 6 :") && code.Contains("case Key.F9:"),
-            "Close is 88 px tall (twice 44); the \"Landscape photos\" toggle sits in the top bar (88 px), starts from RED's "
+            "Close is 88 px tall (twice 44); the toggle sits in the top bar (88 px, at most 150 px wide, its text wrapping) and "
+            + "reads \"Landscape only\" (the default) or \"Allow all orientations\" (owner 2026-10-22); it starts from RED's "
             + "camera setting and switches the engine; the framing guide takes no input; the upright simulation is dev-only");
 
         // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.

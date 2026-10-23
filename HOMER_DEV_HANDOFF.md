@@ -4,6 +4,25 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-22 — RED 2.3.11 — the landscape toggle in the owner's words
+
+- **Base:** 2.3.10 (`e2da8e0`). Built in `Dropbox\P\PL` by the F-027 camera session.
+  - The owner, relayed by the RED Camera session: "the setting they can change to toggle is default to "landscape
+    only" or when pressed .. "allow all orientations"".
+  - Released on the owner's word: "Yes, release the new toggle wording as RED 2.3.11 with the usual checks."
+  - The 3 files were copied from PL with CRLF.
+- **Files:**
+  - `CameraCaptureWindow.xaml`: the toggle's text wraps (MaxWidth 150).
+  - `CameraCaptureWindow.xaml.cs`: "Landscape only" / "Allow all orientations".
+  - `tests/CameraCaptureHarness/Program.cs`: the wording check.
+  - Version 2.3.11 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:** only the toggle's words change. "Landscape only" works in spite of rotation lock, because the cut
+  follows the orientation sensor, as in 2.3.10.
+- **Verification:**
+  - PL: CameraCapture 14/14, RedCameraCore 52/52, in-app driver 23/23.
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged).
+- **Deployment:** pending.
 ### 2026-10-22 — RED 2.3.10 — RED's camera: photos always landscape, Close twice as tall (F-027 L1-L3)
 
 - **Base:** 2.3.9 (`11f50ed`). Built in `Dropbox\P\PL` by the F-027 camera session.

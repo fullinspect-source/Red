@@ -279,8 +279,9 @@ namespace InspectionEditor
             Log($"landscape photos {(on ? "on" : "off")}.");
         }
 
+        // Owner 2026-10-22: "default to "landscape only" or when pressed .. "allow all orientations"".
         private void ShowLandscapeToggle() =>
-            LandscapeToggle.Content = LandscapeToggle.IsChecked == true ? "Landscape: ON" : "Landscape: OFF";
+            LandscapeToggle.Content = LandscapeToggle.IsChecked == true ? "Landscape only" : "Allow all orientations";
 
         /// <summary>The EXIF orientation the next press uses (the orientation sensor, else the screen; O3).</summary>
         private int NextExifOrientation() => _devUpright ? 6 : _orientation.StillExifOrientation(_controller.CurrentCamera);
