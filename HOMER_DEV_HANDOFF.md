@@ -8,7 +8,8 @@ This file is the concise cross-session source of development context for work pe
 
 - **Base:** 2.3.11 (`d83ad8f`). Built in `Dropbox\P\PL` by the F-027 camera session.
   - The owner: "file camera and delete buttons are too short (not tall engout) in the right panel of RED v 2.3.11".
-  - Released on the owner's word: "released updated version" (no release had been made since 2.3.11).
+  - Released on the owner's word: "released updated version", then "Yes, publish RED 2.3.12 on GitHub now as the
+    latest release."
   - Only the changed lines were applied here, so the file's mixed line endings stay as they were.
 - **Files:**
   - `MainWindow.xaml`: `SelectPhotoButton`, `CameraButton` and `DeletePhotoButton` get `MinHeight="44"` (were about
@@ -21,9 +22,11 @@ This file is the concise cross-session source of development context for work pe
 - **Verification:**
   - PL, isolated Red2Dev build on a sandbox report, measured in the app at 1280x800 and 1920x1040: each button
     44 px tall, all three inside the 140 px photo area.
-  - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged).
-- **Deployment:** pending.
+  - This tree (`e2d6dde`): Debug build `--no-incremental` 0 errors; `tests\run-harnesses.ps1` 49 of 49 pass; Python
+    36/46, the known 10 (red_21_layout passes).
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real
+    profile).
+- **Deployment:** released 2026-10-23: GitHub v2.3.12 (fullinspect-source/Red), Latest since 14:35 UTC; release commit `e2d6dde`. `releases/latest` = v2.3.12; Red-v2.3.12.zip 93,877,845 bytes (503 entries, sha256 `0d2c257a00d48f529276346b76016ad59223935e80f696361ebcd9a6d9a8da3e`) answers HEAD 200 and downloads byte-identical; update_red.bat attached and its latest link answers 200. RedCamera.Core unchanged (1.3.0).
 
 ### 2026-10-22 — RED 2.3.11 — the landscape toggle in the owner's words
 
