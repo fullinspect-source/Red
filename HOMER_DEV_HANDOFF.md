@@ -20,9 +20,11 @@ This file is the concise cross-session source of development context for work pe
   follows the orientation sensor, as in 2.3.10.
 - **Verification:**
   - PL: CameraCapture 14/14, RedCameraCore 52/52, in-app driver 23/23.
-  - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged).
-- **Deployment:** pending.
+  - This tree (`19e02e9`): Debug build `--no-incremental` 0 errors; `tests\run-harnesses.ps1` 49 of 49 pass; Python
+    36/46, the known 10.
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real
+    profile).
+- **Deployment:** released 2026-10-22: GitHub v2.3.11 (fullinspect-source/Red), Latest since 02:49 UTC 2026-10-23; release commit `19e02e9`. `releases/latest` = v2.3.11; Red-v2.3.11.zip 93,877,851 bytes (503 entries, sha256 `2bdf5e97389a25ea828f35af50fc7ecf4912811ed2e8e45e00c4e688461c8b0d`) answers HEAD 200 and downloads byte-identical; update_red.bat attached and its latest link answers 200. RedCamera.Core unchanged (1.3.0).
 ### 2026-10-22 — RED 2.3.10 — RED's camera: photos always landscape, Close twice as tall (F-027 L1-L3)
 
 - **Base:** 2.3.9 (`11f50ed`). Built in `Dropbox\P\PL` by the F-027 camera session.
