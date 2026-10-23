@@ -1,5 +1,14 @@
 # RED 2.0 Release Notes
 
+## 2.3.10 — RED's camera: photos always landscape, bigger Close button
+
+- **Photos are always landscape:** hold the tablet upright or sideways, and the saved photo is a wide (landscape)
+  picture, the right way up, which fits the reports. Held upright, the camera darkens the top and bottom of the picture
+  and a dashed box shows exactly what will be saved.
+- **"Landscape: ON / OFF"** at the top of the camera screen switches this. It is ON unless you turn it off, and RED
+  remembers your choice. With it OFF, photos follow the way the tablet is held, as before.
+- **The Close button is twice as tall**, easier to hit on a tablet.
+
 ## 2.3.9 — RED cleans up after itself: update downloads, old backups and temporary files
 
 - **Updates no longer leave copies behind.** Each update RED downloads (about 315 MB) is deleted once it is installed,

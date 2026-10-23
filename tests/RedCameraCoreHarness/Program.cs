@@ -162,7 +162,15 @@ static class CameraHarness
     private sealed class FakeCropper : ICameraStillCropper
     {
         public List<double> Factors { get; } = new();
+        public List<ZoomCrop> Regions { get; } = new();
         public bool Throw { get; set; }
+
+        public Task<CapturedStill> CropToAsync(CapturedStill still, ZoomCrop region)
+        {
+            Regions.Add(region);
+            if (Throw) return Task.FromException<CapturedStill>(new InvalidOperationException("fake crop failure"));
+            return Task.FromResult(still with { Jpeg = new byte[256], Width = region.Width, Height = region.Height });
+        }
 
         public Task<CapturedStill> CropAsync(CapturedStill still, double factor)
         {
@@ -260,6 +268,9 @@ static class CameraHarness
             await FocusFallback();
             await CameraCycling();
             ShutterKeys();
+            LandscapeRules();
+            await LandscapePhotos();
+            LandscapeJpeg();
         }
         catch (Exception ex)
         {
@@ -1567,5 +1578,145 @@ static class CameraHarness
         Check("A-027-33", first && !repeat && !bounce && later && !command && commandLater && !wrapBounce,
             "a shutter key (Volume Up, Enter, Space) takes one photo per press: auto-repeat and a second signal within 400 ms "
             + "take nothing, also across the tick counter wrapping");
+    }
+
+    // ------------------------------------------------------------------ always landscape (F-027 L1, owner 2026-10-22)
+
+    private static void LandscapeRules()
+    {
+        var rows = new (ZoomCrop Within, int Exif, ZoomCrop Keep)[]
+        {
+            (new(0, 0, 1280, 720), 1, new(0, 0, 1280, 720)),       // held landscape: kept whole
+            (new(0, 0, 1280, 720), 3, new(0, 0, 1280, 720)),       // upside down: still landscape
+            (new(0, 0, 1280, 720), 6, new(437, 0, 405, 720)),      // held upright: shown 720x1280, keep 720x405
+            (new(0, 0, 1280, 720), 8, new(437, 0, 405, 720)),
+            (new(0, 0, 4000, 3000), 6, new(875, 0, 2250, 3000)),   // 4:3 stays 4:3: shown 3000x2250
+            (new(0, 0, 720, 1280), 1, new(0, 437, 720, 405)),      // a portrait-mounted camera held upright
+            (new(320, 180, 640, 360), 6, new(539, 180, 202, 360)), // a 2x zoom crop, then its band
+        };
+        var bad = rows.Where(r => CameraLandscape.RegionFor(r.Within, r.Exif) != r.Keep)
+            .Select(r => $"{r.Within.Width}x{r.Within.Height}/{r.Exif} → {CameraLandscape.RegionFor(r.Within, r.Exif)}").ToList();
+        var landscapeAfter = rows.All(r =>
+        {
+            var k = CameraLandscape.RegionFor(r.Within, r.Exif);
+            var (w, h) = CameraLandscape.Upright(k.Width, k.Height, r.Exif);
+            return w >= h;
+        });
+        var band = CameraLandscape.Band(new System.Windows.Rect(10, 20, 300, 600));
+        bool guide = band is { } b && Near(b.Height, 150) && Near(b.Y, 20 + 225) && Near(b.Width, 300)
+            && CameraLandscape.Band(new System.Windows.Rect(0, 0, 600, 300)) == null;
+        // A-027-35b: the guide from the next photo's own cut, mapped to the shown preview (review 2026-10-22).
+        System.Windows.Rect? K(int pw, int ph, int exif, int fw, int fh, double zoom, double rotation, bool mirror) =>
+            CameraLandscape.KeptOnScreen(pw, ph, exif, fw, fh, zoom, rotation, mirror);
+        bool RectNear(System.Windows.Rect? r, double x, double y, double w, double h) =>
+            r is { } v && Near(v.X, x, 0.002) && Near(v.Y, y, 0.002) && Near(v.Width, w, 0.002) && Near(v.Height, h, 0.002);
+        double sameShape = 405.0 / 1280; // a 1280x720 photo held upright keeps 405 of its 1280 stored columns
+        bool screen = RectNear(K(1280, 720, 6, 1280, 720, 1, 90, false), 0, (1 - sameShape) / 2, 1, sameShape)          // the usual case
+            && RectNear(K(3264, 2448, 6, 1280, 720, 1, 90, false), 0, 0.21875, 1, 0.5625)                                // 4:3 photo, 16:9 preview
+            && RectNear(K(1280, 720, 6, 1280, 720, 1, 0, false), (1 - sameShape) / 2, 0, sameShape, 1)                    // screen not turned
+            && K(1280, 720, 1, 1280, 720, 1, 0, false) == null                                                            // held landscape
+            && RectNear(K(1280, 720, 6, 1280, 720, 2, 90, false), 0, 0.5 - 101.0 / 640, 1, 202.0 / 640)                  // zoomed 2x: same part of the screen
+            && RectNear(K(1280, 720, 8, 1280, 720, 1, 270, true), 0, (1 - sameShape) / 2, 1, sameShape);                 // front camera, other way
+        bool roundTrip = true;
+        foreach (double angle in new[] { 0.0, 90, 180, 270 })
+            foreach (bool mirrored in new[] { false, true })
+            {
+                var (dx, dy) = CameraFocus.SourceToDisplay(0.2, 0.7, angle, mirrored);
+                roundTrip &= NearPoint(CameraFocus.DisplayToSource(dx, dy, angle, mirrored), (0.2, 0.7));
+            }
+
+        Check("A-027-35", bad.Count == 0 && landscapeAfter && guide && screen && roundTrip,
+            "a photo shown portrait keeps its centred landscape band (full width as shown, the camera's landscape shape); one "
+            + "shown landscape is kept whole; with a zoom the band is cut from the zoom's crop; the on-screen guide marks the "
+            + "next photo's own band on the shown preview, also for a 4:3 photo on a 16:9 preview, a screen that does not "
+            + "turn, a zoom and a mirrored front camera" + (bad.Count == 0 ? string.Empty : " (wrong: " + string.Join("; ", bad) + ")"));
+    }
+
+    /// <summary>A cropper that cannot cut to a region (an older implementation): the default method fails.</summary>
+    private sealed class ZoomOnlyCropper : ICameraStillCropper
+    {
+        public List<double> Factors { get; } = new();
+        public Task<CapturedStill> CropAsync(CapturedStill still, double factor)
+        {
+            Factors.Add(factor);
+            var crop = CameraZoom.CropFor(still.Width, still.Height, factor);
+            return Task.FromResult(still with { Width = crop.Width, Height = crop.Height, Zoom = factor });
+        }
+    }
+
+    private static async Task LandscapePhotos()
+    {
+        var rig = new Rig(Back);
+        await rig.OpenLive();
+        bool previewShape = rig.Controller.PhotoSize == (16, 9); // nothing taken yet, no size chosen: the preview's
+        bool offByDefault = !rig.Controller.AlwaysLandscape;
+        var plainUpright = await rig.Controller.CaptureAsync(6);       // the library's default: off, nothing cut
+        rig.Controller.AlwaysLandscape = true;
+        var upright = await rig.Controller.CaptureAsync(6);
+        var held = await rig.Controller.CaptureAsync(1);
+        rig.Controller.SetZoom(2);
+        var zoomedUpright = await rig.Controller.CaptureAsync(8);
+        bool photoShape = previewShape && rig.Controller.PhotoSize == (4000, 3000); // the last still's stored size
+        bool cut = photoShape && offByDefault && plainUpright.Still is { Width: 4000, Height: 3000, Landscaped: false }
+            && upright.Still is { Width: 2250, Height: 3000, Landscaped: true, ExifOrientation: 6 }
+            && held.Still is { Width: 4000, Landscaped: false }
+            && zoomedUpright.Still is { Width: 1125, Height: 1500, Landscaped: true, Zoom: 2.0 }
+            && rig.Cropper.Regions.SequenceEqual(new[] { new ZoomCrop(875, 0, 2250, 3000), new ZoomCrop(1437, 750, 1125, 1500) })
+            && rig.Cropper.Factors.Count == 0 // the zoom and the band are one cut
+            && rig.Log.Any(l => l.Contains("cut to landscape"));
+
+        // A cropper that cannot cut to a region: the photo is kept as the zoom alone makes it, with a log line.
+        var old = new FakeBackend();
+        old.Cameras.Add(Back);
+        var zoomOnly = new ZoomOnlyCropper();
+        var log = new List<string>();
+        var now = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+        var controller = new CameraSessionController(old, new MemoryPreferences(), () => now, log: log.Add,
+            runDetached: work => work(), cropper: zoomOnly) { AlwaysLandscape = true };
+        await controller.OpenAsync();
+        for (int i = 0; i < 3; i++) { now = now.AddMilliseconds(100); old.Streams.Last().Frame(); await controller.TickAsync(); }
+        controller.SetZoom(2);
+        var fallback = await controller.CaptureAsync(6);
+        bool kept = fallback.Still is { Width: 2000, Height: 1500, Landscaped: false } && zoomOnly.Factors.SequenceEqual(new[] { 2.0 })
+            && log.Any(l => l.Contains("landscape cut failed"));
+
+        Check("A-027-36", cut && kept,
+            "with AlwaysLandscape (off by default in the library, on in RED) a photo taken upright is cut to its landscape "
+            + "band (4000x3000 stored, EXIF 6 → 2250x3000, shown 3000x2250), one taken landscape is not; with a 2x zoom the "
+            + "zoom and the band are one cut; a cropper that cannot cut keeps the zoomed photo and logs it");
+    }
+
+    /// <summary>A-027-36b: the real JPEG cut keeps the band's pixels and the EXIF orientation.</summary>
+    private static void LandscapeJpeg()
+    {
+        string result = string.Empty;
+        bool ok = false;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                byte[] jpeg = Jpeg(1280, 720);
+                var region = CameraLandscape.RegionFor(new ZoomCrop(0, 0, 1280, 720), 6);
+                var cut = new JpegStillCropper().CropToAsync(new CapturedStill(jpeg, 1280, 720, "photo", 6), region).GetAwaiter().GetResult();
+                var decoded = Decode(cut.Jpeg, region.Width, region.Height);
+                // The source picture's same region, for comparison.
+                var source = WpfImaging.BitmapSource.Create(1280, 720, 96, 96, WpfMedia.PixelFormats.Bgr32, null, Pattern(1280, 720), 1280 * 4);
+                var expected = new WpfImaging.FormatConvertedBitmap(new WpfImaging.CroppedBitmap(source,
+                    new System.Windows.Int32Rect(region.X, region.Y, region.Width, region.Height)), WpfMedia.PixelFormats.Bgra32, null, 0);
+                var expectedPixels = new byte[region.Width * region.Height * 4];
+                expected.CopyPixels(expectedPixels, region.Width * 4, 0);
+                double difference = MeanDifference(decoded.Pixels, expectedPixels);
+                ok = decoded.Width == 405 && decoded.Height == 720 && decoded.Orientation is ushort o && o == 6 && difference <= 3;
+                result = $"stored {decoded.Width}x{decoded.Height}, EXIF {decoded.Orientation}, difference to the source band {difference:0.0}";
+            }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Check("A-027-36b", ok && error == null,
+            "the real JPEG cut of a 1280x720 photo taken upright keeps the stored 405x720 band with EXIF 6, so it shows 720x405: "
+            + result + (error == null ? string.Empty : " " + error));
     }
 }

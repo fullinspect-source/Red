@@ -216,6 +216,21 @@ static class LiveCheck
             $"tap focus on this camera: {(focusCaps.Supported ? "applied" : "not supported, mark only")} ({focusCaps}); hold ended after 2 s; "
             + "live throughout and a still afterwards");
 
+        // F-027 L1 on the real camera: a photo taken upright (EXIF 6, as on a tablet held upright) is cut to its landscape
+        // band; one taken landscape is not; off, nothing is cut.
+        controller.ResetZoom(); // L15 left 2x; the zoom's own cut is A-027-36's
+        controller.AlwaysLandscape = true;
+        var uprightShot = await controller.CaptureAsync(6);
+        var landscapeShot = await controller.CaptureAsync(1);
+        controller.AlwaysLandscape = false;
+        var offShot = await controller.CaptureAsync(6);
+        var band = CameraLandscape.RegionFor(new ZoomCrop(0, 0, fullW, fullH), 6);
+        bool uprightOk = uprightShot.Still is { } u && u.Width == band.Width && u.Height == band.Height && u.Landscaped && u.ExifOrientation == 6;
+        Check("L19", uprightOk && landscapeShot.Still is { Landscaped: false } ls && ls.Width == fullW
+            && offShot.Still is { Landscaped: false } os && os.Width == fullW,
+            $"landscape photos: taken upright → stored {uprightShot.Still?.Width}x{uprightShot.Still?.Height} with EXIF 6 (shown "
+            + $"{uprightShot.Still?.Height}x{uprightShot.Still?.Width}); taken landscape and switched off → {fullW}x{fullH}, uncut");
+
         controller.SetZoom(3);
         await controller.CloseAsync();
         await Task.Delay(1500);

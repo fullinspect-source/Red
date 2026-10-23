@@ -49,6 +49,19 @@ static class CameraHarness
             Check("C11-settings", defaultRed && kept && !reloaded.UsesWindowsCameraApp && reloaded.DeviceId == Front.Id,
                 "camera mode defaults to RED camera; mode and remembered camera survive each other's saves (own file)");
 
+            // F-027 L1 (owner 2026-10-22): landscape photos are on by default, also for a settings file written before the
+            // option existed; switching them off survives a restart and the other saves.
+            string olderFile = Path.Combine(folder, "older_camera_settings.json");
+            File.WriteAllText(olderFile, "{\"Mode\":\"red\",\"DeviceId\":\"cam-front\",\"Panel\":\"Front\"}");
+            bool onForOlder = new CameraSettingsService(olderFile).AlwaysLandscape;
+            bool onByDefault = new CameraSettingsService(Path.Combine(folder, "fresh.json")).AlwaysLandscape;
+            reloaded.SetAlwaysLandscape(false);
+            reloaded.Remember(Front);
+            reloaded.SetMode(windowsCameraApp: false);
+            var again = new CameraSettingsService(Path.Combine(folder, "camera_settings.json"));
+            Check("L1-settings", onForOlder && onByDefault && !again.AlwaysLandscape && again.DeviceId == Front.Id,
+                "landscape photos are on by default (also for an older settings file); off survives a restart and the other saves");
+
             // This harness runs as the Red2Dev assembly, so the copy must never resolve to the real Pictures folder.
             string pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
             Environment.SetEnvironmentVariable(CameraRollCopy.DevFolderVariable, Path.Combine(folder, "roll"));
@@ -202,12 +215,30 @@ static class CameraHarness
         int failure = xaml.IndexOf("x:Name=\"FailurePanel\"", StringComparison.Ordinal);
         string failureBlock = failure < 0 ? string.Empty : xaml[failure..xaml.IndexOf("</Border>", xaml.IndexOf("</ScrollViewer>", failure, StringComparison.Ordinal), StringComparison.Ordinal)];
         bool small = code.Contains("private void PlaceSwitchButton()") && code.Contains("new Thickness(0, 0, 120, 0)")
-            && code.Contains("PreviewArea.SizeChanged += (_, _) => PlaceSwitchButton();")
+            && code.Contains("PreviewArea.SizeChanged += (_, _) =>") && code.Contains("                PlaceSwitchButton();")
             && failureBlock.Contains("<Style TargetType=\"Button\">") && failureBlock.Contains("TextWrapping=\"Wrap\"");
         Check("A-027-34", shutterRight && switchAbove && keys && tapFocus && small,
             "the shutter overlays the middle of the preview's right edge (88 px) with Switch camera above it; a tap or click focuses "
             + "through CameraFocus and shows a mark that takes no input; Volume Up, Enter and Space (and the Volume Up app command) "
             + "take one photo per press; on a short preview Switch moves beside the shutter, and failure buttons wrap their text");
+
+        // Owner 2026-10-22: Close twice as tall; the landscape toggle at the top, from RED's camera settings, driving the
+        // engine's AlwaysLandscape; a guide that takes no input.
+        int close = xaml.IndexOf("x:Name=\"CloseCameraButton\"", StringComparison.Ordinal);
+        string closeTag = close < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', close)..xaml.IndexOf('>', close)];
+        int toggle = xaml.IndexOf("x:Name=\"LandscapeToggle\"", StringComparison.Ordinal);
+        string toggleTag = toggle < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', toggle)..xaml.IndexOf('>', toggle)];
+        int guide = xaml.IndexOf("x:Name=\"LandscapeGuide\"", StringComparison.Ordinal);
+        string guideTag = guide < 0 ? string.Empty : xaml[xaml.LastIndexOf('<', guide)..xaml.IndexOf('>', guide)];
+        bool topBar = toggle >= 0 && toggle < xaml.IndexOf("x:Name=\"PreviewArea\"", StringComparison.Ordinal);
+        Check("A-027-37", Number(closeTag, "MinHeight") == 88 && Number(toggleTag, "MinHeight") == 88 && topBar
+            && guideTag.Contains("IsHitTestVisible=\"False\"")
+            && code.Contains("_controller.AlwaysLandscape = _cameraSettings.AlwaysLandscape")
+            && code.Contains("_cameraSettings.SetAlwaysLandscape(on)") && code.Contains("CameraLandscape.KeptOnScreen(")
+            && code.Contains("NextExifOrientation(), frame.Width") && code.Contains("int exif = NextExifOrientation();")
+            && code.Contains("_devUpright ? 6 :") && code.Contains("case Key.F9:"),
+            "Close is 88 px tall (twice 44); the \"Landscape photos\" toggle sits in the top bar (88 px), starts from RED's "
+            + "camera setting and switches the engine; the framing guide takes no input; the upright simulation is dev-only");
 
         // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.
         string coreFolder = Path.Combine(root, "RedCamera.Core");

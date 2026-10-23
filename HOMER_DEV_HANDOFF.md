@@ -4,6 +4,44 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-22 — RED 2.3.10 — RED's camera: photos always landscape, Close twice as tall (F-027 L1-L3)
+
+- **Base:** 2.3.9 (`11f50ed`). Built in `Dropbox\P\PL` by the F-027 camera session.
+  - The owner's request: "Make close button twice as tall ... no matter if the tablet is held in either rotation .. the
+    images it saves are horizontal ... make that a toggle setting at the top .. but default it ignores orientation and
+    always makes it a landscape saved image".
+  - Released on the owner's word: "Yes, release it as RED 2.3.10 with the usual checks".
+  - The 15 camera files were copied from PL with CRLF; before the change they were identical to this tree.
+  - Program: F-027 SPEC §3 L1-L3, ACCEPTANCE A-027-35 to -37 and the owner check; CHANGELOG 2026-10-22.
+- **Files:**
+  - `RedCamera.Core`: new `CameraLandscape.cs`; changed `CameraFocus.cs` (`SourceToDisplay`), `CameraModels.cs`
+    (`Landscaped`, `ICameraStream.PhotoSize`), `CameraSessionController.cs` (`AlwaysLandscape`, `PhotoSize`, the
+    combined cut), `CameraZoom.cs` (`ICameraStillCropper.CropToAsync`), `JpegStillCropper.cs` (region cut),
+    `WinRtCameraBackend.cs` (the chosen still size), `README.md`, and the csproj (library 1.3.0).
+  - `CameraCaptureWindow.xaml(.cs)`: Close 88 px; the "Landscape: ON/OFF" toggle; the framing guide; the item label
+    wraps; dev key F9 (dev builds only).
+  - `Services/Camera/CameraSettingsService.cs` (`AlwaysLandscape`, true when absent).
+  - `tests/RedCameraCoreHarness`, `tests/CameraCaptureHarness`, `tests/CameraLiveCheck`.
+  - Version 2.3.10 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:**
+  - With the toggle ON (the default, also for existing settings files), a photo shown portrait is cut to its centred
+    landscape band. The cut is in stored pixels, keeps the EXIF orientation, and is one cut with any digital zoom. A
+    1280x720 camera held upright gives 405x720 stored, which shows as 720x405.
+  - The guide shades the preview outside the band. It is worked out from the next photo's own cut: the photo's stored
+    size and the tilt-sensor EXIF orientation.
+  - OFF keeps the old behaviour.
+  - A code review fixed four things first:
+    - the guide's shape for 4:3 photos under a 16:9 preview;
+    - the guide following the screen, not the sensor;
+    - the item label squeezed by the toggle;
+    - the zoom readout under Switch in a tiny window.
+- **Verification:**
+  - PL: all 49 harnesses (RedCameraCore 52, CameraCapture 14); webcam 20/20 (L19: EXIF 6 → 405x720); in-app driver
+    23/23 in four runs (sandbox profile, housekeeping off).
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged).
+  - Owner check on the tablet: held upright, the dark bands, the dashed box and a wide photo.
+- **Deployment:** pending.
 ### 2026-10-22 — RED 2.3.9 — Storage cleanup (audit R-storage-debris-audit fixes F1-F5, F7, S-28)
 
 - **Base:** 2.3.8 (`dc43d25`). Owner-approved fixes from `Dropbox/ios-port/program/research/R-storage-debris-audit.md`;

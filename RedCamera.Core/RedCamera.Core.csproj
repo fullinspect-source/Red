@@ -11,7 +11,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>RedCamera.Core</RootNamespace>
     <AssemblyName>RedCamera.Core</AssemblyName>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Company>Full Inspection Services</Company>
     <Product>RED Camera engine</Product>
     <Description>Reliable WinRT camera engine shared by RED and the RED Camera companion.</Description>

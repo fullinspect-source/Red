@@ -16,11 +16,17 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Background="#1E1E1E" LastChildFill="True">
-            <Button x:Name="CloseCameraButton" DockPanel.Dock="Right" Content="✕ Close" FontSize="16" MinWidth="96" MinHeight="44"
+            <!-- Owner 2026-10-22: Close twice as tall (88 px). -->
+            <Button x:Name="CloseCameraButton" DockPanel.Dock="Right" Content="✕ Close" FontSize="16" MinWidth="96" MinHeight="88"
                     Margin="6" Padding="12,4" Click="CloseCameraButton_Click" AutomationProperties.AutomationId="CloseCameraButton"/>
+            <!-- F-027 L1 (owner 2026-10-22): every photo saved landscape, whichever way the tablet is held; on by default. -->
+            <ToggleButton x:Name="LandscapeToggle" DockPanel.Dock="Right" FontSize="16" MinWidth="130" MinHeight="88" Margin="6"
+                          Padding="12,4" Focusable="False" Checked="LandscapeToggle_Changed" Unchecked="LandscapeToggle_Changed"
+                          AutomationProperties.AutomationId="LandscapeToggle" AutomationProperties.Name="Always save landscape photos"/>
             <StackPanel VerticalAlignment="Center" Margin="12,6">
-                <TextBlock x:Name="TargetText" Foreground="White" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
-                           AutomationProperties.AutomationId="CameraTargetText"/>
+                <!-- Wraps (up to three lines in the 88 px bar) so a narrow window still shows which item gets the photo. -->
+                <TextBlock x:Name="TargetText" Foreground="White" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"
+                           MaxHeight="69" TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="CameraTargetText"/>
                 <TextBlock x:Name="CameraNameText" Foreground="#A0A7AE" FontSize="12" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </DockPanel>
@@ -44,6 +50,16 @@
                 </Image>
             </Border>
             <Border x:Name="FlashOverlay" Background="White" Opacity="0" IsHitTestVisible="False"/>
+
+            <!-- F-027 L1: with landscape photos on and the picture shown upright, the parts the photo will not keep are
+                 shaded and the kept landscape band is outlined. -->
+            <Canvas x:Name="LandscapeGuide" IsHitTestVisible="False" Visibility="Collapsed">
+                <Rectangle x:Name="GuideTop" Fill="#A6000000"/>
+                <Rectangle x:Name="GuideBottom" Fill="#A6000000"/>
+                <Rectangle x:Name="GuideLeft" Fill="#A6000000"/>
+                <Rectangle x:Name="GuideRight" Fill="#A6000000"/>
+                <Rectangle x:Name="GuideFrame" Stroke="#CCFFFFFF" StrokeThickness="1.5" StrokeDashArray="6 4"/>
+            </Canvas>
 
             <!-- F-027 T1: the mark at a tap, shown briefly while the camera focuses and exposes there. -->
             <Canvas x:Name="FocusLayer" IsHitTestVisible="False">
@@ -127,7 +143,7 @@
             </Border>
             <TextBlock x:Name="DevHintText" Foreground="#80FFFFFF" FontSize="11" Margin="8" HorizontalAlignment="Left"
                        VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"
-                       Text="Dev: Ctrl+Shift+F5 suspend/resume · F6 display off/on · F7 lock/unlock · F8 stall"/>
+                       Text="Dev: Ctrl+Shift+F5 suspend/resume · F6 display off/on · F7 lock/unlock · F8 stall · F9 held upright"/>
 
             <!-- F-027 C11: switch camera, on the right edge just above the shutter, never over it. -->
             <Button x:Name="SwitchCameraButton" Panel.ZIndex="100" Width="56" Height="56" HorizontalAlignment="Right"

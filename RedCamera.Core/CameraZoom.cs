@@ -20,6 +20,11 @@ namespace RedCamera.Core
         /// <summary>The still cropped to <see cref="CameraZoom.CropFor"/> of its own size, at the crop's own pixel size
         /// (never scaled up), with its EXIF orientation kept and <see cref="CapturedStill.Zoom"/> set.</summary>
         Task<CapturedStill> CropAsync(CapturedStill still, double factor);
+
+        /// <summary>F-027 L1 (1.3.0): the still cropped to <paramref name="region"/> of its stored pixels, at the region's
+        /// own size, EXIF orientation kept. A cropper without it fails, and the engine then keeps the full photo.</summary>
+        Task<CapturedStill> CropToAsync(CapturedStill still, ZoomCrop region) =>
+            Task.FromException<CapturedStill>(new NotSupportedException("This cropper only crops to a zoom."));
     }
 
     /// <summary>F-027 Z1-Z3: the zoom rules shared by the engine and the screens that use it.</summary>

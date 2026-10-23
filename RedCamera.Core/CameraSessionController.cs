@@ -82,6 +82,7 @@ namespace RedCamera.Core
         private int _focusWantedVersion, _focusAppliedVersion;
         private bool _focusPushing, _focusFallbackLogged;
         private int _frameWidth, _frameHeight;
+        private (int Width, int Height) _lastStillSize;
 
         // F-027 C11 cycling: the camera the user switched to, until it is live (then it is remembered). A camera that does
         // not start is skipped for this screen until the camera list changes.
@@ -142,6 +143,31 @@ namespace RedCamera.Core
         /// <summary>Raised on the controller's thread when <see cref="ZoomFactor"/>, <see cref="ZoomMax"/> or
         /// <see cref="PreviewZoom"/> may have changed.</summary>
         public event Action? ZoomChanged;
+
+        /// <summary>
+        /// F-027 L1 (1.3.0): when true, a photo that would be shown portrait (the device held upright) is cut to its centred
+        /// landscape band (<see cref="CameraLandscape"/>), so every photo is landscape. Read at each press. Off by default;
+        /// RED turns it on from its camera setting (owner 2026-10-22: on unless switched off).
+        /// </summary>
+        public bool AlwaysLandscape { get; set; }
+
+        /// <summary>
+        /// F-027 L2 (1.3.0): the stored size of this session's stills, for the framing guide: the last still taken in this
+        /// session, else the size the camera chose when it opened, else the preview's (same shape). (0, 0) before any.
+        /// </summary>
+        public (int Width, int Height) PhotoSize
+        {
+            get
+            {
+                if (_lastStillSize != (0, 0)) return _lastStillSize;
+                (int, int) chosen = (0, 0);
+                try { chosen = _stream?.PhotoSize ?? (0, 0); } catch (Exception) { }
+                return chosen != (0, 0) ? chosen : PreviewFrameSize;
+            }
+        }
+
+        /// <summary>The size of the preview frames (the camera's preview shape); (0, 0) before the first frame.</summary>
+        public (int Width, int Height) PreviewFrameSize => (Volatile.Read(ref _frameWidth), Volatile.Read(ref _frameHeight));
 
         /// <summary>F-027 T1: what the open session's camera can do with a tap.</summary>
         public FocusCapabilities FocusCapabilities => _focusCaps;
@@ -669,6 +695,7 @@ namespace RedCamera.Core
             int generation = _generation;
             double zoom = _zoom; // Z2: the zoom shown at the press
             bool digital = zoom > 1.0 && !_zoomCaps.Hardware;
+            bool landscape = AlwaysLandscape;
             try
             {
                 using var cts = new CancellationTokenSource(_timings.CaptureTimeout);
@@ -681,10 +708,16 @@ namespace RedCamera.Core
                     return CaptureOutcome.NotTaken(CaptureFailedText);
                 }
                 var still = await capture;
-                if (digital) still = await CropStillAsync(still, zoom);
+                if (generation == _generation) _lastStillSize = (still.Width, still.Height); // L2: the guide's photo shape
+                // Z2 then L1: the zoom's crop, and within it the landscape band of a photo taken upright, in one cut.
+                var zoomed = digital ? CameraZoom.CropFor(still.Width, still.Height, zoom) : new ZoomCrop(0, 0, still.Width, still.Height);
+                var keep = landscape ? CameraLandscape.RegionFor(zoomed, still.ExifOrientation) : zoomed;
+                if (keep != zoomed) still = await CropToLandscapeAsync(still, keep, zoom, digital);
+                else if (digital) still = await CropStillAsync(still, zoom);
                 else if (zoom > 1.0) still = still with { Zoom = zoom };
                 string zoomNote = still.Zoom > 1.0 ? $", zoom {still.Zoom:0.0}x {(digital ? "digital" : "camera")}" : string.Empty;
-                _log($"Camera still {still.Width}x{still.Height} via {still.Source}, orientation {still.ExifOrientation}{zoomNote}.");
+                string landscapeNote = still.Landscaped ? ", cut to landscape" : string.Empty;
+                _log($"Camera still {still.Width}x{still.Height} via {still.Source}, orientation {still.ExifOrientation}{zoomNote}{landscapeNote}.");
                 return CaptureOutcome.Taken(still);
             }
             catch (Exception ex)
@@ -740,6 +773,25 @@ namespace RedCamera.Core
                 _log($"Camera zoom crop failed ({ex.GetType().Name}); the full photo is kept.");
             }
             return still;
+        }
+
+        /// <summary>L1: the still cut to <paramref name="region"/> (its zoom crop and landscape band). If that fails the
+        /// photo is kept as the zoom alone would make it, never lost.</summary>
+        private async Task<CapturedStill> CropToLandscapeAsync(CapturedStill still, ZoomCrop region, double zoom, bool digital)
+        {
+            try
+            {
+                var crop = _cropper.CropToAsync(still with { Zoom = zoom }, region);
+                var finished = await Task.WhenAny(crop, Task.Delay(_timings.CaptureTimeout));
+                if (finished == crop) return (await crop) with { Zoom = zoom, Landscaped = true };
+                _ = crop.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                _log("Camera landscape cut took too long; the photo is kept uncut.");
+            }
+            catch (Exception ex)
+            {
+                _log($"Camera landscape cut failed ({ex.GetType().Name}); the photo is kept uncut.");
+            }
+            return digital ? await CropStillAsync(still, zoom) : still with { Zoom = zoom };
         }
 
         /// <summary>Test and dev tools only (A-027-16): stop the real preview frames underneath the watchdog.</summary>
@@ -934,6 +986,7 @@ namespace RedCamera.Core
             ResetFrameStats();
             EndFocusHold(); // T3: a new session starts with the camera's own focus and exposure
             _focusCaps = FocusCapabilities.None;
+            _lastStillSize = (0, 0); // another session (or camera) may take stills of another size
             if (stream != null)
             {
                 _log($"Camera released ({reason}).");

@@ -57,7 +57,9 @@ namespace InspectionEditor
         private readonly DispatcherTimer _noteTimer;
         private readonly ZoomGesture _pinch = new();
         private readonly ShutterKeyGate _shutterKeys = new();
+        private readonly CameraSettingsService _cameraSettings = new();
         private DateTime _noticeShownAt = DateTime.MinValue;
+        private bool _loadingToggle, _devUpright;
         private readonly HashSet<int> _touchIds = new();
         private double _pinchStartZoom = 1.0;
         private bool _multiTouch, _hasLastTap;
@@ -77,8 +79,12 @@ namespace InspectionEditor
             InitializeComponent();
             Owner = owner;
             _target = target;
-            _controller = new CameraSessionController(new WinRtCameraBackend(Log), new CameraSettingsService(),
+            _controller = new CameraSessionController(new WinRtCameraBackend(Log), _cameraSettings,
                 () => DateTime.UtcNow, log: Log);
+            _loadingToggle = true;
+            LandscapeToggle.IsChecked = _controller.AlwaysLandscape = _cameraSettings.AlwaysLandscape; // L1: on by default
+            _loadingToggle = false;
+            ShowLandscapeToggle();
             _controller.StateChanged += OnControllerStateChanged;
             _controller.ZoomChanged += OnZoomChanged;
             // C11: the new camera's name, unless a note about a skipped camera (which names it) is still being read.
@@ -91,7 +97,11 @@ namespace InspectionEditor
                 _noticeShownAt = DateTime.UtcNow;
                 ShowNote(text, seconds: 5);
             });
-            PreviewArea.SizeChanged += (_, _) => PlaceSwitchButton();
+            PreviewArea.SizeChanged += (_, _) =>
+            {
+                PlaceSwitchButton();
+                UpdateLandscapeGuide();
+            };
             _renderer = new CameraPreviewRenderer(PreviewImage, Log);
             _controller.PreviewFrame += _renderer.Push;
             _holds = new CameraHoldWatcher(Dispatcher, (hold, on) => _controller.SetHold(hold, on), Log);
@@ -191,6 +201,7 @@ namespace InspectionEditor
             {
                 RefreshTarget();
                 UpdateOrientation();
+                UpdateLandscapeGuide();
                 await _controller.TickAsync();
             }
             catch (Exception ex)
@@ -250,8 +261,69 @@ namespace InspectionEditor
             var camera = _controller.CurrentCamera;
             if (camera == null) return;
             var (rotation, mirror) = _orientation.Preview(camera);
+            if (_devUpright) rotation = (rotation + 90) % 360; // dev builds: as if the tablet were held upright
             PreviewRotation.Angle = rotation;
             PreviewMirror.ScaleX = mirror ? -1 : 1;
+        }
+
+        // ------------------------------------------------------------------ landscape photos (F-027 L1)
+
+        private void LandscapeToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            bool on = LandscapeToggle.IsChecked == true;
+            _controller.AlwaysLandscape = on;
+            ShowLandscapeToggle();
+            UpdateLandscapeGuide();
+            if (_loadingToggle) return;
+            _cameraSettings.SetAlwaysLandscape(on);
+            Log($"landscape photos {(on ? "on" : "off")}.");
+        }
+
+        private void ShowLandscapeToggle() =>
+            LandscapeToggle.Content = LandscapeToggle.IsChecked == true ? "Landscape: ON" : "Landscape: OFF";
+
+        /// <summary>The EXIF orientation the next press uses (the orientation sensor, else the screen; O3).</summary>
+        private int NextExifOrientation() => _devUpright ? 6 : _orientation.StillExifOrientation(_controller.CurrentCamera);
+
+        /// <summary>
+        /// L2: with landscape photos on, shade the parts of the preview the next photo will not keep and outline the band it
+        /// keeps, worked out from that photo's own cut (its stored size and the orientation the next press uses), so it
+        /// matches the saved photo even when the photo has another shape than the preview or the screen does not turn.
+        /// </summary>
+        private void UpdateLandscapeGuide()
+        {
+            Rect? kept = null;
+            Rect shown = Rect.Empty;
+            if (_controller.AlwaysLandscape && _controller.State == CameraState.Live && PreviewImage.Source != null
+                && PreviewImage.RenderSize.Width > 0 && PreviewImage.IsDescendantOf(PreviewArea))
+            {
+                shown = PreviewImage.TransformToAncestor(PreviewArea).TransformBounds(new Rect(PreviewImage.RenderSize));
+                var photo = _controller.PhotoSize;
+                var frame = _controller.PreviewFrameSize;
+                if (CameraLandscape.KeptOnScreen(photo.Width, photo.Height, NextExifOrientation(), frame.Width, frame.Height,
+                        _controller.PreviewZoom, PreviewRotation.Angle, PreviewMirror.ScaleX < 0) is { } part)
+                    kept = new Rect(shown.X + part.X * shown.Width, shown.Y + part.Y * shown.Height, part.Width * shown.Width,
+                        part.Height * shown.Height);
+            }
+            if (kept is not { } k)
+            {
+                LandscapeGuide.Visibility = Visibility.Collapsed;
+                return;
+            }
+            Place(GuideTop, new Rect(shown.X, shown.Y, shown.Width, k.Y - shown.Y));
+            Place(GuideBottom, new Rect(shown.X, k.Bottom, shown.Width, shown.Bottom - k.Bottom));
+            Place(GuideLeft, new Rect(shown.X, k.Y, k.X - shown.X, k.Height));
+            Place(GuideRight, new Rect(k.Right, k.Y, shown.Right - k.Right, k.Height));
+            Place(GuideFrame, k);
+            LandscapeGuide.Visibility = Visibility.Visible;
+        }
+
+        private static void Place(FrameworkElement element, Rect at)
+        {
+            System.Windows.Controls.Canvas.SetLeft(element, at.X);
+            System.Windows.Controls.Canvas.SetTop(element, at.Y);
+            element.Width = Math.Max(0, at.Width);
+            element.Height = Math.Max(0, at.Height);
         }
 
         // ------------------------------------------------------------------ zoom (F-027 Z1-Z5)
@@ -366,6 +438,9 @@ namespace InspectionEditor
         {
             bool tall = PreviewArea.ActualHeight >= 2 * (44 + 16 + 56 + 8);
             SwitchCameraButton.Margin = tall ? new Thickness(0, 0, 32, 176) : new Thickness(0, 0, 120, 0);
+            // On a short preview the zoom readout moves to the left so Switch never covers it.
+            ZoomReadoutButton.HorizontalAlignment = tall ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            ZoomReadoutButton.Margin = tall ? new Thickness(0, 12, 0, 0) : new Thickness(12, 12, 0, 0);
         }
 
         // ------------------------------------------------------------------ tap to focus (F-027 T1-T3)
@@ -407,7 +482,7 @@ namespace InspectionEditor
                     ShowNote("Select an item in RED first.");
                     return;
                 }
-                int exif = _orientation.StillExifOrientation(_controller.CurrentCamera);
+                int exif = NextExifOrientation();
                 var outcome = await _controller.CaptureAsync(exif);
                 if (outcome.Still == null)
                 {
@@ -537,6 +612,14 @@ namespace InspectionEditor
                 case Key.F8:
                     Log("dev: stopping the preview frames (simulated stall).");
                     _ = _controller.DebugStallAsync();
+                    return true;
+                case Key.F9:
+                    // L1 on a PC without an orientation sensor: as if the tablet were held upright (preview turned,
+                    // stills tagged EXIF 6).
+                    _devUpright = !_devUpright;
+                    Log($"dev: held upright {(_devUpright ? "on" : "off")}.");
+                    UpdateOrientation();
+                    UpdateLandscapeGuide();
                     return true;
             }
             return false;

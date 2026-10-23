@@ -26,6 +26,7 @@ namespace InspectionEditor.Services.Camera
             public string Mode { get; set; } = RedCameraMode; // owner Q-60 default: RED camera
             public string? DeviceId { get; set; }
             public string? Panel { get; set; }
+            public bool AlwaysLandscape { get; set; } = true; // F-027 L1, owner 2026-10-22: on unless switched off
         }
 
         public CameraSettings Load()
@@ -64,6 +65,16 @@ namespace InspectionEditor.Services.Camera
         {
             var settings = Load();
             settings.Mode = windowsCameraApp ? WindowsCameraAppMode : RedCameraMode;
+            Save(settings);
+        }
+
+        /// <summary>F-027 L1: photos are always saved landscape (the camera screen's toggle).</summary>
+        public bool AlwaysLandscape => Load().AlwaysLandscape;
+
+        public void SetAlwaysLandscape(bool on)
+        {
+            var settings = Load();
+            settings.AlwaysLandscape = on;
             Save(settings);
         }
 

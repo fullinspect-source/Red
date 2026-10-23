@@ -174,6 +174,7 @@ namespace RedCamera.Core
         public bool Shared { get; }
         public ZoomCapabilities ZoomCapabilities { get; private set; } = ZoomCapabilities.DigitalOnly;
         public FocusCapabilities FocusCapabilities { get; private set; } = FocusCapabilities.None;
+        public (int Width, int Height) PhotoSize { get; private set; }
         public event Action<CameraPreviewFrame>? FrameArrived;
         public event Action<int, string>? Failed;
 
@@ -190,6 +191,7 @@ namespace RedCamera.Core
             if (!Shared) await ChooseStillSizeAsync(_source);
 
             var format = _source.CurrentFormat?.VideoFormat;
+            if (PhotoSize == (0, 0) && format != null) PhotoSize = ((int)format.Width, (int)format.Height); // stills from this stream
             var size = PreviewSize(format?.Width ?? 1280, format?.Height ?? 720);
             _reader = await _capture.CreateFrameReaderAsync(_source, MediaEncodingSubtypes.Bgra8, size);
             _reader.AcquisitionMode = MediaFrameReaderAcquisitionMode.Realtime;
@@ -389,7 +391,16 @@ namespace RedCamera.Core
                     .Select(p => (Props: p, Pixels: Pixels(p)))
                     .OrderByDescending(p => p.Pixels)
                     .FirstOrDefault();
-                if (largest.Props != null) await controller.SetMediaStreamPropertiesAsync(photoFrom, largest.Props);
+                if (largest.Props != null)
+                {
+                    await controller.SetMediaStreamPropertiesAsync(photoFrom, largest.Props);
+                    PhotoSize = largest.Props switch
+                    {
+                        ImageEncodingProperties image => ((int)image.Width, (int)image.Height),
+                        VideoEncodingProperties video => ((int)video.Width, (int)video.Height),
+                        _ => (0, 0),
+                    };
+                }
             }
             catch (Exception ex)
             {

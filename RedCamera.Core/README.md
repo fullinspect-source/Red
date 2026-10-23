@@ -17,6 +17,7 @@ use it, so a fix lands in both. Spec: `ios-port\program\features\F-027-reliable-
 - orientation (O1-O3);
 - zoom (Z1-Z3): the factor, the camera's own zoom or a digital crop of the preview and the still, and the gesture rules;
 - tap to focus and expose (T1-T3), camera cycling with skip-on-failure (C11), the shutter-key gate (K1);
+- landscape photos (L1): the band a photo taken upright keeps, and the guide's rectangle;
 - INSPECT 2026's camera-roll location (F-023 T3);
 - a WPF preview renderer.
 
@@ -118,6 +119,15 @@ var keys = new ShutterKeyGate();                           // PreviewKeyDown: Sp
 if (keys.Press(e.IsRepeat, e.Timestamp)) await TakePhotoAsync();   // WM_APPCOMMAND volume up: keys.Pulse(tick)
 ```
 
+### Landscape photos (1.3.0)
+
+```csharp
+controller.AlwaysLandscape = settings.AlwaysLandscape;     // RED: on unless the user switched it off
+// Framing guide, when on and the picture is shown upright:
+var shown = previewImage.TransformToAncestor(area).TransformBounds(new Rect(previewImage.RenderSize));
+if (CameraLandscape.Band(shown) is { } kept) { /* shade shown minus kept; outline kept */ }
+```
+
 `CaptureAsync` and `CaptureToFileAsync` crop a digital zoom's still to the region the preview shows, at the crop's own
 size. The zoom is kept through a rebuilt session and sleep/wake, and is 1x after `OpenAsync` and `SwitchCamera`. RED's
 `CameraCaptureWindow` is the reference screen (its taps are timed by the touch events' timestamps).
@@ -190,6 +200,14 @@ Sources: `ios-port\program\research\R-red-camera-companion.md` §3-§5, and F-02
 - `tests\CameraLiveCheck`: the real camera on this PC (A-027-16, A-027-28 zoom). Not in the automatic suite.
 
 ## Changes
+
+- 1.3.0 (2026-10-22, owner: landscape photos), added API only:
+  - `CameraSessionController.AlwaysLandscape` (off by default): a photo shown portrait is cut to its centred landscape
+    band. It is one cut together with any digital zoom, in stored pixels, with the EXIF orientation kept;
+  - `CameraLandscape` (`RegionFor`, `Upright`, `QuarterTurn`, `Band` for the on-screen guide) and
+    `CapturedStill.Landscaped`;
+  - `ICameraStillCropper.CropToAsync(still, region)` (a default that fails, so older croppers still compile; the
+    engine then keeps the zoomed photo); `JpegStillCropper` implements it.
 
 - 1.2.0 (2026-10-22, owner camera update, released with RED 2.3.8), added API only:
   - tap to focus and expose (F-027 T1-T3): `CameraFocus` (`TryMapTap`, `TapToFrame`, `DisplayToSource`,

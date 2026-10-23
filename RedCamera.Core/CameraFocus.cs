@@ -58,6 +58,23 @@ namespace RedCamera.Core
             return (a + 0.5, b + 0.5);
         }
 
+        /// <summary>The other way round from <see cref="DisplayToSource"/>: a point of the picture as delivered to where it
+        /// shows on screen (0..1 of the shown box), mirrored first, then turned clockwise.</summary>
+        public static (double X, double Y) SourceToDisplay(double u, double v, double rotationClockwise, bool mirrored)
+        {
+            double a = u - 0.5, b = v - 0.5;
+            if (mirrored) a = -a;
+            int quarter = ((int)Math.Round(rotationClockwise / 90.0) % 4 + 4) % 4;
+            (double p, double q) = quarter switch
+            {
+                1 => (-b, a),
+                2 => (-a, -b),
+                3 => (b, -a),
+                _ => (a, b),
+            };
+            return (p + 0.5, q + 0.5);
+        }
+
         /// <summary>A point of the zoomed (centred crop) picture to the same point of the full frame.</summary>
         public static (double X, double Y) SourceToFrame(double u, double v, double previewZoom)
         {

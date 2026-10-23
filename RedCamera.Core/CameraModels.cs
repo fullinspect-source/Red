@@ -27,6 +27,9 @@ namespace RedCamera.Core
     {
         /// <summary>F-027 Z2: the zoom the photo was taken at (1 = none). A digital zoom is already cropped into the photo.</summary>
         public double Zoom { get; init; } = 1.0;
+
+        /// <summary>F-027 L1 (1.3.0): true when a photo taken upright was cut to its landscape band.</summary>
+        public bool Landscaped { get; init; }
     }
 
     public interface ICameraBackend
@@ -62,6 +65,10 @@ namespace RedCamera.Core
         /// <summary>F-027 Z1: sets the camera's own zoom; called only when <see cref="ZoomCapabilities"/> is hardware.
         /// False when the camera refused it (the engine then zooms digitally).</summary>
         Task<bool> SetHardwareZoomAsync(double factor) => Task.FromResult(false);
+
+        /// <summary>F-027 L2 (1.3.0): the size of the stills this session takes, as chosen when it opened; (0, 0) when not
+        /// known (the engine then takes the preview's shape).</summary>
+        (int Width, int Height) PhotoSize => (0, 0);
 
         /// <summary>F-027 T1: what the camera can do with a tap (read once the session is open).</summary>
         FocusCapabilities FocusCapabilities => FocusCapabilities.None;
