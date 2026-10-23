@@ -150,7 +150,7 @@
             </Border>
             <TextBlock x:Name="DevHintText" Foreground="#80FFFFFF" FontSize="11" Margin="8" HorizontalAlignment="Left"
                        VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"
-                       Text="Dev: Ctrl+Shift+F5 suspend/resume · F6 display off/on · F7 lock/unlock · F8 stall · F9 held upright"/>
+                       Text="Dev: Ctrl+Shift+F4 rotation lock · F5 suspend/resume · F6 display off/on · F7 lock/unlock · F8 stall · F9 held upright"/>
 
             <!-- F-027 C11: switch camera, on the right edge just above the shutter, never over it. -->
             <Button x:Name="SwitchCameraButton" Panel.ZIndex="100" Width="56" Height="56" HorizontalAlignment="Right"

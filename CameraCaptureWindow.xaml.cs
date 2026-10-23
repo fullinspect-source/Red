@@ -67,6 +67,17 @@ namespace InspectionEditor
         private Point _touchDownPoint, _lastTapPoint;
         private int _photoCount;
         private bool _devSuspended, _devDisplayOff, _devLocked;
+        private readonly OrientationSwitchWatcher _rotation;
+        private int _devRotation; // dev builds (Ctrl+Shift+F4): 0 = Windows' own state, else one of DevRotationStates
+
+        private static readonly (AutoRotationState State, bool Landscape, string Name)[] DevRotationStates =
+        {
+            (AutoRotationState.Enabled, true, "Windows' own state"),
+            (AutoRotationState.Enabled, true, "auto-rotate on"),
+            (AutoRotationState.Disabled, true, "rotation locked in landscape"),
+            (AutoRotationState.Disabled, false, "rotation locked in portrait"),
+            (AutoRotationState.NoSensor, true, "no rotation sensor")
+        };
 
         /// <summary>Raised on the UI thread for each still; the main window adds it to the bound item.</summary>
         public event Action<CameraPhoto>? PhotoTaken;
@@ -81,10 +92,16 @@ namespace InspectionEditor
             _target = target;
             _controller = new CameraSessionController(new WinRtCameraBackend(Log), _cameraSettings,
                 () => DateTime.UtcNow, log: Log);
+            // Owner 2026-10-23: Windows' rotation lock decides whether the switch is offered (RedCamera.Core's rule).
+            _rotation = new OrientationSwitchWatcher(
+                () => _devRotation == 0 ? CameraRotationLock.ReadState() : DevRotationStates[_devRotation].State,
+                () => _devRotation == 0 ? CameraRotationLock.IsDisplayLandscape(new WindowInteropHelper(this).Handle) : DevRotationStates[_devRotation].Landscape);
             _loadingToggle = true;
             LandscapeToggle.IsChecked = _controller.AlwaysLandscape = _cameraSettings.AlwaysLandscape; // L1: on by default
             _loadingToggle = false;
             ShowLandscapeToggle();
+            _rotation.Changed += _ => ApplyRotationRule();
+            ApplyRotationRule(); // watched from OnLoaded: a window that is never shown must not keep a poll running
             _controller.StateChanged += OnControllerStateChanged;
             _controller.ZoomChanged += OnZoomChanged;
             // C11: the new camera's name, unless a note about a skipped camera (which names it) is still being read.
@@ -142,6 +159,8 @@ namespace InspectionEditor
         {
             try
             {
+                _rotation.Attach(this); // stops when the window closes
+                _rotation.Refresh();    // now on the window's own monitor
                 PlaceOnRightHalf();
                 RefreshTarget();
                 _holds.Attach();
@@ -271,12 +290,24 @@ namespace InspectionEditor
         private void LandscapeToggle_Changed(object sender, RoutedEventArgs e)
         {
             bool on = LandscapeToggle.IsChecked == true;
-            _controller.AlwaysLandscape = on;
+            _controller.AlwaysLandscape = on || _rotation.Current.ForceLandscape;
             ShowLandscapeToggle();
             UpdateLandscapeGuide();
             if (_loadingToggle) return;
             _cameraSettings.SetAlwaysLandscape(on);
             Log($"landscape photos {(on ? "on" : "off")}.");
+        }
+
+        // Owner 2026-10-23: locked in landscape, or a screen that cannot rotate: no switch, and photos are landscape. The
+        // switch is hidden, not collapsed, so nothing in the top bar moves under a finger; the stored choice is kept for
+        // when it shows again (unlocked, or locked in portrait).
+        private void ApplyRotationRule()
+        {
+            var rule = _rotation.Current;
+            LandscapeToggle.Visibility = rule.ShowSwitch ? Visibility.Visible : Visibility.Hidden;
+            _controller.AlwaysLandscape = rule.ForceLandscape || LandscapeToggle.IsChecked == true;
+            UpdateLandscapeGuide();
+            Log($"orientation switch: {rule.Reason}.");
         }
 
         // Owner 2026-10-22: "default to "landscape only" or when pressed .. "allow all orientations"".
@@ -621,6 +652,12 @@ namespace InspectionEditor
                     Log($"dev: held upright {(_devUpright ? "on" : "off")}.");
                     UpdateOrientation();
                     UpdateLandscapeGuide();
+                    return true;
+                case Key.F4:
+                    // The owner's rotation-lock rule on a PC that cannot rotate: cycle through simulated states.
+                    _devRotation = (_devRotation + 1) % DevRotationStates.Length;
+                    Log($"dev: rotation {DevRotationStates[_devRotation].Name}.");
+                    _rotation.Refresh();
                     return true;
             }
             return false;

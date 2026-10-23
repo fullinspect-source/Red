@@ -4,6 +4,50 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-23 — RED 2.3.15 — the orientation switch follows Windows' rotation lock (F-027 L4, RedCamera.Core 1.4.0)
+
+- **Base:** 2.3.14 (`c9e06d3`, another session's license-policy release, published while this one was in its checks). Built in `Dropbox\P\PL` by the F-027 camera session.
+  - The owner, relayed by the coordinating session: "it should determine first of all if the windows instance is
+    already orientation locked. if the windows is rotation locked during the use of RED camera and the rotation locked is
+    already in horizontal / landscape view, then the control for override should not be shown .. however if the device
+    is not rotation locked then the control / override button should appear and then it should work."
+  - Only the camera files were copied from PL, with CRLF. PL also holds two unreleased changes, which are not in this
+    release: section headers' "N items to fix", and the ORDERS check after Remove.
+- **Files:**
+  - `RedCamera.Core/CameraRotationLock.cs` (new) holds:
+    - `CameraRotationLock`: `Decide`, `ReadState` (user32 `GetAutoRotationState`), `IsDisplayLandscape` (the window's
+      monitor);
+    - `AutoRotationState`, `OrientationSwitchDecision`;
+    - `OrientationSwitchWatcher`: activation, `WM_DISPLAYCHANGE`/`WM_SETTINGCHANGE`, a 2 s poll; it stops on close.
+  - `RedCamera.Core/RedCamera.Core.csproj`: 1.4.0. `RedCamera.Core/README.md`: the rule and the 1.4.0 changes.
+  - `CameraCaptureWindow.xaml.cs` and `.xaml`:
+    - the watcher is made before the stored choice loads and attached in `OnLoaded`;
+    - `ApplyRotationRule` sets the switch to Visible or Hidden (Hidden, so nothing moves), with the effective
+      `AlwaysLandscape` = forced or the stored choice;
+    - the rule never writes the setting;
+    - dev key Ctrl+Shift+F4 simulates the states.
+  - `tests/RedCameraCoreHarness/Program.cs`: RL1-RL5. `tests/CameraCaptureHarness/Program.cs`: RL-red.
+  - Version 2.3.15 in the csproj (ReleaseDate 2026-10-23 as 2.3.14 set it) and the four release-metadata tests (2.3.14 had left them at 2.3.13); release notes; this handoff.
+- **Behavior:**
+  - Locked in landscape, or a screen that cannot rotate (no sensor, not supported, laptop, docked, several monitors, a
+    remote session): the switch is hidden and photos are landscape.
+  - Locked in portrait, or auto-rotate on: the switch is shown and works.
+  - A state Windows cannot report: shown, as before.
+- **Review:** an independent review found no blocking defect. Two fixes were made:
+  - the watcher was attached in the constructor, so a window whose Show failed would keep a poll; it is now attached in
+    `OnLoaded`;
+  - RL5 could not fail; it now checks a 100 ms poll stops on close.
+- **Verification:**
+  - PL: RedCameraCoreHarness 57/57; CameraCaptureHarness 15/15.
+  - In-app with this PC's webcam, 24/24 including RL-live:
+    - this PC (NoSensor): the switch is hidden;
+    - simulated locked-landscape: hidden, and an upright photo comes out 360x202 with the stored choice OFF;
+    - locked-portrait: shown, and that photo is 360x640;
+    - the top bar does not move.
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged).
+- **Deployment:** pending.
+
 ### 2026-10-23 — RED 2.3.13 — photo button labels wrap instead of being cut off
 
 - **Base:** 2.3.12 (`623b9eb`). Built in `Dropbox\P\PL` by the F-027 camera session.

@@ -271,6 +271,8 @@ static class CameraHarness
             LandscapeRules();
             await LandscapePhotos();
             LandscapeJpeg();
+            RotationLockRule();
+            RotationLockWatcher();
         }
         catch (Exception ex)
         {
@@ -1173,6 +1175,130 @@ static class CameraHarness
         for (int i = 0; i + 3 < Math.Min(a.Length, b.Length); i += 4, n++)
             sum += Math.Abs(a[i] - b[i]) + Math.Abs(a[i + 1] - b[i + 1]) + Math.Abs(a[i + 2] - b[i + 2]);
         return n == 0 ? double.MaxValue : sum / (3.0 * n);
+    }
+
+    /// <summary>
+    /// Owner rule 2026-10-23 (RL1): every AR_STATE flag, and the combinations that matter, against a landscape, portrait and
+    /// unknown screen. Shown: auto-rotate on (or suppressed), locked in portrait, an unknown state. Hidden with landscape
+    /// forced: locked in landscape, and any screen that cannot rotate (that wins over the lock).
+    /// </summary>
+    private static void RotationLockRule()
+    {
+        const string Show = "show", Hide = "hide+landscape";
+        var table = new (AutoRotationState? State, bool? Landscape, string Expect)[]
+        {
+            (AutoRotationState.Enabled, true, Show), (AutoRotationState.Enabled, false, Show), (AutoRotationState.Enabled, null, Show),
+            (AutoRotationState.Suppressed, true, Show), (AutoRotationState.Suppressed, false, Show),
+            (AutoRotationState.Disabled, true, Hide), (AutoRotationState.Disabled, false, Show), (AutoRotationState.Disabled, null, Show),
+            (AutoRotationState.Disabled | AutoRotationState.Suppressed, true, Hide),
+            (AutoRotationState.Disabled | AutoRotationState.Suppressed, false, Show),
+            (null, true, Show), (null, false, Show), (null, null, Show),
+        };
+        var cannot = new[] { AutoRotationState.RemoteSession, AutoRotationState.MultiMonitor, AutoRotationState.NoSensor,
+                             AutoRotationState.NotSupported, AutoRotationState.Docked, AutoRotationState.Laptop };
+        var rows = table.ToList();
+        foreach (var flag in cannot)
+            foreach (bool? landscape in new bool?[] { true, false, null })
+            {
+                rows.Add((flag, landscape, Hide));
+                rows.Add((flag | AutoRotationState.Disabled, landscape, Hide));  // locked, but it cannot rotate anyway
+            }
+        rows.Add((AutoRotationState.NoSensor | AutoRotationState.Laptop | AutoRotationState.MultiMonitor, false, Hide));
+        var wrong = new List<string>();
+        foreach (var (state, landscape, expect) in rows)
+        {
+            var d = CameraRotationLock.Decide(state, landscape);
+            string got = d.ShowSwitch && !d.ForceLandscape ? Show : !d.ShowSwitch && d.ForceLandscape ? Hide : $"show={d.ShowSwitch} force={d.ForceLandscape}";
+            if (got != expect || string.IsNullOrWhiteSpace(d.Reason))
+                wrong.Add($"{state?.ToString() ?? "unknown"}/{(landscape == null ? "?" : landscape.Value ? "landscape" : "portrait")}: {got}");
+        }
+        Check("RL1-table", wrong.Count == 0,
+            $"the decision for all {rows.Count} combinations of AR_* flags x landscape/portrait/unknown: hidden + landscape when locked in "
+            + "landscape or the screen cannot rotate, shown otherwise" + (wrong.Count > 0 ? ": WRONG " + string.Join("; ", wrong) : ""));
+
+        var real = CameraRotationLock.ReadState();
+        var shape = CameraRotationLock.IsDisplayLandscape(IntPtr.Zero);
+        Check("RL2-windows", real != null && shape != null,
+            $"user32 answers on this PC: GetAutoRotationState {real?.ToString() ?? "failed"} (0x{(int)(real ?? 0):X}), primary screen {(shape == null ? "unknown" : shape.Value ? "landscape" : "portrait")}");
+    }
+
+    /// <summary>
+    /// RL3-RL5: the watcher on a real (hidden) window: a lock switched on or off is picked up by the poll alone (Windows
+    /// sends no message for it), a display change message re-reads at once, Changed is raised only on a change, and closing
+    /// the window stops it.
+    /// </summary>
+    private static void RotationLockWatcher()
+    {
+        var lines = new List<string>();
+        bool polled = false, message = false, quiet = false, stopped = false, manual = false;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                AutoRotationState? state = AutoRotationState.Enabled;
+                bool? landscape = true;
+                var watcher = new OrientationSwitchWatcher(() => state, () => landscape);
+                var seen = new List<OrientationSwitchDecision>();
+                watcher.Changed += d => seen.Add(d);
+                manual = watcher.Current.ShowSwitch && !watcher.Refresh() && seen.Count == 0;
+
+                var window = new System.Windows.Window
+                {
+                    Width = 200, Height = 100, WindowStyle = System.Windows.WindowStyle.None, ShowInTaskbar = false,
+                    ShowActivated = false, Left = -6000, Top = -6000
+                };
+                window.Show();
+                watcher.Attach(window, TimeSpan.FromMilliseconds(100));
+                Pump();
+
+                // The user locks rotation while the tablet is landscape: no message; the poll hides the switch.
+                state = AutoRotationState.Disabled;
+                var until = DateTime.UtcNow.AddSeconds(2);
+                while (DateTime.UtcNow < until && seen.Count == 0) { Thread.Sleep(20); Pump(); }
+                polled = seen.Count == 1 && !seen[0].ShowSwitch && seen[0].ForceLandscape && !watcher.Current.ShowSwitch;
+                lines.Add($"locked in landscape: {(seen.Count > 0 ? seen[^1].Reason : "no change seen")}");
+
+                // Nothing changes for a while: no more events.
+                until = DateTime.UtcNow.AddMilliseconds(500);
+                while (DateTime.UtcNow < until) { Thread.Sleep(20); Pump(); }
+                quiet = seen.Count == 1;
+
+                // A slow poll from here; the screen turns to portrait and Windows sends WM_DISPLAYCHANGE: read at once.
+                watcher.Dispose();
+                watcher = new OrientationSwitchWatcher(() => state, () => landscape);
+                watcher.Changed += d => seen.Add(d);
+                watcher.Attach(window, TimeSpan.FromMinutes(5));
+                landscape = false;
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                SendMessage(hwnd, 0x007Eu, IntPtr.Zero, IntPtr.Zero);
+                until = DateTime.UtcNow.AddSeconds(1);
+                while (DateTime.UtcNow < until && seen.Count < 2) { Thread.Sleep(20); Pump(); }
+                message = seen.Count == 2 && seen[1].ShowSwitch && !seen[1].ForceLandscape;
+                lines.Add($"display change to portrait: {(seen.Count > 1 ? seen[^1].Reason : "no change seen")}");
+
+                // Closed: a watcher polling every 100 ms stops (without OnClosed => Dispose its poll would see the change).
+                watcher.Dispose();
+                watcher = new OrientationSwitchWatcher(() => state, () => landscape);
+                watcher.Changed += d => seen.Add(d);
+                watcher.Attach(window, TimeSpan.FromMilliseconds(100));
+                window.Close();
+                Pump();
+                state = AutoRotationState.NoSensor;
+                until = DateTime.UtcNow.AddMilliseconds(600);
+                while (DateTime.UtcNow < until) { Thread.Sleep(20); Pump(); }
+                stopped = seen.Count == 2 && !watcher.Current.ForceLandscape;
+            }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join(TimeSpan.FromSeconds(20));
+        Check("RL3-poll", manual && polled && quiet,
+            $"rotation lock switched on (no Windows message) is picked up by the 2 s poll (here 100 ms), once; Refresh without a change raises nothing ({string.Join("; ", lines.Take(1))}{error?.Message})");
+        Check("RL4-display-change", message,
+            $"WM_DISPLAYCHANGE (the screen turned) re-reads at once: locked in portrait shows the switch again ({string.Join("; ", lines.Skip(1))}{error?.Message})");
+        Check("RL5-closed", stopped, "closing the window stops its watcher: a state change 600 ms later is not seen by its 100 ms poll");
     }
 
     private static void Pump()

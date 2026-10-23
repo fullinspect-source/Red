@@ -242,6 +242,24 @@ static class CameraHarness
             + "reads \"Landscape only\" (the default) or \"Allow all orientations\" (owner 2026-10-22); it starts from RED's "
             + "camera setting and switches the engine; the framing guide takes no input; the upright simulation is dev-only");
 
+        // Owner 2026-10-23: Windows' rotation lock decides whether the switch is offered (RedCamera.Core's rule and watcher).
+        int watcherAt = code.IndexOf("_rotation = new OrientationSwitchWatcher(", StringComparison.Ordinal);
+        int toggleLoad = code.IndexOf("LandscapeToggle.IsChecked = _controller.AlwaysLandscape = _cameraSettings.AlwaysLandscape", StringComparison.Ordinal);
+        int onLoaded = code.IndexOf("private async void OnLoaded(", StringComparison.Ordinal);
+        int attachAt = code.IndexOf("_rotation.Attach(this);", StringComparison.Ordinal);
+        Check("RL-red", watcherAt > 0 && watcherAt < toggleLoad && onLoaded > 0 && attachAt > onLoaded
+            && code.IndexOf("_rotation.Attach(this);", attachAt + 1, StringComparison.Ordinal) < 0
+            && code.Contains("CameraRotationLock.ReadState()") && code.Contains("CameraRotationLock.IsDisplayLandscape(new WindowInteropHelper(this).Handle)")
+            && code.Contains("_rotation.Changed += _ => ApplyRotationRule();")
+            && code.Contains("LandscapeToggle.Visibility = rule.ShowSwitch ? Visibility.Visible : Visibility.Hidden;")
+            && code.Contains("_controller.AlwaysLandscape = rule.ForceLandscape || LandscapeToggle.IsChecked == true;")
+            && code.Contains("_controller.AlwaysLandscape = on || _rotation.Current.ForceLandscape;")
+            && !code.Contains("SetAlwaysLandscape(rule") && code.Contains("case Key.F4:") && xaml.Contains("Ctrl+Shift+F4 rotation lock"),
+            "the switch follows Windows' rotation lock: hidden (its space kept, nothing moves) and landscape forced when locked in "
+            + "landscape or the screen cannot rotate; shown otherwise; the stored choice is never changed by the rule; it is "
+            + "watched only once the window has loaded (a window never shown keeps no poll); dev builds simulate the states with "
+            + "Ctrl+Shift+F4");
+
         // The engine stays free of RED code, so the RED Camera companion can reuse it unchanged.
         string coreFolder = Path.Combine(root, "RedCamera.Core");
         var coreSources = Directory.Exists(coreFolder)

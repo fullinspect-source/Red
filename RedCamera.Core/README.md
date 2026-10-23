@@ -132,6 +132,31 @@ if (CameraLandscape.Band(shown) is { } kept) { /* shade shown minus kept; outlin
 size. The zoom is kept through a rebuilt session and sleep/wake, and is 1x after `OpenAsync` and `SwitchCamera`. RED's
 `CameraCaptureWindow` is the reference screen (its taps are timed by the touch events' timestamps).
 
+### The orientation switch follows Windows' rotation lock (1.4.0)
+
+```csharp
+var rotation = OrientationSwitchWatcher.ForWindow(window);  // activation, display changes, a 2 s poll
+void Apply()
+{
+    var rule = rotation.Current;
+    landscapeSwitch.Visibility = rule.ShowSwitch ? Visibility.Visible : Visibility.Hidden; // Hidden: nothing moves
+    controller.AlwaysLandscape = rule.ForceLandscape || landscapeSwitch.IsChecked == true; // stored choice untouched
+}
+rotation.Changed += _ => Apply();
+Apply();
+// and in the switch's own handler: controller.AlwaysLandscape = on || rotation.Current.ForceLandscape;
+```
+
+Owner rule (2026-10-23):
+- Rotation locked in landscape: the switch is hidden and photos are landscape.
+- Rotation locked in portrait, or auto-rotate on: the switch is shown and works.
+- A screen that cannot rotate (no sensor, not supported, laptop, docked, several monitors, remote session): the switch is
+  hidden and photos are landscape.
+- An unknown state: the switch is shown, as before 1.4.0.
+
+`CameraRotationLock.Decide(state, displayLandscape)` is the pure table. `ReadState()` reads user32
+`GetAutoRotationState`; `IsDisplayLandscape(hwnd)` reads the window's monitor.
+
 ## API summary
 
 **`CameraSessionController`**
@@ -200,6 +225,15 @@ Sources: `ios-port\program\research\R-red-camera-companion.md` §3-§5, and F-02
 - `tests\CameraLiveCheck`: the real camera on this PC (A-027-16, A-027-28 zoom). Not in the automatic suite.
 
 ## Changes
+
+- 1.4.0 (2026-10-23, owner: the orientation switch follows Windows' rotation lock), added API only:
+  - `CameraRotationLock` (`Decide`, `ReadState`, `IsDisplayLandscape`, `CannotRotate`), `AutoRotationState` (the AR_STATE
+    flags) and `OrientationSwitchDecision` (`ShowSwitch`, `ForceLandscape`, `Reason`);
+  - `OrientationSwitchWatcher` (`ForWindow`, `Attach`, `Refresh`, `Current`, `Changed`, `Dispose`). It re-reads on
+    window activation, `WM_DISPLAYCHANGE` and `WM_SETTINGCHANGE`, and every 2 s, because switching rotation lock sends
+    no message. It stops when the window closes.
+  - Tests: `RedCameraCoreHarness` RL1-RL5 (every flag x landscape/portrait/unknown; the poll, the display-change message
+    and the stop on close, on a real window).
 
 - 1.3.0 (2026-10-22, owner: landscape photos), added API only:
   - `CameraSessionController.AlwaysLandscape` (off by default): a photo shown portrait is cut to its centred landscape

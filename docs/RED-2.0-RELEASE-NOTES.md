@@ -1,5 +1,14 @@
 # RED 2.0 Release Notes
 
+## 2.3.15 — RED's camera: the orientation switch follows rotation lock
+
+- **Rotation lock on, tablet in landscape:** the "Landscape only" switch is not shown at the top of the camera screen,
+  and every photo is saved wide.
+- **Rotation lock off (or locked while the tablet is upright):** the switch is shown and works as before.
+- **A screen that cannot turn** (a laptop, a docked tablet, a PC without a rotation sensor): no switch; photos are wide.
+- The switch appears or disappears within about 2 seconds of changing rotation lock, without moving anything else on
+  the screen. Your own choice on the switch is kept for when it shows again.
+
 ## 2.3.13 — Photo button labels fit on the tablet
 
 - **No more cut-off labels** on File, Camera and Delete beside the photo: a long label now wraps onto a second line
