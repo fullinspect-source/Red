@@ -1,5 +1,11 @@
 # RED 2.0 Release Notes
 
+## 2.3.13 — Photo button labels fit on the tablet
+
+- **No more cut-off labels** on File, Camera and Delete beside the photo: a long label now wraps onto a second line
+  (for example "Camera" / "Open") instead of being cut off on a tablet.
+- **The photo count reads "1 photo" or "12 photos"** on the Camera button, instead of "12 photo(s)".
+
 ## 2.3.12 — Taller photo buttons
 
 - **File, Camera and Delete** beside the photo, on the right side of the editor, are now about twice as tall, so

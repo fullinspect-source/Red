@@ -145,9 +145,11 @@ class Red21LayoutTests(unittest.TestCase):
         self.assertLess(XAML.index('x:Name="SavedCommentsBorder"'), XAML.index('x:Name="PhotoBorder"'))
         self.assertLess(XAML.index('x:Name="PhotoBorder"'), XAML.index('x:Name="GenAiBorder"'))
         self.assertIn('x:Name="PhotoBorder" Height="150"', XAML)
+        self.assertIn('<AccessText Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>', XAML)
         for name in ("SelectPhotoButton", "CameraButton", "DeletePhotoButton"):
             start = XAML.index(f'x:Name="{name}"')
-            self.assertIn('MinHeight="44"', XAML[start:start + 400])
+            self.assertIn('MinHeight="44"', XAML[start:start + 500])
+            self.assertIn('ContentTemplate="{StaticResource PhotoActionLabelTemplate}"', XAML[start:start + 500])
         self.assertIn('x:Name="PhotoImage" Grid.Column="1" Width="180" Height="100"', XAML)
         self.assertIn('x:Name="PrevPhotoButton" Grid.Column="0"', XAML)
         self.assertIn('x:Name="NextPhotoButton" Grid.Column="2"', XAML)

@@ -1133,9 +1133,16 @@
                                 <TextBlock x:Name="PhotoCounterText" Grid.Column="1" Text="No photos" FontSize="10" Foreground="#334155" Background="#CCFFFFFF" Padding="4,1" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
                                 <Button x:Name="NextPhotoButton" Grid.Column="2" Content="▶" Click="NextPhotoButton_Click" Visibility="Collapsed" Background="#555" Foreground="White" BorderThickness="0" Padding="4" FontSize="14" Width="30" Height="42" VerticalAlignment="Center" TabIndex="45"/>
                                 <StackPanel x:Name="PhotoActionsPanel" Grid.Column="3" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <Button x:Name="SelectPhotoButton" Content="📁 _File" Click="SelectPhotoButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" MinHeight="44" ToolTip="Select photo file (Alt+F)" TabIndex="40"/>
-                                    <Button x:Name="CameraButton" Content="📷 Ca_mera" Click="CameraButton_Click" Background="#9B59B6" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" MinHeight="44" ToolTip="Take photo with camera (Alt+M)" TabIndex="41"/>
-                                    <Button x:Name="DeletePhotoButton" Content="🗑️ De_lete" Click="DeletePhotoButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="8,4" Margin="0,1" MinHeight="44" IsEnabled="False" ToolTip="Delete current photo (Alt+L)" TabIndex="42"/>
+                                    <StackPanel.Resources>
+                                        <!-- Owner 2026-10-23: "Camera Open" and "N photos" were cut off on a tablet. A long label wraps
+                                             onto a second line instead; AccessText keeps Alt+F / Alt+M / Alt+L. -->
+                                        <DataTemplate x:Key="PhotoActionLabelTemplate">
+                                            <AccessText Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                        </DataTemplate>
+                                    </StackPanel.Resources>
+                                    <Button x:Name="SelectPhotoButton" Content="📁 _File" ContentTemplate="{StaticResource PhotoActionLabelTemplate}" Click="SelectPhotoButton_Click" Background="#3498DB" Foreground="White" BorderThickness="0" Padding="4,2" Margin="0,1" MinHeight="44" ToolTip="Select photo file (Alt+F)" TabIndex="40"/>
+                                    <Button x:Name="CameraButton" Content="📷 Ca_mera" ContentTemplate="{StaticResource PhotoActionLabelTemplate}" Click="CameraButton_Click" Background="#9B59B6" Foreground="White" BorderThickness="0" Padding="4,2" Margin="0,1" MinHeight="44" ToolTip="Take photo with camera (Alt+M)" TabIndex="41"/>
+                                    <Button x:Name="DeletePhotoButton" Content="🗑️ De_lete" ContentTemplate="{StaticResource PhotoActionLabelTemplate}" Click="DeletePhotoButton_Click" Background="#E74C3C" Foreground="White" BorderThickness="0" Padding="4,2" Margin="0,1" MinHeight="44" IsEnabled="False" ToolTip="Delete current photo (Alt+L)" TabIndex="42"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

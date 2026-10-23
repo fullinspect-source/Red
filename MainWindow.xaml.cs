@@ -2297,8 +2297,9 @@ namespace InspectionEditor
                     Focus();
                 }
 
-                // Brief visual feedback on the button
-                CameraButton.Content = $"📷 {_editorLoadedItem.Pictures.Count} photo(s)";
+                // Brief visual feedback on the button. A plain plural: WPF may wrap "photo(s)" before the "(" on a tablet.
+                int photoCount = _editorLoadedItem.Pictures.Count;
+                CameraButton.Content = $"📷 {photoCount} {(photoCount == 1 ? "photo" : "photos")}";
             }
             catch (InvalidOperationException ex)
             {

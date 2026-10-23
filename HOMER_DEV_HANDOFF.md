@@ -4,6 +4,37 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-23 — RED 2.3.13 — photo button labels wrap instead of being cut off
+
+- **Base:** 2.3.12 (`623b9eb`). Built in `Dropbox\P\PL` by the F-027 camera session.
+  - The owner: "Yes, fix the Camera button's cut-off labels on the tablet, then ask me before releasing."
+  - Released on the owner's word: "Yes, release the label fix as RED 2.3.13 with the usual checks, and publish it on
+    GitHub as the latest release."
+  - Ported as line edits. PL's `MainWindow.xaml.cs` is older than this tree's, so that file was never copied.
+- **Files:**
+  - `MainWindow.xaml`:
+    - `PhotoActionLabelTemplate`, an `AccessText` with `TextWrapping="Wrap"` and `TextAlignment="Center"`, so Alt+F /
+      Alt+M / Alt+L keep working.
+    - It is the `ContentTemplate` of `SelectPhotoButton`, `CameraButton` and `DeletePhotoButton`.
+    - Their padding is `4,2` (was `8,4`).
+  - `MainWindow.xaml.cs`: after a photo arrives, the Camera button reads "📷 1 photo" / "📷 N photos" (was
+    "📷 N photo(s)", which WPF broke before the "(").
+  - `tests/red_21_layout_static_test.py`: pins the template on the three buttons.
+  - Version 2.3.13 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:**
+  - At the right panel's 390 px minimum (a 1280-wide tablet): "📷 Camera | Open" and "📷 12 | photos".
+  - On a wide screen every label stays on one line.
+  - The buttons stay 44 px tall.
+- **Known, not changed:** once an item loads, RED's code relabels the button "📷 Camera" without the underscore, so
+  Alt+M stops working after the first item. Already so in 2.3.12.
+- **Verification:**
+  - PL in-app measurement (isolated Red2Dev, sandbox report, 1280x800 and 1920x1040): 8/8. It reads the drawn lines,
+    so every break falls at a space.
+  - PL: 49/49 harnesses. PdfCleanup flaked once on timing, then passed 3 of 3.
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged).
+- **Deployment:** pending.
+
 ### 2026-10-22 — RED 2.3.12 — taller File / Camera / Delete photo buttons
 
 - **Base:** 2.3.11 (`d83ad8f`). Built in `Dropbox\P\PL` by the F-027 camera session.
