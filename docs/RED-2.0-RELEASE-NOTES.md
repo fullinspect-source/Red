@@ -1,5 +1,10 @@
 # RED 2.0 Release Notes
 
+## 2.3.12 — Taller photo buttons
+
+- **File, Camera and Delete** beside the photo, on the right side of the editor, are now about twice as tall, so
+  they are easy to hit with a finger on the tablet. The photo box is a little taller to hold them.
+
 ## 2.3.11 — RED's camera: clearer landscape setting
 
 - **The switch at the top of the camera screen now says "Landscape only"** (the normal setting: every photo is saved

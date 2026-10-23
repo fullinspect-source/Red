@@ -4,6 +4,27 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-22 — RED 2.3.12 — taller File / Camera / Delete photo buttons
+
+- **Base:** 2.3.11 (`d83ad8f`). Built in `Dropbox\P\PL` by the F-027 camera session.
+  - The owner: "file camera and delete buttons are too short (not tall engout) in the right panel of RED v 2.3.11".
+  - Released on the owner's word: "released updated version" (no release had been made since 2.3.11).
+  - Only the changed lines were applied here, so the file's mixed line endings stay as they were.
+- **Files:**
+  - `MainWindow.xaml`: `SelectPhotoButton`, `CameraButton` and `DeletePhotoButton` get `MinHeight="44"` (were about
+    24 px). `PhotoBorder` goes from 120 to 150 px tall to hold them. Text size and widths are unchanged.
+  - `tests/red_21_layout_static_test.py`: pins the 150 px photo box and the three 44 px buttons.
+  - Version 2.3.12 in the csproj and the four release-metadata tests; release notes; this handoff.
+- **Behavior:** only the heights change. Clicks, Alt+F / Alt+M / Alt+L, tab order and read-only locking are as before.
+- **Known, not changed:** at the right panel's 390 px minimum (a 1280-wide tablet), the Camera button is about 86 px
+  wide. Its longer labels "📷 Camera Open" and "📷 N photo(s)" were already cut off there in 2.3.11.
+- **Verification:**
+  - PL, isolated Red2Dev build on a sandbox report, measured in the app at 1280x800 and 1920x1040: each button
+    44 px tall, all three inside the 140 px photo area.
+  - This tree: see Deployment.
+  - Not run: the corpus round trip (save code unchanged).
+- **Deployment:** pending.
+
 ### 2026-10-22 — RED 2.3.11 — the landscape toggle in the owner's words
 
 - **Base:** 2.3.10 (`e2da8e0`). Built in `Dropbox\P\PL` by the F-027 camera session.
