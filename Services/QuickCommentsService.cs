@@ -103,6 +103,43 @@ namespace InspectionEditor.Services
         }
 
         /// <summary>
+        /// Every suggestion of one inspection type, by item number, most used first, read once (owner 2026-10-24: the
+        /// checklist search reads all of them, not only the top three).
+        /// </summary>
+        public Dictionary<string, List<string>> AllSuggestionsFor(string app)
+        {
+            LoadComments();
+            return SuggestionsByItem(_comments, app);
+        }
+
+        public static Dictionary<string, List<string>> SuggestionsByItem(IReadOnlyDictionary<string, List<QuickComment>> comments, string app)
+        {
+            string prefix = app + "|";
+            var result = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var pair in comments)
+            {
+                if (!pair.Key.StartsWith(prefix, StringComparison.Ordinal) || pair.Value == null)
+                    continue;
+                result[pair.Key.Substring(prefix.Length)] = pair.Value
+                    .Where(s => s != null && !string.IsNullOrWhiteSpace(s.Text)) // a damaged entry is skipped
+                    .OrderByDescending(s => s.Count)
+                    .Select(s => s.Text)
+                    .ToList();
+            }
+            return result;
+        }
+
+        /// <summary>Names the loaded file's state; it changes when a newer quick_comments.json is read.</summary>
+        public string Stamp
+        {
+            get
+            {
+                LoadComments();
+                return $"{_loadedPath}|{_loadedWriteTimeUtc.Ticks}|{_comments.Count}";
+            }
+        }
+
+        /// <summary>
         /// Check if there are any suggestions available for an item.
         /// </summary>
         public bool HasSuggestions(string app, string itemNumber)

@@ -4632,8 +4632,11 @@ namespace InspectionEditor
             _inlineNumberpadSliders.Clear();
             ClearInlineItemGroupCells();
             ClearHeaderSectionState();
+            _checklistSearchText = filter ?? "";
             if (!_inlineEditorMode || _currentInspection?.Sections == null)
                 return;
+            if (!string.IsNullOrWhiteSpace(filter))
+                RefreshCommentSearchIndex(); // owner 2026-10-24: items also match through their common comments
 
             bool isSCI = (_currentInspectionCode ?? "").Equals("SCI", StringComparison.OrdinalIgnoreCase);
             bool hasAnyRows = false;
@@ -4688,18 +4691,10 @@ namespace InspectionEditor
             if (!ChecklistItemVisibility.ShouldShow(item))
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(filter))
-            {
-                string filterLower = filter.ToLower();
-                bool matchesFilter =
-                    item.Name?.ToLower().Contains(filterLower) == true ||
-                    item.Number?.ToLower().Contains(filterLower) == true ||
-                    item.Comments?.ToLower().Contains(filterLower) == true ||
-                    item.Value?.ToString()?.ToLower().Contains(filterLower) == true;
-
-                if (!matchesFilter)
-                    return false;
-            }
+            // Owner 2026-10-24: the item's own text, or one of its common comments, contains the search.
+            if (!string.IsNullOrWhiteSpace(filter) &&
+                !InlineSearchLabelMatches(item, filter.ToLower()) && !MatchesThroughComments(item, filter))
+                return false;
 
             if (_ofiFilterActive)
             {
@@ -5263,6 +5258,8 @@ namespace InspectionEditor
                 chips.Children.Add(CreateInlineBadge($"Photo {item.Pictures.Count}", new SolidColorBrush(Color.FromRgb(37, 99, 235)), Brushes.White, FontWeights.SemiBold));
             if (!string.IsNullOrWhiteSpace(item.Comments))
                 chips.Children.Add(CreateInlineBadge("Comment", new SolidColorBrush(Color.FromRgb(88, 80, 141)), Brushes.White, FontWeights.SemiBold));
+            if (IsInlineCommentOnlySearchMatch(item))
+                chips.Children.Add(CreateCommentSearchBadge()); // owner 2026-10-24: listed through a common comment
             var pressureBalanceChip = CreateInlineRoomPressureBalanceChip(item);
             if (pressureBalanceChip != null)
                 chips.Children.Add(pressureBalanceChip);
@@ -6561,6 +6558,8 @@ namespace InspectionEditor
                         BorderBrush = new SolidColorBrush(Color.FromRgb(165, 180, 252)),
                         ToolTip = comment
                     };
+                    if (ChecklistCommentSearch.Contains(comment, _checklistSearchText))
+                        HighlightMatchingComment(button); // owner 2026-10-24
                     button.Click += InlineQuickCommentButton_Click;
                     Grid.SetColumn(button, i);
                     quickPanel.Children.Add(button);
@@ -6687,8 +6686,13 @@ namespace InspectionEditor
             var panel = new DockPanel { LastChildFill = true };
 
             var list = new StackPanel { Orientation = Orientation.Vertical };
-            var saved = GetInlineSavedComments(item);
-            if (saved.Count == 0)
+            // Owner 2026-10-24: while a search is typed, the comments that contain it come first (each shown once).
+            var matches = SearchMatchedComments(item);
+            AddInlineMatchingComments(list, item, matches);
+            var saved = GetInlineSavedComments(item)
+                .Where(comment => !IsShownAsMatch(matches, ChecklistCommentSource.Saved, comment))
+                .ToList();
+            if (saved.Count == 0 && matches.Count == 0)
             {
                 list.Children.Add(new TextBlock
                 {
@@ -6704,7 +6708,7 @@ namespace InspectionEditor
                 foreach (string comment in saved)
                     list.Children.Add(CreateInlineSavedCommentRow(item, comment));
             }
-            AddInspectCommentSections(list, item); // F-024
+            AddInspectCommentSections(list, item, matches); // F-024
 
             var scroller = new ScrollViewer
             {
@@ -6726,7 +6730,7 @@ namespace InspectionEditor
             return shell;
         }
 
-        private UIElement CreateInlineSavedCommentRow(Item item, string comment)
+        private UIElement CreateInlineSavedCommentRow(Item item, string comment, bool highlight = false)
         {
             var row = new Grid
             {
@@ -6757,6 +6761,8 @@ namespace InspectionEditor
                 BorderBrush = new SolidColorBrush(Color.FromRgb(216, 180, 254)),
                 ToolTip = comment
             };
+            if (highlight)
+                HighlightMatchingComment(applyButton); // owner 2026-10-24: matches the checklist search
             applyButton.Click += InlineSavedCommentButton_Click;
             Grid.SetColumn(applyButton, 0);
             row.Children.Add(applyButton);
@@ -6782,7 +6788,8 @@ namespace InspectionEditor
 
         private UIElement CreateInlineSavedCommentsDrawer(Item item)
         {
-            var suggestions = GetInlineSavedComments(item);
+            // Owner 2026-10-24: the saved comments that contain the checklist search come first, highlighted.
+            var suggestions = ChecklistCommentSearch.MatchingFirst(GetInlineSavedComments(item), _checklistSearchText);
             if (suggestions.Count == 0)
                 return CreateInlineInfoText("No saved comments yet.");
 
@@ -6817,6 +6824,8 @@ namespace InspectionEditor
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                     ToolTip = comment
                 };
+                if (ChecklistCommentSearch.Contains(comment, _checklistSearchText))
+                    HighlightMatchingComment(button);
                 button.Click += InlineQuickCommentButton_Click;
                 panel.Children.Add(button);
             }
@@ -6877,7 +6886,8 @@ namespace InspectionEditor
             if (string.IsNullOrWhiteSpace(_currentInspectionCode) || string.IsNullOrWhiteSpace(item.Number))
                 return new List<string>();
 
-            return _quickCommentsService.GetSuggestions(_currentInspectionCode, item.Number, 3);
+            // Owner 2026-10-24: while a search is typed, the quick comments that contain it take the slots first.
+            return QuickCommentsMatchingFirst(item, _quickCommentsService.GetSuggestions(_currentInspectionCode, item.Number, 3), 3);
         }
 
         private bool HasInlineSavedComments(Item item) => GetInlineSavedComments(item).Count > 0;
@@ -10016,12 +10026,17 @@ namespace InspectionEditor
         {
             // Invalidate navigation queued for any previously rendered filter/search.
             _checklistFilterGeneration++;
+            var buildTimer = System.Diagnostics.Stopwatch.StartNew();
+            _searchRebuildTimer?.Stop(); // this build supersedes a pending typed-search build
             SectionsTreeView.Items.Clear();
             UpdateResultButton(); // item 14: on open, after edits, read-only changes and close
             if (_currentInspection?.Sections == null) return;
 
             bool hasFilter = !string.IsNullOrWhiteSpace(filter);
             string filterLower = filter?.ToLower() ?? "";
+            _checklistSearchText = filter ?? "";
+            if (hasFilter)
+                RefreshCommentSearchIndex(); // owner 2026-10-24: items also match through their common comments
 
             // SCI (Special Consult) uses Section 1 as actual content — no locking for SCI
             bool isSCI = (_currentInspectionCode ?? "").Equals("SCI", StringComparison.OrdinalIgnoreCase);
@@ -10219,15 +10234,17 @@ namespace InspectionEditor
 
                     if (ChecklistItemVisibility.ShouldShow(item))
                     {
-                        // Apply text filter if present
+                        // Apply text filter if present (owner 2026-10-24: or one of the item's common comments matches)
+                        bool commentOnlyMatch = false;
                         if (hasFilter)
                         {
-                            bool matchesFilter = 
+                            bool matchesFilter =
                                 item.Name?.ToLower().Contains(filterLower) == true ||
                                 item.Number?.ToLower().Contains(filterLower) == true ||
                                 item.Comments?.ToLower().Contains(filterLower) == true;
-                            
-                            if (!matchesFilter) continue;
+                            commentOnlyMatch = IsCommentOnlySearchMatch(item, matchesFilter, filter);
+
+                            if (!matchesFilter && !commentOnlyMatch) continue;
                         }
                         
                         // Apply OFI (Only Fail Items) filter if active
@@ -10314,7 +10331,9 @@ namespace InspectionEditor
                                 Foreground = new SolidColorBrush(nameColor)
                             });
                         }
-                        
+                        if (commentOnlyMatch)
+                            AddCommentSearchMarker(nameText);
+
                         // Use DockPanel: dock number left, dock deviation RIGHT (stays aligned), name fills and wraps
                         var itemPanel = new DockPanel { LastChildFill = true };
                         
@@ -10543,6 +10562,8 @@ namespace InspectionEditor
             UpdateInspectionTotalCounter();
             ApplyChecklistEditorMode();
             PopulateInlineChecklist(filter);
+            RefreshOpenItemCommentMatches(); // owner 2026-10-24: the open item's matching comments follow the search
+            NoteChecklistBuilt(buildTimer);
         }
 
         /// <summary>
@@ -10637,6 +10658,13 @@ namespace InspectionEditor
         {
             if (_resettingChecklistFilters) return;
             string filter = SearchFilterBox.Text;
+            // Owner 2026-10-24: on a report whose list takes long to build, the list follows once typing pauses.
+            if (_lastChecklistBuildMs >= SlowChecklistBuildMs)
+            {
+                _checklistFilterGeneration++; // a queued OFI jump is stale at once
+                ScheduleSearchRebuild();
+                return;
+            }
             PopulateTreeView(filter);
         }
 
@@ -12934,6 +12962,7 @@ namespace InspectionEditor
 
         private void LoadSavedComments()
         {
+            _rightPanelSearchText = _checklistSearchText; // owner 2026-10-24: the search its matches are built with
             SavedCommentsPanel.Children.Clear();
             SavedCommentsPanel.MaxWidth = double.PositiveInfinity;
             
@@ -12944,9 +12973,13 @@ namespace InspectionEditor
                 return;
             }
 
-            var saved = _userDataService.GetSavedComments(_currentInspectionCode, _currentItem.Number ?? "");
-            
-            if (saved.Count == 0)
+            // Owner 2026-10-24: while a search is typed, the item's comments that contain it (from every list) come first.
+            var matches = SearchMatchedComments(_currentItem);
+            var saved = _userDataService.GetSavedComments(_currentInspectionCode, _currentItem.Number ?? "")
+                .Where(comment => !IsShownAsMatch(matches, ChecklistCommentSource.Saved, comment))
+                .ToList();
+
+            if (saved.Count == 0 && matches.Count == 0)
             {
                 SavedCommentsPanel.Children.Add(NoSavedCommentsText);
                 NoSavedCommentsText.Visibility = Visibility.Visible;
@@ -12954,6 +12987,7 @@ namespace InspectionEditor
             }
 
             NoSavedCommentsText.Visibility = Visibility.Collapsed;
+            AddMatchingCommentsToSavedPanel(matches);
 
             foreach (var comment in saved)
             {
@@ -14267,9 +14301,10 @@ namespace InspectionEditor
             if (_currentItem == null || string.IsNullOrEmpty(_currentInspectionCode))
                 return;
 
-            // Get suggestions for this app/item
-            var suggestions = _quickCommentsService.GetSuggestions(_currentInspectionCode, _currentItem.Number ?? "");
-            
+            // Get suggestions for this app/item (owner 2026-10-24: the ones that contain the checklist search first)
+            var suggestions = QuickCommentsMatchingFirst(_currentItem,
+                _quickCommentsService.GetSuggestions(_currentInspectionCode, _currentItem.Number ?? ""), 3);
+
             if (suggestions.Count == 0)
                 return;
 
@@ -14291,6 +14326,7 @@ namespace InspectionEditor
                 QuickSuggestionCText.Text = suggestions[2];
                 QuickSuggestionC.Visibility = Visibility.Visible;
             }
+            MarkQuickSuggestionMatches();
         }
 
         /// <summary>

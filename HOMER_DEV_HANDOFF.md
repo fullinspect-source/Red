@@ -4,6 +4,69 @@ This file is the concise cross-session source of development context for work pe
 
 ## Latest Changes
 
+### 2026-10-24 — RED 2.3.16 — the checklist search also finds items through their comments (owner; F-024 SPEC §6)
+
+- **Base:** 2.3.15 (`afd51a7`). Built and tested in `Dropbox\P\PL` by the tablet-fixes session (local_12a4b014), then
+  ported here as line edits (PL's `MainWindow.xaml.cs` is older than this tree's; the `ChecklistCommentSnippet` lines
+  stay). PL's two unreleased F-027 changes (section "N items to fix", the ORDERS check after Remove) are NOT in this
+  release.
+  - The owner: "the left panel has a search / filter tool for the checklist .. and it searches the text of the
+    checklist .. what it should do instead is search and return the checklist items with text matching the search but
+    also return checklist items with the common comments matching the search even if the actual text of the checklist
+    does not have a match". Release: "Yes. Release the comment-aware checklist search as the next RED version once
+    vetted, with the usual checks."
+- **Files:**
+  - `Services/ChecklistCommentSearch.cs` (new): `ChecklistCommentIndex` (per item, read once, keyed by number and
+    ItemId; `HasMatch`, `Matching`), `ChecklistCommentSearch` (`Match` Label/CommentOnly/None, `MatchingFirst`,
+    `Contains`, `SourceLabel`, the marker text).
+  - `MainWindow.CommentSearch.cs` (new): the per-report index (`RefreshCommentSearchIndex`, stamp of the quick-comments
+    file, the four `.cmt` files and the saved-comments file), the marker, the "🔍 Matches" groups for the right panel and
+    the v2.1 drawer, quick-slot ordering and highlight, and the typing pause (`SlowChecklistBuildMs` 150,
+    `SearchRebuildDelay` 300 ms, measured at ContextIdle).
+  - `MainWindow.xaml.cs`: `PopulateTreeView` (index refresh, comment match, marker, build timer, stops a pending typed
+    build), `SearchFilterBox_TextChanged` (pause on slow lists), `PopulateInlineChecklist`, `ShouldShowInlineItem`,
+    `CreateInlineItemHeader` (chip), the comment drawer's quick slots, `CreateInlineSavedCommentsSidePanel`,
+    `CreateInlineSavedCommentRow(highlight)`, `CreateInlineSavedCommentsDrawer`, `GetInlineQuickComments`,
+    `LoadSavedComments`, `UpdateQuickSuggestionsOverlay`.
+  - `MainWindow.ItemGroups.cs` (grid cells match through comments), `MainWindow.CommentLibraries.cs` (entries shown as
+    matches are not repeated).
+  - `Services/QuickCommentsService.cs` (`AllSuggestionsFor`, `SuggestionsByItem`, `Stamp`),
+    `Services/UserDataService.cs` (`GetSavedCommentsByItem`, `SavedCommentsStamp`), `Services/InspectCommentLibrary.cs`
+    (`All`, `Stamp`).
+  - `tests/ChecklistCommentSearchHarness` (new, A-024-05 to 18); `tests/checklist_filter_reset_test.py` (doubles for the
+    typing pause plus one check).
+  - Version 2.3.16 and ReleaseDate 2026-10-24 in the csproj and the four release-metadata tests; release notes; this
+    handoff.
+- **Behavior:**
+  - The search lists an item when its own text (unchanged rule) or any common comment contains the search text
+    (case-insensitive): all quick comments for the item, Company comments, My INSPECT comments, My saved comments.
+  - "🔍 in comments" marks rows listed only through a comment.
+  - With a search typed, the opened item lists its matching comments first, highlighted, with the list's name; one
+    tap applies (saved and quick comments as a saved comment, INSPECT entries the INSPECT way).
+  - OFI, REQ and INC still filter on top; ALL clears. With an empty search nothing changes.
+  - A list that took 150 ms or more to build waits for a 300 ms pause in typing; quicker lists rebuild per key.
+- **Verification:** an independent review found 7 issues (no data loss); all fixed before release:
+  1. the open item's comment lists now follow the search the list was built with (also after ALL or a new search);
+  2. Company and My INSPECT entries tapped in the right panel are added "existing, entry" (F-024 B2), as in the v2.1
+     drawer;
+  3. a quick comment the user also saved still takes a quick slot;
+  4. leaving the search box builds a pending (paused) search once the tap is handled;
+  5. build time is read at Loaded priority, so open-time background work does not slow a small report's first search;
+  6. with an empty search the quick slots are exactly as before;
+  7. a damaged quick-comments, saved-comments or library file no longer stops the search (logged; own-text matching
+     stays).
+  - This tree: Debug build 0 errors (28 warnings); 48/48 harnesses (ChecklistCommentSearchHarness 17/17,
+    CommentSnippetHarness 53, TabletUiHarness 24, PdfCleanupHarness 52); Python (PYTHONUTF8=1) 38/47, the 9 failures all
+    on the known list.
+  - Isolated Red2Dev built from this tree ("RED v2.3.16"), synthetic 632-item CPP report, sandbox lists only: the four
+    lists each list their item with "🔍 in comments"; "GFCI devices tested" has no marker; no match shows the empty
+    message; OFI with a search; ALL clears; the open item lists the matching comment first and one tap applies it; the
+    open item follows a new search and ALL; a company entry is added as "Truck late, Weep screed buried below grade".
+  - Speed (in-app timing in PL, same code): narrowing keys 13-25 ms with and without the change; the ~2.9 s full-list
+    rebuild of that report in the v2.1 view is not new; typing a broad word now freezes once after the pause.
+  - Not run: the corpus round trip (save code unchanged); the packaged smoke start (a non-dev Red.exe would use the real
+    profile and Inspections folder).
+- **Deployment:** pending.
 ### 2026-10-23 — RED 2.3.15 — the orientation switch follows Windows' rotation lock (F-027 L4, RedCamera.Core 1.4.0)
 
 - **Base:** 2.3.14 (`c9e06d3`, another session's license-policy release, published while this one was in its checks). Built in `Dropbox\P\PL` by the F-027 camera session.

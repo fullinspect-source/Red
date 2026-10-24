@@ -69,6 +69,9 @@ class Harness {
  TreeViewItem SectionsTreeView = new();
  Item edited = new(); int renders, navigations;
  string renderedSearch; int renderedMode;
+ // Owner 2026-10-24: a slow list defers typed searches until typing pauses.
+ double _lastChecklistBuildMs; const double SlowChecklistBuildMs = 150; int scheduled;
+ void ScheduleSearchRebuild() { scheduled++; }
  void UpdateChecklistFilterButtonStyles() {}
  void LoadItemEditor(Item item) { navigations++; Assert(item.Comments == "unsaved edit", "edit retained"); }
  void PopulateTreeView(string filter = null) {
@@ -116,6 +119,10 @@ class Harness {
   Assert(r.navigations == 0, "report switch cancels stale OFI");
   var q = new Harness(); q.Click(1); q.Click(2); q.Click(1); q.Dispatcher.Drain();
   Assert(q.navigations == 1, "OFI REQ OFI generation guard");
+  // A slow list: typing schedules one rebuild instead of rendering per key, and still cancels a stale OFI jump.
+  var d = new Harness(); d.Click(1); d._lastChecklistBuildMs = 500; int rendersBefore = d.renders;
+  d.SearchFilterBox.Text = "g"; d.SearchFilterBox.Text = "gf"; d.Dispatcher.Drain();
+  Assert(d.renders == rendersBefore && d.scheduled == 2 && d.navigations == 0, "slow list defers typed search");
   Console.WriteLine($"PASS: {assertions} runtime assertions; extracted production filter handlers");
  }
 '''

@@ -66,7 +66,8 @@ namespace InspectionEditor
                                item.Number?.ToLowerInvariant().Contains(filterLower) == true ||
                                item.Comments?.ToLowerInvariant().Contains(filterLower) == true ||
                                item.Value?.ToString()?.ToLowerInvariant().Contains(filterLower) == true;
-                if (!matches)
+                // Owner 2026-10-24: a cell also matches through its common comments (the grid shows whole).
+                if (!matches && !MatchesThroughComments(item, filter))
                     return false;
             }
             if (_ofiFilterActive && !string.Equals(item.Value?.ToString(), "Fail", StringComparison.OrdinalIgnoreCase))

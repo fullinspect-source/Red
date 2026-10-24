@@ -1,5 +1,16 @@
 # RED 2.0 Release Notes
 
+## 2.3.16 — The checklist search also finds items through their comments
+
+- **Search finds more:** the search box above the checklist now also lists an item when one of its common comments
+  contains what you typed, even if the item's own text does not. It looks in all of the item's common comments, your
+  company's and your own INSPECT comment lists, and your saved comments.
+- **"🔍 in comments":** an item listed only because of a comment shows this small tag, so you know why it is there.
+- **The matching comment comes first:** while a search is typed, tap an item and its matching comments are at the top
+  of its comment lists, highlighted, with the list they come from. One tap adds the comment.
+- **OFI, REQ and INC still work with a search**, and ALL clears everything, as before.
+- **Large reports:** when a report's list is slow to redraw, the list waits until you pause typing instead of
+  redrawing on every letter.
 ## 2.3.15 — RED's camera: the orientation switch follows rotation lock
 
 - **Rotation lock on, tablet in landscape:** the "Landscape only" switch is not shown at the top of the camera screen,

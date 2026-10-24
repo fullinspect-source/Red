@@ -34,6 +34,33 @@ namespace InspectionEditor.Services
             return library.TryGetValue(itemId.ToString(System.Globalization.CultureInfo.InvariantCulture), out var list) ? list : Array.Empty<string>();
         }
 
+        /// <summary>One library's entries for every item, keyed by ItemId, read once (owner 2026-10-24: the checklist search).</summary>
+        public static IReadOnlyDictionary<string, List<string>> All(string? inspectionsFolder, Kind kind) =>
+            string.IsNullOrWhiteSpace(inspectionsFolder)
+                ? new Dictionary<string, List<string>>()
+                : Load(Path.Combine(inspectionsFolder, "Data"), kind);
+
+        /// <summary>Changes when any of the four library files changes (owner 2026-10-24: the checklist search's index).</summary>
+        public static string Stamp(string? inspectionsFolder)
+        {
+            if (string.IsNullOrWhiteSpace(inspectionsFolder)) return "none";
+            var parts = new List<string>();
+            foreach (var kind in new[] { Kind.Company, Kind.User })
+                foreach (bool temp in new[] { true, false })
+                {
+                    try
+                    {
+                        var info = new FileInfo(Path.Combine(inspectionsFolder, "Data", FileName(kind, temp)));
+                        parts.Add(info.Exists ? $"{info.LastWriteTimeUtc.Ticks}:{info.Length}" : "-");
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+                    {
+                        parts.Add("?");
+                    }
+                }
+            return string.Join("|", parts);
+        }
+
         // B2: INSPECT's "{0}, {1}"; an empty comment becomes the entry itself.
         public static string Append(string? existing, string entry) =>
             string.IsNullOrWhiteSpace(existing) ? entry : $"{existing}, {entry}";

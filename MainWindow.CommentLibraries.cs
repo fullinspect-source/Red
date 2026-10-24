@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -23,12 +25,16 @@ namespace InspectionEditor
         }
 
         // B1/B5: one section per library that has entries for this item; nothing when a library is missing or empty.
-        private void AddInspectCommentSections(Panel list, Item item)
+        // Entries already listed above as matches of the checklist search (owner 2026-10-24) are not repeated.
+        private void AddInspectCommentSections(Panel list, Item item, IReadOnlyList<ChecklistComment>? shownAsMatches = null)
         {
             string? folder = CommentLibraryFolder();
             foreach (var (kind, title) in new[] { (InspectCommentLibrary.Kind.Company, InspectCommentLibrary.CompanyTitle), (InspectCommentLibrary.Kind.User, InspectCommentLibrary.UserTitle) })
             {
-                var entries = InspectCommentLibrary.Entries(folder, kind, item.ItemId);
+                var source = kind == InspectCommentLibrary.Kind.Company ? ChecklistCommentSource.Company : ChecklistCommentSource.InspectUser;
+                var entries = InspectCommentLibrary.Entries(folder, kind, item.ItemId)
+                    .Where(entry => shownAsMatches == null || !IsShownAsMatch(shownAsMatches, source, entry))
+                    .ToList();
                 if (entries.Count == 0)
                     continue;
                 list.Children.Add(new TextBlock

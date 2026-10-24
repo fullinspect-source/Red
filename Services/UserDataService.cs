@@ -226,6 +226,23 @@ namespace InspectionEditor.Services
             return new List<string>();
         }
 
+        /// <summary>All saved comments of one inspection type by item number, read once (owner 2026-10-24: checklist search).</summary>
+        public Dictionary<string, List<string>> GetSavedCommentsByItem(string inspectionCode) => LoadCommentsFile(inspectionCode);
+
+        /// <summary>Changes when the inspection type's saved-comments file changes.</summary>
+        public string SavedCommentsStamp(string inspectionCode)
+        {
+            try
+            {
+                var info = new FileInfo(Path.Combine(_userDataPath, $"comments_{inspectionCode}.json"));
+                return info.Exists ? $"{info.LastWriteTimeUtc.Ticks}:{info.Length}" : "none";
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                return "unreadable";
+            }
+        }
+
         public void SaveComment(string inspectionCode, string itemNumber, string comment)
         {
             var allComments = LoadCommentsFile(inspectionCode);
