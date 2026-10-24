@@ -44,9 +44,20 @@ This file is the concise cross-session source of development context for work pe
     - simulated locked-landscape: hidden, and an upright photo comes out 360x202 with the stored choice OFF;
     - locked-portrait: shown, and that photo is 360x640;
     - the top bar does not move.
-  - This tree: see Deployment.
-  - Not run: the corpus round trip (save code unchanged).
-- **Deployment:** pending.
+  - This tree (`cc7be86`, on 2.3.14):
+    - Debug build `--no-incremental` 0 errors;
+    - `tests\run-harnesses.ps1` 49 of 49 pass;
+    - Python 38/47, all 9 failures among the known 10. 2.3.14's new `license_policy_test` passes, and
+      `ocr_window_rating_test` passed this time.
+  - Not run: the corpus round trip (save code unchanged); the packaged-exe smoke start (it would use the real profile).
+- **Deployment:** released 2026-10-24 00:04 UTC: GitHub v2.3.15 (fullinspect-source/Red), Latest.
+  - Release commit `cc7be86`. `releases/latest` = v2.3.15.
+  - Red-v2.3.15.zip: 93,881,771 bytes, 503 entries, sha256
+    `08ff50269c265562a9bff9671cf179fe9f65d5087c776a31e9a4a1547efb6ad4`. It answers HEAD 200 and downloads
+    byte-identical.
+  - update_red.bat is attached, and its latest link answers 200.
+  - RedCamera.Core 1.4.0 was packed from `cc7be86` (`packages\RedCamera.Core.1.4.0.nupkg`, 63,006 bytes, sha256
+    `0ede9515…0853`) for RED Camera.
 
 ### 2026-10-23 — RED 2.3.13 — photo button labels wrap instead of being cut off
 
