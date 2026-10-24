@@ -66,7 +66,7 @@ This file is the concise cross-session source of development context for work pe
     rebuild of that report in the v2.1 view is not new; typing a broad word now freezes once after the pause.
   - Not run: the corpus round trip (save code unchanged); the packaged smoke start (a non-dev Red.exe would use the real
     profile and Inspections folder).
-- **Deployment:** pending.
+- **Deployment:** released 2026-10-24: GitHub v2.3.16 (fullinspect-source/Red), Latest since 06:34 UTC; release commit `c87ed5b`. `releases/latest` = v2.3.16; Red-v2.3.16.zip 93,892,585 bytes (503 entries, sha256 `beb88cad0f4c165848c0083c7413977693827340c9cd4c7e8c69c33cdb415736`) answers HEAD 200 and downloads byte-identical; update_red.bat attached. Red.dll 2.3.16+c87ed5b.
 ### 2026-10-23 — RED 2.3.15 — the orientation switch follows Windows' rotation lock (F-027 L4, RedCamera.Core 1.4.0)
 
 - **Base:** 2.3.14 (`c9e06d3`, another session's license-policy release, published while this one was in its checks). Built in `Dropbox\P\PL` by the F-027 camera session.
